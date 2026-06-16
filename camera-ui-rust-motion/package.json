@@ -1,0 +1,62 @@
+{
+  "displayName": "Rust Motion",
+  "name": "@camera.ui/camera-ui-rust-motion",
+  "version": "0.0.35",
+  "description": "Lightning-fast motion detection written in Rust. Exceptional performance and reliability for continuous monitoring.",
+  "author": "seydx (https://github.com/seydx/camera.ui)",
+  "main": "./bundle/dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "rimraf dist && tsc",
+    "bundle": "npm run format && npm run lint:fix && npm run build && cui bundle",
+    "bundle:dev": "npm run format && npm run lint:fix && npm run build && cross-env MODE=development cui bundle",
+    "format": "prettier --write \"src/\" --ignore-unknown --no-error-on-unmatched-pattern",
+    "install-updates": "npm i --save",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "prepublishOnly": "node -e \"if(!process.env.SAFE_PUBLISH){console.error('Error: Please use @camera.ui/cli to publish the plugin:\\n  npm run publish:alpha\\n  npm run publish:beta\\n  npm run publish:latest\\n');process.exit(1)}\"",
+    "publish:alpha": "npm i --save && npm run bundle && cui publish --alpha",
+    "publish:beta": "npm i --save && npm run bundle && cui publish --beta",
+    "publish:latest": "npm i --save && npm run bundle && cui publish --latest",
+    "update": "updates --update ./"
+  },
+  "dependencies": {
+    "@camera.ui/sdk": "file:../externals/sdk/node",
+    "@camera.ui/rust-detector": "^0.0.8"
+  },
+  "devDependencies": {
+    "@camera.ui/cli": "file:../externals/cli",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@typescript-eslint/parser": "^8.61.0",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "eslint": "9.39.2",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.4",
+    "rimraf": "^6.1.3",
+    "set-interval-async": "^3.0.3",
+    "sharp": "^0.35.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.61.0",
+    "updates": "^17.18.0"
+  },
+  "bugs": {
+    "url": "https://github.com/seydx/camera.ui/issues"
+  },
+  "homepage": "https://github.com/seydx/camera.ui#readme",
+  "keywords": [
+    "camera-ui-plugin",
+    "rust",
+    "motion",
+    "detection"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seydx/camera.ui.git"
+  },
+  "engines": {
+    "camera.ui": ">=0.0.50",
+    "node": ">=22.0.0"
+  }
+}
