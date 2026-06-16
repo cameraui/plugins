@@ -1,0 +1,56 @@
+{
+  "displayName": "CoreML",
+  "name": "@camera.ui/camera-ui-coreml",
+  "version": "0.0.29",
+  "description": "Consolidated Apple CoreML plugin providing object detection, face detection and recognition, license plate detection with OCR, and CLIP semantic embeddings.",
+  "author": "seydx (https://github.com/seydx/camera.ui)",
+  "main": "./bundle/dist/main.py",
+  "type": "module",
+  "scripts": {
+    "build": "mypy src",
+    "bundle": "npm run format && npm run lint:fix && npm run build && cui bundle",
+    "bundle:dev": "npm run format && npm run lint:fix && npm run build && cross-env MODE=development cui bundle",
+    "format": "ruff format",
+    "install-updates": "npm i --save",
+    "lint": "ruff check",
+    "lint:fix": "ruff check --fix",
+    "prepublishOnly": "node -e \"if(!process.env.SAFE_PUBLISH){console.error('Error: Please use @camera.ui/cli to publish the plugin:\\n  npm run publish:alpha\\n  npm run publish:beta\\n  npm run publish:latest\\n');process.exit(1)}\"",
+    "publish:alpha": "npm i --save && npm run bundle && cui publish --alpha",
+    "publish:beta": "npm i --save && npm run bundle && cui publish --beta",
+    "publish:latest": "npm i --save && npm run bundle && cui publish --latest",
+    "update": "updates --update ./ && cupdate"
+  },
+  "devDependencies": {
+    "@camera.ui/cli": "file:../externals/cli",
+    "@camera.ui/sdk": "file:../externals/sdk/node",
+    "cross-env": "^10.1.0",
+    "updates": "^17.18.0"
+  },
+  "bugs": {
+    "url": "https://github.com/seydx/camera.ui/issues"
+  },
+  "engines": {
+    "camera.ui": ">=0.0.50",
+    "node": ">=22.0.0"
+  },
+  "homepage": "https://github.com/seydx/camera.ui#readme",
+  "keywords": [
+    "camera-ui-plugin",
+    "object",
+    "clip-detection",
+    "clip",
+    "face-detection",
+    "face",
+    "license-plate",
+    "lpd",
+    "ocr",
+    "alpr",
+    "coreml",
+    "detection"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seydx/camera.ui.git"
+  }
+}
