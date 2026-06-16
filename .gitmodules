@@ -10,3 +10,6 @@
 [submodule "externals/ring"]
 	path = externals/ring
 	url = https://github.com/seydx/ring.git
+[submodule "externals/hap"]
+	path = externals/hap
+	url = https://github.com/seydx/HAP-NodeJS.git
