@@ -1,0 +1,11 @@
+{
+  "homes": [
+    {
+      "name": "Demo",
+      "email": "test@test.com",
+      "password": "demo",
+      "token": "token",
+      "locationIds": ["locationId"]
+    }
+  ]
+}

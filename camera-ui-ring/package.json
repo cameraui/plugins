@@ -1,14 +1,14 @@
 {
-  "displayName": "Onvif",
-  "name": "@camera.ui/camera-ui-onvif",
-  "version": "0.0.1",
-  "description": "ONVIF integration for camera.ui. Provides PTZ control and motion detection via ONVIF Events.",
+  "displayName": "Ring",
+  "name": "@camera.ui/camera-ui-ring",
+  "version": "0.0.65",
+  "description": "Integrate Ring security cameras seamlessly. Access live feeds, manage recordings, and control Ring device settings.",
   "author": "seydx (https://github.com/seydx/camera.ui)",
-  "type": "module",
   "main": "./bundle/dist/index.js",
+  "type": "module",
   "scripts": {
-    "build": "rimraf dist && npm run build:onvif && tsc",
-    "build:onvif": "npm --prefix ../externals/onvif ci --ignore-scripts && npm --prefix ../externals/onvif run build",
+    "build": "rimraf dist && npm run build:ring && tsc",
+    "build:ring": "npm --prefix ../externals/ring ci --ignore-scripts && npm --prefix ../externals/ring run build",
     "bundle": "npm run format && npm run lint:fix && npm run build && cui bundle",
     "bundle:dev": "npm run format && npm run lint:fix && npm run build && cross-env MODE=development cui bundle",
     "format": "prettier --write \"src/\" --ignore-unknown --no-error-on-unmatched-pattern",
@@ -23,13 +23,15 @@
   },
   "dependencies": {
     "@camera.ui/sdk": "file:../externals/sdk/node",
-    "@seydx/onvif": "file:../externals/onvif"
+    "ring-client-api": "file:../externals/ring"
   },
   "devDependencies": {
     "@camera.ui/cli": "file:../externals/cli",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "25.9.3",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/parser": "^8.61.0",
+    "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
     "globals": "^17.6.0",
@@ -43,14 +45,14 @@
     "url": "https://github.com/seydx/camera.ui/issues"
   },
   "engines": {
-    "camera.ui": ">=0.0.50",
-    "node": ">=20.19.0"
+    "camera.ui": ">=0.0.66",
+    "node": ">=22.0.0"
   },
   "homepage": "https://github.com/seydx/camera.ui#readme",
   "keywords": [
     "camera-ui-plugin",
-    "ptz",
-    "onvif"
+    "ring",
+    "webrtc"
   ],
   "license": "MIT",
   "repository": {

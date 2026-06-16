@@ -7,3 +7,6 @@
 [submodule "externals/onvif"]
 	path = externals/onvif
 	url = https://github.com/seydx/onvif
+[submodule "externals/ring"]
+	path = externals/ring
+	url = https://github.com/seydx/ring.git
