@@ -1,0 +1,28 @@
+{
+  "entries": ["./assembly/console.ts", "./assembly/index.ts"],
+  "options": {
+    "memoryBase": 1,
+    "initialMemory": 128,
+    "bindings": "raw",
+    "enable": ["relaxed-simd"],
+    "runtime": "minimal",
+    "exportRuntime": true
+  },
+  "targets": {
+    "debug": {
+      "binaryFile": "build/untouched.wasm",
+      "textFile": "build/untouched.wat",
+      "sourceMap": true,
+      "debug": true
+    },
+    "release": {
+      "outFile": "build/detector.wasm",
+      "sourceMap": false,
+      "debug": false,
+      "optimizeLevel": 3,
+      "shrinkLevel": 1,
+      "converge": true,
+      "noAssert": true
+    }
+  }
+}

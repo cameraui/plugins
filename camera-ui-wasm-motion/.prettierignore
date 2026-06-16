@@ -1,0 +1,11 @@
+coverage/
+dist/
+__snapshots__/
+media/
+package-lock.json
+*.md
+interface/
+node_modules/
+bundle/
+build/
+src/wasm/assembly/
