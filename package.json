@@ -5,7 +5,13 @@
   "description": "camera.ui plugins monorepo",
   "type": "module",
   "scripts": {
-    "build:externals": "npm --prefix externals/cli ci --ignore-scripts && npm --prefix externals/cli run build && npm --prefix externals/sdk/node ci --ignore-scripts && npm --prefix externals/sdk/node run build"
+    "build": "tsx ./scripts/build.ts",
+    "build:externals": "npm --prefix externals/cli ci --ignore-scripts && npm --prefix externals/cli run build && npm --prefix externals/sdk/node ci --ignore-scripts && npm --prefix externals/sdk/node run build",
+    "bundle": "cross-env MODE=development tsx ./scripts/bundle.ts",
+    "format": "tsx ./scripts/format.ts",
+    "install-updates": "npm i --save && tsx ./scripts/install.ts",
+    "lint": "tsx ./scripts/lint.ts",
+    "update": "updates --update ./ && cupdate && npm i --save && tsx ./scripts/update.ts"
   },
   "homepage": "https://github.com/cameraui/plugins#readme",
   "bugs": {
@@ -19,6 +25,8 @@
   "author": "seydx",
   "devDependencies": {
     "@types/node": "^25.9.3",
+    "chalk": "^5.6.2",
+    "cross-env": "^10.1.0",
     "tsx": "^4.22.4",
     "typescript": "5.9.3",
     "updates": "^17.18.0"
