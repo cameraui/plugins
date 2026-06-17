@@ -50,7 +50,7 @@ export class CameraAccessory extends Subscribed {
   private published = false;
   private cameraSeenOnline = false;
 
-  private publishedExternalAccessories = new Map<MacAddress, Accessory>();
+  private publishedExternalAccessories: Map<MacAddress, Accessory>;
   private accessoryPort: number | undefined;
 
   private get advertiser(): MDNSAdvertiser {
@@ -64,6 +64,7 @@ export class CameraAccessory extends Subscribed {
     this.logger = platform.logger;
     this.cameraLogger = cameraDevice.logger;
     this.cameraDevice = cameraDevice;
+    this.publishedExternalAccessories = platform.publishedExternalAccessories;
 
     this.cameraStorage = this.createCameraStorage();
 
