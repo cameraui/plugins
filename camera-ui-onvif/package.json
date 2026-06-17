@@ -3,7 +3,7 @@
   "name": "@camera.ui/camera-ui-onvif",
   "version": "0.0.1",
   "description": "ONVIF integration for camera.ui. Provides PTZ control and motion detection via ONVIF Events.",
-  "author": "seydx (https://github.com/seydx/camera.ui)",
+  "author": "seydx (https://github.com/cameraui/plugins)",
   "type": "module",
   "main": "./bundle/dist/index.js",
   "scripts": {
@@ -40,13 +40,13 @@
     "updates": "^17.18.0"
   },
   "bugs": {
-    "url": "https://github.com/seydx/camera.ui/issues"
+    "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
     "camera.ui": ">=0.0.50",
     "node": ">=20.19.0"
   },
-  "homepage": "https://github.com/seydx/camera.ui#readme",
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-onvif#readme",
   "keywords": [
     "camera-ui-plugin",
     "ptz",
@@ -55,6 +55,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/seydx/camera.ui.git"
+    "url": "git+https://github.com/cameraui/plugins.git",
+    "directory": "camera-ui-onvif"
   }
 }

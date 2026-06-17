@@ -3,7 +3,7 @@
   "name": "@camera.ui/camera-ui-ring",
   "version": "0.0.65",
   "description": "Integrate Ring security cameras seamlessly. Access live feeds, manage recordings, and control Ring device settings.",
-  "author": "seydx (https://github.com/seydx/camera.ui)",
+  "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
   "type": "module",
   "scripts": {
@@ -42,13 +42,13 @@
     "updates": "^17.18.0"
   },
   "bugs": {
-    "url": "https://github.com/seydx/camera.ui/issues"
+    "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
     "camera.ui": ">=0.0.66",
     "node": ">=22.0.0"
   },
-  "homepage": "https://github.com/seydx/camera.ui#readme",
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-ring#readme",
   "keywords": [
     "camera-ui-plugin",
     "ring",
@@ -57,6 +57,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/seydx/camera.ui.git"
+    "url": "git+https://github.com/cameraui/plugins.git",
+    "directory": "camera-ui-ring"
   }
 }

@@ -3,7 +3,7 @@
   "name": "@camera.ui/camera-ui-wasm-motion",
   "version": "0.0.19",
   "description": "Browser-based motion detection using WebAssembly. Fast, client-side movement analysis with cross-platform support.",
-  "author": "seydx (https://github.com/seydx/camera.ui)",
+  "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
   "type": "module",
   "scripts": {
@@ -47,13 +47,13 @@
     "updates": "^17.18.0"
   },
   "bugs": {
-    "url": "https://github.com/seydx/camera.ui/issues"
+    "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
     "camera.ui": ">=0.0.50",
     "node": ">=22.0.0"
   },
-  "homepage": "https://github.com/seydx/camera.ui#readme",
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-wasm-motion#readme",
   "keywords": [
     "camera-ui-plugin",
     "smtp",
@@ -63,6 +63,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/seydx/camera.ui.git"
+    "url": "git+https://github.com/cameraui/plugins.git",
+    "directory": "camera-ui-wasm-motion"
   }
 }

@@ -3,7 +3,7 @@
   "name": "@camera.ui/camera-ui-rust-motion",
   "version": "0.0.35",
   "description": "Lightning-fast motion detection written in Rust. Exceptional performance and reliability for continuous monitoring.",
-  "author": "seydx (https://github.com/seydx/camera.ui)",
+  "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
   "type": "module",
   "scripts": {
@@ -41,9 +41,9 @@
     "updates": "^17.18.0"
   },
   "bugs": {
-    "url": "https://github.com/seydx/camera.ui/issues"
+    "url": "https://github.com/cameraui/plugins/issues"
   },
-  "homepage": "https://github.com/seydx/camera.ui#readme",
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-rust-motion#readme",
   "keywords": [
     "camera-ui-plugin",
     "rust",
@@ -53,7 +53,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/seydx/camera.ui.git"
+    "url": "git+https://github.com/cameraui/plugins.git",
+    "directory": "camera-ui-rust-motion"
   },
   "engines": {
     "camera.ui": ">=0.0.50",
