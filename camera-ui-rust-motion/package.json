@@ -21,12 +21,13 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "@camera.ui/sdk": "file:../externals/sdk/node",
-    "@camera.ui/rust-detector": "^0.0.8"
+    "@camera.ui/rust-detector": "^0.0.8",
+    "@camera.ui/sdk": "file:../externals/sdk/node"
   },
   "devDependencies": {
     "@camera.ui/cli": "file:../externals/cli",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^25.9.3",
     "@typescript-eslint/parser": "^8.61.1",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
