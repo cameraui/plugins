@@ -1,0 +1,13 @@
+{
+  "homes": [
+    {
+      "username": "demo",
+      "password": "demo",
+      "country": "US",
+      "deviceName": "camera.ui",
+      "pollingIntervalMinutes": 10,
+      "ignoreDevices": [],
+      "debug": false
+    }
+  ]
+}
