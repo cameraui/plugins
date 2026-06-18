@@ -21,7 +21,7 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "@camera.ui/rust-detector": "^0.0.8",
+    "@camera.ui/rust-detector": "^0.0.10",
     "@camera.ui/sdk": "file:../externals/sdk/node"
   },
   "devDependencies": {

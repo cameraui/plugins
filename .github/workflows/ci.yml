@@ -22,7 +22,7 @@ jobs:
       node: ${{ steps.select.outputs.node }}
       python: ${{ steps.select.outputs.python }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -62,7 +62,7 @@ jobs:
     if: needs.changes.outputs.node != '[]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Init submodules (cli + sdk)
         run: git submodule update --init --depth 1 externals/cli externals/sdk
       - uses: actions/setup-node@v6
@@ -87,7 +87,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.node) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Init submodules
         run: git submodule update --init --depth 1 externals/cli externals/sdk ${{ matrix.externals }}
@@ -120,7 +120,7 @@ jobs:
       matrix:
         plugin: ${{ fromJSON(needs.changes.outputs.python) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
