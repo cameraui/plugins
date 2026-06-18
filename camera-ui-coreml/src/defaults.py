@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-MODEL_BASE_URL = "https://raw.githubusercontent.com/seydx/models/main/models/coreml"
-MODEL_LFS_URL = "https://media.githubusercontent.com/media/seydx/models/main/models/coreml"
+MODEL_BASE_URL = "https://raw.githubusercontent.com/cameraui/models/main/models/coreml"
+MODEL_LFS_URL = "https://media.githubusercontent.com/media/cameraui/models/main/models/coreml"
 
 model_version = "v1"
 
