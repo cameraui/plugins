@@ -11,6 +11,7 @@
     "format": "tsx ./scripts/format.ts",
     "install-updates": "npm i --save && tsx ./scripts/install.ts",
     "lint": "tsx ./scripts/lint.ts",
+    "setup": "tsx ./scripts/setup.ts",
     "update": "updates --update ./ && cupdate && npm i --save && tsx ./scripts/update.ts"
   },
   "homepage": "https://github.com/cameraui/plugins#readme",
