@@ -53,12 +53,6 @@ const directories = [
   '../camera-ui-tuya',
   '../camera-ui-wasm-motion',
   '../camera-ui-wyze',
-  '../mockups/camera-ui-mock-motion',
-  '../mockups/camera-ui-mock-object',
-  '../mockups/camera-ui-mock-tuya',
-  '../mockups/camera-ui-test-node',
-  '../mockups/camera-ui-test-go',
-  '../mockups/camera-ui-test-python',
 ];
 
 runCommandsInDirectories(directories);

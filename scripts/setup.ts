@@ -34,17 +34,9 @@ function venvPython(): string {
 function pluginRequirements(): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(ROOT, { withFileTypes: true })) {
-    if (entry.name.startsWith("camera-ui-")) {
-      const req = join(ROOT, entry.name, "requirements.txt");
-      if (existsSync(req)) found.push(req);
-    } else if (entry.name === "mockups" && existsSync(join(ROOT, "mockups"))) {
-      for (const mock of readdirSync(join(ROOT, "mockups"), {
-        withFileTypes: true,
-      })) {
-        const req = join(ROOT, "mockups", mock.name, "requirements.txt");
-        if (existsSync(req)) found.push(req);
-      }
-    }
+    if (!entry.name.startsWith("camera-ui-")) continue;
+    const req = join(ROOT, entry.name, "requirements.txt");
+    if (existsSync(req)) found.push(req);
   }
   return found;
 }
