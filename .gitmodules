@@ -13,6 +13,3 @@
 [submodule "externals/hap"]
 	path = externals/hap
 	url = https://github.com/seydx/HAP-NodeJS.git
-[submodule "externals/common"]
-	path = externals/common
-	url = https://github.com/cameraui/common.git
