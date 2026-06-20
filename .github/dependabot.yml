@@ -3,16 +3,16 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: "npm"
     directories:
       - "/"
       - "/camera-ui-*"
     schedule:
-      interval: weekly
+      interval: daily
   - package-ecosystem: "pip"
     directories:
       - "/"
       - "/camera-ui-*"
     schedule:
-      interval: weekly
+      interval: daily
