@@ -21,7 +21,7 @@
     "update": "updates --update ./"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.54",
+    "@camera.ui/cli": "^0.0.55",
     "@camera.ui/sdk": "^0.0.7",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.0.0",

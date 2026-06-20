@@ -1,3 +1,3 @@
 export default {
-  exclude: ['typescript', 'eslint', '@camera.ui/cli', '@camera.ui/sdk', 'ring-client-api'],
+  exclude: ['typescript', 'eslint', 'ring-client-api'],
 };
