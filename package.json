@@ -13,7 +13,7 @@
     "lint": "tsx ./scripts/lint.ts",
     "presetup": "npm install",
     "setup": "tsx ./scripts/setup.ts",
-    "update": "updates --update ./ && cupdate && npm i --save && tsx ./scripts/update.ts"
+    "update": "updates --update ./ && cupdate && tsx ./scripts/update.ts"
   },
   "homepage": "https://github.com/cameraui/plugins#readme",
   "bugs": {
