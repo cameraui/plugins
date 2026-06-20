@@ -35,7 +35,7 @@
     "assemblyscript": "^0.28.19",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "eslint": "9.39.2",
+    "eslint": "10.5.0",
     "fs-extra": "^11.3.5",
     "globals": "^17.6.0",
     "prettier": "^3.8.4",
