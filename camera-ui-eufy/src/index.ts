@@ -1,6 +1,8 @@
 import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 import { installNativeLogging } from '@seydx/rtsp';
 import { Device, EufySecurity, P2PConnectionType } from 'eufy-security-client';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { Camera } from './camera.js';
 import { COUNTRIES, getCountryCode, PromiseTimeout } from './utils.js';
@@ -634,12 +636,17 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         },
       };
 
+      const homeKey = home.name?.replace(/[^\w.-]/g, '_') || 'default';
+      const persistentDir = resolve(this.api.storagePath, homeKey);
+      mkdirSync(persistentDir, { recursive: true });
+
       const eufyConfig: EufySecurityConfig = {
         username: home.username,
         password: home.password,
         country: getCountryCode(home.country),
         trustedDeviceName: home.deviceName,
         language: 'en',
+        persistentDir,
         p2pConnectionSetup: P2PConnectionType.QUICKEST,
         pollingIntervalMinutes: 10,
         eventDurationSeconds: 10,
