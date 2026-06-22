@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "camera-ui-*-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      plugin: ${{ steps.resolve.outputs.plugin }}
+      version: ${{ steps.resolve.outputs.version }}
+      runtime: ${{ steps.resolve.outputs.runtime }}
+      externals: ${{ steps.resolve.outputs.externals }}
+      dist_tag: ${{ steps.resolve.outputs.dist_tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: resolve
+        run: node .github/scripts/resolve-release.mjs
+
+  publish:
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # OIDC: npm provenance + trusted publishing (no NPM_TOKEN)
+    env:
+      PLUGIN: ${{ needs.resolve.outputs.plugin }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Init submodule
+        if: needs.resolve.outputs.externals != ''
+        run: git submodule update --init --depth 1 ${{ needs.resolve.outputs.externals }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Python
+        if: needs.resolve.outputs.runtime == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Python deps (shared tools + plugin-specific)
+        if: needs.resolve.outputs.runtime == 'python'
+        run: pip install -r requirements.txt -r "$PLUGIN/requirements.txt"
+
+      - name: Verify tag matches plugin package.json version
+        run: |
+          PKG="$(node -p "require('./$PLUGIN/package.json').version")"
+          echo "tag=$VERSION package.json=$PKG"
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::tag version $VERSION does not match $PLUGIN/package.json version $PKG"
+            exit 1
+          fi
+
+      - name: Install plugin dependencies
+        run: npm --prefix "$PLUGIN" install --ignore-scripts
+
+      - name: Build
+        run: npm --prefix "$PLUGIN" run build
+
+      - name: Bundle
+        working-directory: ${{ needs.resolve.outputs.plugin }}
+        run: npx cui bundle
+
+      - name: Publish to npm (provenance via OIDC)
+        working-directory: ${{ needs.resolve.outputs.plugin }}
+        run: |
+          npm install -g npm@latest
+          npx cui publish --${{ needs.resolve.outputs.dist_tag }} --yes --provenance
