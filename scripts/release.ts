@@ -28,8 +28,7 @@ function usage(): never {
   console.log(
     [
       '',
-      chalk.bold('Usage:') +
-        ' tsx scripts/release.ts <plugin> <version|major|minor|patch> [--yes] [--skip-checks]',
+      chalk.bold('Usage:') + ' tsx scripts/release.ts <plugin> <version|major|minor|patch> [--yes] [--skip-checks]',
       '',
       'Examples:',
       '  tsx scripts/release.ts camera-ui-homekit patch',
@@ -57,8 +56,7 @@ function git(cmd: string, opts: { capture?: boolean } = {}): string {
 
 function bump(current: string, spec: 'major' | 'minor' | 'patch'): string {
   const [major, minor, patch] = current.split('-')[0].split('.').map(Number);
-  if ([major, minor, patch].some(Number.isNaN))
-    fail(`Cannot bump non-numeric version '${current}'.`);
+  if ([major, minor, patch].some(Number.isNaN)) fail(`Cannot bump non-numeric version '${current}'.`);
   if (spec === 'major') return `${major + 1}.0.0`;
   if (spec === 'minor') return `${major}.${minor + 1}.0`;
   return `${major}.${minor}.${patch + 1}`;
@@ -107,14 +105,8 @@ async function main(): Promise<void> {
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
   const current: string = pkg.version;
 
-  const next =
-    spec === 'major' || spec === 'minor' || spec === 'patch'
-      ? bump(current, spec)
-      : spec;
-  if (!SEMVER.test(next))
-    fail(
-      `Invalid version '${next}' (expected X.Y.Z or X.Y.Z-alpha.N / -beta.N).`,
-    );
+  const next = spec === 'major' || spec === 'minor' || spec === 'patch' ? bump(current, spec) : spec;
+  if (!SEMVER.test(next)) fail(`Invalid version '${next}' (expected X.Y.Z or X.Y.Z-alpha.N / -beta.N).`);
 
   const tag = `${plugin}-v${next}`;
   try {
@@ -124,11 +116,7 @@ async function main(): Promise<void> {
     // tag does not exist - good
   }
 
-  console.log(
-    chalk.cyan(
-      `\r\nReleasing ${chalk.bold(plugin)}: ${current} -> ${chalk.bold(next)} (tag ${tag})\r\n`,
-    ),
-  );
+  console.log(chalk.cyan(`\r\nReleasing ${chalk.bold(plugin)}: ${current} -> ${chalk.bold(next)} (tag ${tag})\r\n`));
 
   if (!skipChecks) {
     console.log(chalk.yellow(`Running lint + build for ${plugin}...`));
@@ -156,30 +144,18 @@ async function main(): Promise<void> {
   console.log(chalk.green(`Created tag ${tag}.`));
 
   if (!yes) {
-    const ok = await confirm(
-      `Push main + ${tag} and trigger the release? [y/N] `,
-    );
+    const ok = await confirm(`Push main + ${tag} and trigger the release? [y/N] `);
     if (!ok) {
       git(`tag -d ${tag}`, { capture: true });
       git('reset -q --hard HEAD~1', { capture: true });
-      console.log(
-        chalk.yellow('Aborted - tag and bump commit were undone locally.'),
-      );
+      console.log(chalk.yellow('Aborted - tag and bump commit were undone locally.'));
       process.exit(0);
     }
   }
 
   git('push -q origin main');
   git(`push -q origin ${tag}`);
-  console.log(
-    '\r\n',
-    chalk.bgGreen(' SUCCESS '),
-    chalk.green(
-      'Pushed. Watch the release workflow under the repo Actions tab.',
-    ),
-  );
+  console.log('\r\n', chalk.bgGreen(' SUCCESS '), chalk.green('Pushed. Watch the release workflow under the repo Actions tab.'));
 }
 
-main().catch((error) =>
-  fail(error instanceof Error ? error.message : String(error)),
-);
+main().catch((error) => fail(error instanceof Error ? error.message : String(error)));

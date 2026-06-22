@@ -16,7 +16,11 @@ function runCommandsInDirectory(directoryPath: string) {
     console.log(chalk.cyan('DIR:', fullPath));
     console.log(chalk.cyan(`COMMAND: ${cmd}\r\n`));
 
-    execSync(cmd, { stdio: 'inherit', cwd: fullPath, env: { ...process.env, MODE: 'development' } });
+    execSync(cmd, {
+      stdio: 'inherit',
+      cwd: fullPath,
+      env: { ...process.env, MODE: 'development' },
+    });
 
     console.log('\r\n', chalk.bgGreen(' SUCCESS '), chalk.green(`Command completed in ${fullPath}`));
   } catch (error) {
