@@ -53,6 +53,7 @@ jobs:
             camera-ui-eufy: ['camera-ui-eufy/**']
             camera-ui-opencl: ['camera-ui-opencl/**']
             camera-ui-opencv: ['camera-ui-opencv/**']
+            camera-ui-openvino: ['camera-ui-openvino/**']
             camera-ui-wyze: ['camera-ui-wyze/**']
       - id: select
         env:

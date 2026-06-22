@@ -22,6 +22,9 @@ opencl:
 opencv:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-opencv/**'
+openvino:
+  - changed-files:
+      - any-glob-to-any-file: 'camera-ui-openvino/**'
 pamdiff:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-pamdiff/**'

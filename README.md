@@ -11,6 +11,7 @@ Official plugins for the camera.ui ecosystem.
 | [ONVIF](camera-ui-onvif)               | `@camera.ui/camera-ui-onvif`        |
 | [OpenCL](camera-ui-opencl)             | `@camera.ui/camera-ui-opencl`       |
 | [OpenCV](camera-ui-opencv)             | `@camera.ui/camera-ui-opencv`       |
+| [OpenVino](camera-ui-openvino)         | `@camera.ui/camera-ui-openvino`     |
 | [Pam Diff](camera-ui-pamdiff)          | `@camera.ui/camera-ui-pamdiff`      |
 | [Ring](camera-ui-ring)                 | `@camera.ui/camera-ui-ring`         |
 | [Rust Motion](camera-ui-rust-motion)   | `@camera.ui/camera-ui-rust-motion`  |

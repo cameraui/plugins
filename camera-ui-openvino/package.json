@@ -1,8 +1,8 @@
 {
-  "displayName": "ONNX",
-  "name": "@camera.ui/camera-ui-onnx",
+  "displayName": "OpenVino",
+  "name": "@camera.ui/camera-ui-openvino",
   "version": "0.0.1",
-  "description": "Consolidated ONNX plugin providing object detection, face detection and recognition, license plate detection with OCR, and CLIP semantic embeddings.",
+  "description": "Consolidated OpenVino plugin providing object detection, face detection and recognition, license plate detection with OCR, and CLIP semantic embeddings.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
   "type": "module",
@@ -33,7 +33,7 @@
     "camera.ui": ">=0.0.50",
     "node": ">=22.0.0"
   },
-  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-onnx#readme",
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-openvino#readme",
   "keywords": [
     "camera-ui-plugin",
     "object",
@@ -45,13 +45,13 @@
     "lpd",
     "ocr",
     "alpr",
-    "onnx",
+    "openvino",
     "detection"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
-    "directory": "camera-ui-onnx"
+    "directory": "camera-ui-openvino"
   }
 }

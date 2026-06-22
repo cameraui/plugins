@@ -14,6 +14,7 @@ labels=(
   "onvif|c5def5|Changes to the ONVIF plugin"
   "opencl|c5def5|Changes to the OpenCL plugin"
   "opencv|c5def5|Changes to the OpenCV plugin"
+  "openvino|c5def5|Changes to the OpenVINO plugin"
   "pamdiff|c5def5|Changes to the Pam Diff plugin"
   "ring|c5def5|Changes to the Ring plugin"
   "rust-motion|c5def5|Changes to the Rust Motion plugin"

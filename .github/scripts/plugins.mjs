@@ -16,5 +16,6 @@ export const PYTHON = [
   'camera-ui-onnx',
   'camera-ui-opencl',
   'camera-ui-opencv',
+  'camera-ui-openvino',
   'camera-ui-wyze',
 ];
