@@ -24,3 +24,4 @@ __pycache__
 *.egg-info
 .venv
 .tmp
+/templates

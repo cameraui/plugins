@@ -1,1 +1,1 @@
-# @camera.ui/camera-ui-lpd-coreml
+# @camera.ui/camera-ui-coreml

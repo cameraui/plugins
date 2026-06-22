@@ -1,1 +1,1 @@
-# @camera.ui/camera-ui-yamnet
+# @camera.ui/camera-ui-audio-yamnet
