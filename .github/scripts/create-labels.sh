@@ -10,6 +10,7 @@ labels=(
   "coreml|c5def5|Changes to the CoreML plugin"
   "eufy|c5def5|Changes to the Eufy plugin"
   "homekit|c5def5|Changes to the HomeKit plugin"
+  "ncnn|c5def5|Changes to the NCNN plugin"
   "onnx|c5def5|Changes to the ONNX plugin"
   "onvif|c5def5|Changes to the ONVIF plugin"
   "opencl|c5def5|Changes to the OpenCL plugin"

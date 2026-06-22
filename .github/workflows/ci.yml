@@ -49,6 +49,7 @@ jobs:
             camera-ui-wasm-motion: ['camera-ui-wasm-motion/**']
             camera-ui-audio-yamnet: ['camera-ui-audio-yamnet/**']
             camera-ui-coreml: ['camera-ui-coreml/**']
+            camera-ui-ncnn: ['camera-ui-ncnn/**']
             camera-ui-onnx: ['camera-ui-onnx/**']
             camera-ui-eufy: ['camera-ui-eufy/**']
             camera-ui-opencl: ['camera-ui-opencl/**']

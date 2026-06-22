@@ -10,6 +10,9 @@ eufy:
 homekit:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-homekit/**'
+ncnn:
+  - changed-files:
+      - any-glob-to-any-file: 'camera-ui-ncnn/**'
 onnx:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-onnx/**'
