@@ -1,7 +1,7 @@
 {
   "displayName": "Tuya",
   "name": "@camera.ui/camera-ui-tuya",
-  "version": "0.0.37",
+  "version": "0.0.38",
   "description": "Connect and control Tuya-compatible cameras. Access live streams and settings through the Tuya Smart platform.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
