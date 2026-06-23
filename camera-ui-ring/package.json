@@ -1,7 +1,7 @@
 {
   "displayName": "Ring",
   "name": "@camera.ui/camera-ui-ring",
-  "version": "0.0.65",
+  "version": "0.0.66",
   "description": "Integrate Ring security cameras seamlessly. Access live feeds, manage recordings, and control Ring device settings.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
