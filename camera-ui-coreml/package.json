@@ -1,7 +1,7 @@
 {
   "displayName": "CoreML",
   "name": "@camera.ui/camera-ui-coreml",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "description": "Consolidated Apple CoreML plugin providing object detection, face detection and recognition, license plate detection with OCR, and CLIP semantic embeddings.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
