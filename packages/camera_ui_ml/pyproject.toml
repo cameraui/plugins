@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ui-ml"
+version = "1.2.1"
+description = "Shared ML inference framework for camera.ui detection plugins (onnx, openvino, coreml, ncnn)"
+keywords = ["camera.ui", "python", "ml", "inference", "detection"]
+readme = "README.md"
+license-files = ["LICENSE.md"]
+authors = [{ name = "seydx", email = "hi@seydx.dev" }]
+maintainers = [{ name = "seydx", email = "hi@seydx.dev" }]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = ["typing_extensions>=4.15.0", "camera-ui-sdk>=1.0.95", "numpy>=2.0", "pillow>=12.0", "aiohttp>=3.12"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+clip = ["transformers>=4.40"]
+
+[project.urls]
+Homepage = "https://github.com/cameraui/ml"
+Documentation = "https://github.com/cameraui/ml"
+Repository = "https://github.com/cameraui/ml"
+"Bug Tracker" = "https://github.com/cameraui/ml/issues"
+Changelog = "https://github.com/cameraui/ml/blob/main/CHANGELOG.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["camera_ui_ml*"]
+
+[tool.setuptools.package-data]
+camera_ui_ml = ["py.typed"]
