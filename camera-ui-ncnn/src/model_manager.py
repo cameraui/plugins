@@ -8,8 +8,19 @@ import ncnn
 from camera_ui_ml import BaseModelManager, InferenceBackend
 from camera_ui_sdk import LoggerService
 
-from defaults import MODEL_BASE_URL, MODEL_LFS_URL, model_version
+from defaults import (
+    FACE_DETECTOR_MODELS,
+    LPD_DETECTOR_MODELS,
+    MODEL_BASE_URL,
+    MODEL_LFS_URL,
+    OBJECT_MODELS,
+    model_version,
+)
 from inference import NcnnBackend
+
+# Box-detector input px by model name. The pnnx-converted .param carries no input
+# dims, so the size comes from the model registry; embedder/OCR set their own size.
+_BOX_INPUT_SIZES = {**OBJECT_MODELS, **FACE_DETECTOR_MODELS, **LPD_DETECTOR_MODELS}
 
 
 class NcnnModelManager(BaseModelManager):
@@ -33,7 +44,7 @@ class NcnnModelManager(BaseModelManager):
     async def build_backend(self, model_name: str, paths: Mapping[str, str]) -> InferenceBackend:
         use_vulkan = self._get_use_vulkan()
         net = await asyncio.to_thread(self._build, paths["param"], paths["bin"], use_vulkan)
-        size = _input_size(paths["param"])
+        size = _box_input_size(model_name)
         # ncnn silently runs on CPU if Vulkan was requested but no GPU is present.
         device = "Vulkan (GPU)" if use_vulkan and ncnn.get_gpu_count() > 0 else "CPU"
         self.logger.success(f"Loaded model: {model_name} ({device})")
@@ -48,11 +59,8 @@ class NcnnModelManager(BaseModelManager):
         return net
 
 
-def _input_size(param_path: str) -> tuple[int, int]:
-    # The Input layer encodes dims as `0=W 1=H`; parse them from the .param text.
-    with open(param_path) as handle:
-        for line in handle:
-            if line.startswith("Input"):
-                params = dict(p.split("=", 1) for p in line.split() if "=" in p)
-                return (int(params.get("0", 0)), int(params.get("1", 0)))
-    return (0, 0)
+def _box_input_size(model_name: str) -> tuple[int, int]:
+    # Box detectors (object/face/plate) are square; embedder/OCR aren't in the
+    # registry and set their own input size, so (0, 0) for them is harmless.
+    px = _BOX_INPUT_SIZES.get(model_name, 0)
+    return (px, px)
