@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
-import numpy as np
-from camera_ui_sdk import FaceDetection, FaceDetectorSensor, FaceResult, JsonSchema, ModelSpec, VideoFrameData
-from PIL import Image
+from camera_ui_ml import detect_faces
+from camera_ui_sdk import (
+    FaceDetectorSensor,
+    FaceResult,
+    JsonSchema,
+    ModelSpec,
+    VideoFrameData,
+)
 
-from defaults import DEFAULT_FACE_DETECTOR, DEFAULT_FACE_EMBEDDER, FACE_DETECTOR_MODELS, FACE_EMBEDDER_MODELS
+from defaults import (
+    DEFAULT_FACE_DETECTOR,
+    DEFAULT_FACE_EMBEDDER,
+    FACE_DETECTOR_MODELS,
+    FACE_EMBEDDER_MODELS,
+)
 
 if TYPE_CHECKING:
     from camera_ui_sdk import LoggerService
@@ -88,84 +98,10 @@ class CoreMLFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
         detector = self._plugin.face_detectors.get(detector_name)
         embedder = self._plugin.face_embedders.get(embedder_name)
 
-        empty: FaceResult = {"detected": False, "detections": []}
         if detector is None or not detector.initialized or embedder is None or not embedder.initialized:
-            return [empty for _ in frames]
+            return [{"detected": False, "detections": []} for _ in frames]
 
-        # Convert frames to PIL images
-        images: list[Image.Image] = []
-        for frame in frames:
-            np_array: np.ndarray[Any, Any] = np.frombuffer(frame["data"], dtype=np.uint8).reshape(
-                (frame["height"], frame["width"], 3)
-            )
-            needs_resize = frame["width"] != detector.input_width or frame["height"] != detector.input_height
-            img = Image.fromarray(np_array, mode="RGB")
-            if needs_resize:
-                img = img.resize((detector.input_width, detector.input_height))
-            images.append(img)
-
-        # Batch face detection
-        all_boxes = await detector.detect_batch(images, threshold)
-        for img in images:
-            img.close()
-
-        # Per-frame: embed detected faces
-        results: list[FaceResult] = []
-        for i, face_boxes in enumerate(all_boxes):
-            if not face_boxes:
-                results.append(empty)
-                continue
-
-            width, height = frames[i]["width"], frames[i]["height"]
-            data = frames[i]["data"]
-            scale_x = width / detector.input_width
-            scale_y = height / detector.input_height
-            needs_scale = width != detector.input_width or height != detector.input_height
-
-            face_images: list[Image.Image] = []
-            scaled_boxes: list[tuple[float, float, float, float]] = []
-            for face in face_boxes:
-                x1, y1, x2, y2 = face["box"]
-                if needs_scale:
-                    x1, y1, x2, y2 = x1 * scale_x, y1 * scale_y, x2 * scale_x, y2 * scale_y
-                ix1, iy1 = max(0, int(x1)), max(0, int(y1))
-                ix2, iy2 = min(width, int(x2)), min(height, int(y2))
-                if ix2 <= ix1 or iy2 <= iy1:
-                    continue
-                np_frame: np.ndarray[Any, Any] = np.frombuffer(data, dtype=np.uint8).reshape(
-                    (height, width, 3)
-                )
-                face_images.append(Image.fromarray(np_frame[iy1:iy2, ix1:ix2], mode="RGB"))
-                scaled_boxes.append((x1, y1, x2, y2))
-
-            if not face_images:
-                results.append(empty)
-                continue
-
-            embeddings = await embedder.embed_batch(face_images)
-            for img in face_images:
-                img.close()
-
-            detections: list[FaceDetection] = []
-            for j, (x1, y1, x2, y2) in enumerate(scaled_boxes):
-                detections.append(
-                    {
-                        "label": "person",
-                        "attribute": "face",
-                        "confidence": face_boxes[j]["confidence"],
-                        "box": {
-                            "x": x1 / width,
-                            "y": y1 / height,
-                            "width": (x2 - x1) / width,
-                            "height": (y2 - y1) / height,
-                        },
-                        "embedding": embeddings[j] if j < len(embeddings) else [],
-                    }
-                )
-
-            results.append({"detected": len(detections) > 0, "detections": detections})
-
-        return results
+        return await detect_faces(detector, embedder, frames, threshold)
 
     async def destroy(self) -> None:
         pass

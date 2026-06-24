@@ -2,79 +2,60 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Callable, Mapping
 from typing import Any
 
-import aiohttp
 import coremltools as ct
-from camera_ui_sdk import LoggerService, PluginAPI
+from camera_ui_ml import BaseModelManager, InferenceBackend
+from camera_ui_sdk import LoggerService
 
 from defaults import MODEL_BASE_URL, MODEL_LFS_URL, model_version
+from inference import CoreMlBackend
+
+_COMPUTE_UNITS: dict[str, Any] = {
+    "ALL": ct.ComputeUnit.ALL,
+    "CPU_AND_NE": ct.ComputeUnit.CPU_AND_NE,
+    "CPU_AND_GPU": ct.ComputeUnit.CPU_AND_GPU,
+    "CPU_ONLY": ct.ComputeUnit.CPU_ONLY,
+}
+
+_DEVICE_LABELS = {
+    "ALL": "Neural Engine + GPU + CPU",
+    "CPU_AND_NE": "Neural Engine + CPU",
+    "CPU_AND_GPU": "GPU + CPU",
+    "CPU_ONLY": "CPU",
+}
 
 
-class ModelManager:
-    def __init__(self, api: PluginAPI, logger: LoggerService) -> None:
-        self.model_path = os.path.join(f"{api.storagePath}/models/{model_version}")
-        self.logger = logger
-        self._load_tasks: dict[str, asyncio.Task[Any]] = {}
+class CoreMlModelManager(BaseModelManager):
+    def __init__(
+        self,
+        storage_path: str,
+        logger: LoggerService,
+        get_compute_units: Callable[[], str],
+    ) -> None:
+        super().__init__(storage_path, logger, model_version)
+        self._get_compute_units = get_compute_units
 
-    async def ensure_model(self, model_name: str) -> ct.models.MLModel:
-        task = self._load_tasks.get(model_name)
-        if task is None:
-            task = asyncio.create_task(self._load(model_name))
-            self._load_tasks[model_name] = task
-        return await task
+    def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
+        pkg = f"{model_name}.mlpackage"
+        weights = f"{pkg}/Data/com.apple.CoreML/weights/weight.bin"
+        model = f"{pkg}/Data/com.apple.CoreML/model.mlmodel"
+        manifest = f"{pkg}/Manifest.json"
+        return {
+            "weights": (f"{MODEL_LFS_URL}/{weights}", weights),
+            "model": (f"{MODEL_BASE_URL}/{model}", model),
+            "manifest": (f"{MODEL_BASE_URL}/{manifest}", manifest),
+        }
 
-    async def _load(self, model_name: str) -> ct.models.MLModel:
-        await self._download_mlpackage(model_name)
-        ml_path = os.path.join(self.model_path, f"{model_name}.mlpackage")
-        model: ct.models.MLModel = await asyncio.to_thread(ct.models.MLModel, ml_path)
-        self.logger.success(f"Loaded model: {model_name}")
-        return model
+    async def build_backend(self, model_name: str, paths: Mapping[str, str]) -> InferenceBackend:
+        pkg_path = os.path.join(self.model_path, f"{model_name}.mlpackage")
+        mode = self._get_compute_units()
+        units = _COMPUTE_UNITS.get(mode, ct.ComputeUnit.ALL)
+        model = await asyncio.to_thread(self._load_model, pkg_path, units)
+        self.logger.success(f"Loaded model: {model_name} ({mode})")
+        return CoreMlBackend(model, _DEVICE_LABELS.get(mode, mode))
 
-    async def _download_mlpackage(self, model_name: str) -> None:
-        ml_package = f"{model_name}.mlpackage"
-        files = [
-            f"{ml_package}/Data/com.apple.CoreML/weights/weight.bin",
-            f"{ml_package}/Data/com.apple.CoreML/model.mlmodel",
-            f"{ml_package}/Manifest.json",
-        ]
-        for f in files:
-            base = MODEL_LFS_URL if f.endswith(".bin") else MODEL_BASE_URL
-            url = f"{base}/{f}"
-            await self._download_file(url, f)
-
-    async def _download_file(self, url: str, filename: str) -> None:
-        fullpath = os.path.join(self.model_path, filename)
-        if os.path.isfile(fullpath):
-            return
-
-        tmp = fullpath + ".tmp"
-        os.makedirs(os.path.dirname(fullpath), exist_ok=True)
-
-        short_name = os.path.basename(filename)
-        self.logger.log(f"Downloading {short_name}...")
-
-        async with aiohttp.ClientSession() as session, session.get(url) as response:
-            if response.status < 200 or response.status >= 300:
-                raise Exception(f"Error downloading {url}: {response.status}")
-
-            total_size = int(response.headers.get("content-length", 0))
-            downloaded = 0
-            last_percent = 0
-
-            with open(tmp, "wb") as f:
-                async for chunk in response.content.iter_chunked(1024 * 1024):
-                    if chunk:
-                        downloaded += len(chunk)
-                        f.write(chunk)
-
-                        if total_size > 1024 * 1024:
-                            percent = min(100, (downloaded * 100) // total_size)
-                            if percent >= last_percent + 25 and percent <= 100:
-                                last_percent = (percent // 25) * 25
-                                self.logger.log(f"Downloading {short_name}... {last_percent}%")
-
-            size_mb = downloaded / (1024 * 1024)
-            self.logger.log(f"Downloaded {short_name} ({size_mb:.1f} MB)")
-
-        os.rename(tmp, fullpath)
+    @staticmethod
+    def _load_model(pkg_path: str, compute_units: Any) -> Any:
+        return ct.models.MLModel(pkg_path, compute_units=compute_units)

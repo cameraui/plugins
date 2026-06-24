@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
-import numpy as np
+from camera_ui_ml import detect_plates
 from camera_ui_sdk import (
     JsonSchema,
-    LicensePlateDetection,
     LicensePlateDetectorSensor,
     LicensePlateResult,
     ModelSpec,
     VideoFrameData,
 )
-from PIL import Image
 
 from defaults import DEFAULT_LPD_DETECTOR, DEFAULT_OCR, LPD_DETECTOR_MODELS, OCR_MODELS
 
@@ -30,7 +28,10 @@ class LPDStorageValues(TypedDict):
 
 class CoreMLLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     def __init__(
-        self, plugin: CoreMLPlugin, logger: LoggerService, name: str = "CoreML License Plate"
+        self,
+        plugin: CoreMLPlugin,
+        logger: LoggerService,
+        name: str = "CoreML License Plate",
     ) -> None:
         super().__init__(name)
         self._plugin = plugin
@@ -95,89 +96,10 @@ class CoreMLLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
         detector = self._plugin.plate_detectors.get(detector_name)
         ocr = self._plugin.ocr_models.get(ocr_name)
 
-        empty: LicensePlateResult = {"detected": False, "detections": []}
         if detector is None or not detector.initialized or ocr is None or not ocr.initialized:
-            return [empty for _ in frames]
+            return [{"detected": False, "detections": []} for _ in frames]
 
-        # Convert frames to PIL images
-        images: list[Image.Image] = []
-        for frame in frames:
-            np_array: np.ndarray[Any, Any] = np.frombuffer(frame["data"], dtype=np.uint8).reshape(
-                (frame["height"], frame["width"], 3)
-            )
-            needs_resize = frame["width"] != detector.input_width or frame["height"] != detector.input_height
-            img = Image.fromarray(np_array, mode="RGB")
-            if needs_resize:
-                img = img.resize((detector.input_width, detector.input_height))
-            images.append(img)
-
-        # Batch plate detection
-        all_boxes = await detector.detect_batch(images, threshold)
-        for img in images:
-            img.close()
-
-        # Per-frame: OCR detected plates
-        results: list[LicensePlateResult] = []
-        for i, plate_boxes in enumerate(all_boxes):
-            if not plate_boxes:
-                results.append(empty)
-                continue
-
-            width, height = frames[i]["width"], frames[i]["height"]
-            data = frames[i]["data"]
-            scale_x = width / detector.input_width
-            scale_y = height / detector.input_height
-            needs_scale = width != detector.input_width or height != detector.input_height
-
-            plate_images: list[Image.Image] = []
-            scaled_boxes: list[tuple[float, float, float, float]] = []
-            confidences: list[float] = []
-            for plate in plate_boxes:
-                x1, y1, x2, y2 = plate["box"]
-                if needs_scale:
-                    x1, y1, x2, y2 = x1 * scale_x, y1 * scale_y, x2 * scale_x, y2 * scale_y
-                ix1, iy1 = max(0, int(x1)), max(0, int(y1))
-                ix2, iy2 = min(width, int(x2)), min(height, int(y2))
-                if ix2 <= ix1 or iy2 <= iy1:
-                    continue
-                np_frame: np.ndarray[Any, Any] = np.frombuffer(data, dtype=np.uint8).reshape(
-                    (height, width, 3)
-                )
-                plate_images.append(Image.fromarray(np_frame[iy1:iy2, ix1:ix2], mode="RGB"))
-                scaled_boxes.append((x1, y1, x2, y2))
-                confidences.append(plate["confidence"])
-
-            if not plate_images:
-                results.append(empty)
-                continue
-
-            ocr_results = await ocr.recognize_batch(plate_images)
-            for img in plate_images:
-                img.close()
-
-            detections: list[LicensePlateDetection] = []
-            for j, (x1, y1, x2, y2) in enumerate(scaled_boxes):
-                ocr_result = ocr_results[j] if j < len(ocr_results) else None
-                if ocr_result is None or not ocr_result.text:
-                    continue
-                detections.append(
-                    {
-                        "label": "vehicle",
-                        "attribute": "license_plate",
-                        "confidence": confidences[j],
-                        "plateText": ocr_result.text,
-                        "box": {
-                            "x": x1 / width,
-                            "y": y1 / height,
-                            "width": (x2 - x1) / width,
-                            "height": (y2 - y1) / height,
-                        },
-                    }
-                )
-
-            results.append({"detected": len(detections) > 0, "detections": detections})
-
-        return results
+        return await detect_plates(detector, ocr, frames, threshold)
 
     async def destroy(self) -> None:
         pass

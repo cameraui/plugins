@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
+from camera_ui_ml import detect_objects
 from camera_ui_sdk import (
     JsonSchema,
     ObjectDetectorSensor,
     ObjectModelSpec,
     ObjectResult,
-    TrackedDetection,
     VideoFrameData,
 )
 
@@ -65,31 +65,10 @@ class CoreMLObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
         return {"input": {"width": 320, "height": 320, "format": "rgb"}}
 
     async def detectObjects(self, frame: VideoFrameData) -> ObjectResult:
-        model_name = self.storage.values["model"]
-        detector = self._plugin.object_detectors.get(model_name)
-
+        detector = self._plugin.object_detectors.get(self.storage.values["model"])
         if detector is None or not detector.initialized:
             return {"detected": False, "detections": []}
-
-        width, height = frame["width"], frame["height"]
-        raw = await detector.detect_frame(frame, self.storage.values["confidence_threshold"])
-
-        detections: list[TrackedDetection] = []
-        for det in raw:
-            detections.append(
-                {
-                    "label": det["label"],
-                    "confidence": det["confidence"],
-                    "box": {
-                        "x": det["box"][0] / width,
-                        "y": det["box"][1] / height,
-                        "width": (det["box"][2] - det["box"][0]) / width,
-                        "height": (det["box"][3] - det["box"][1]) / height,
-                    },
-                }
-            )
-
-        return {"detected": len(detections) > 0, "detections": detections}
+        return await detect_objects(detector, frame, self.storage.values["confidence_threshold"])
 
     async def destroy(self) -> None:
         pass
