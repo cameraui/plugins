@@ -1,4 +1,4 @@
-onnxruntime-gpu==1.26.0; sys_platform != "darwin" and platform_machine != "aarch64"
+onnxruntime-gpu==1.27.0; sys_platform != "darwin" and platform_machine != "aarch64"
 onnxruntime==1.27.0
 camera-ui-sdk==1.0.95
 camera-ui-ml==1.2.1
