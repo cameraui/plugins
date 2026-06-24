@@ -18,9 +18,8 @@ class OpenVinoBackend(InferenceBackend):
         self._output_count = len(compiled.outputs)
         self._queue = ov.AsyncInferQueue(compiled)
         self._queue.set_callback(self._on_done)
-
-        shape = compiled.inputs[0].shape  # box detectors are NCHW [1, 3, H, W]
-        self._input_size = (_dim(shape, 3), _dim(shape, 2))
+        pshape = compiled.inputs[0].get_partial_shape()
+        self._input_size = (_dim(pshape, 3), _dim(pshape, 2))
 
     @property
     def input_size(self) -> tuple[int, int]:
@@ -62,8 +61,9 @@ def _set_exception(future: asyncio.Future[Outputs], error: BaseException) -> Non
         future.set_exception(error)
 
 
-def _dim(shape: Any, index: int) -> int:
+def _dim(pshape: Any, index: int) -> int:
     try:
-        return int(shape[index])
-    except (TypeError, ValueError, IndexError):
+        dim = pshape[index]
+        return int(dim.get_length()) if dim.is_static else 0
+    except Exception:
         return 0
