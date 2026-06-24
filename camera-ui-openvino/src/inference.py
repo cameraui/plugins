@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import numpy as np
@@ -18,6 +19,7 @@ class OpenVinoBackend(InferenceBackend):
         self._output_count = len(compiled.outputs)
         self._queue = ov.AsyncInferQueue(compiled)
         self._queue.set_callback(self._on_done)
+        self._dispatch = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ov-dispatch")
         pshape = compiled.inputs[0].get_partial_shape()
         self._input_size = (_dim(pshape, 3), _dim(pshape, 2))
 
@@ -34,12 +36,13 @@ class OpenVinoBackend(InferenceBackend):
 
     async def infer(self, inputs: Sequence[Any]) -> Outputs:
         future: asyncio.Future[Outputs] = self._loop.create_future()
-        await self._loop.run_in_executor(None, self._queue.start_async, list(inputs), future)
+        await self._loop.run_in_executor(self._dispatch, self._queue.start_async, list(inputs), future)
         return await future
 
     def close(self) -> None:
         with contextlib.suppress(Exception):
             self._queue.wait_all()
+        self._dispatch.shutdown(wait=False)
 
     def _on_done(self, request: Any, future: asyncio.Future[Outputs]) -> None:
         try:
