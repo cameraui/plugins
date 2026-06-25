@@ -27,10 +27,10 @@
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.55",
-    "@camera.ui/sdk": "^0.0.7",
+    "@camera.ui/sdk": "^0.0.8",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "26.0.0",
+    "@types/node": "26.0.1",
     "@typescript-eslint/parser": "^8.62.0",
     "assemblyscript": "^0.28.19",
     "concurrently": "^10.0.3",

@@ -21,15 +21,15 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "mailparser": "^3.9.11",
+    "mailparser": "^3.9.12",
     "smtp-server": "^3.19.1"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.55",
-    "@camera.ui/sdk": "^0.0.7",
+    "@camera.ui/sdk": "^0.0.8",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/mailparser": "^3.4.6",
-    "@types/node": "26.0.0",
+    "@types/node": "26.0.1",
     "@types/smtp-server": "^3.5.13",
     "@typescript-eslint/parser": "^8.62.0",
     "cross-env": "^10.1.0",
