@@ -1,4 +1,4 @@
-ruff==0.15.19
+ruff==0.15.20
 camera-ui-sdk==1.0.96
 camera-ui-common==1.0.17
 nats-py==2.15.0
