@@ -1,7 +1,7 @@
 {
   "displayName": "Eufy",
   "name": "@camera.ui/camera-ui-eufy",
-  "version": "0.0.35",
+  "version": "0.0.36",
   "description": "Seamlessly integrate Eufy security cameras into your system. Monitor and control your Eufy devices with easy setup.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
