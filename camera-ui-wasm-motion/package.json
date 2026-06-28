@@ -1,7 +1,7 @@
 {
   "displayName": "WASM Motion",
   "name": "@camera.ui/camera-ui-wasm-motion",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "description": "Browser-based motion detection using WebAssembly. Fast, client-side movement analysis with cross-platform support.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
