@@ -1,3 +1,3 @@
 numpy==2.4.6
 opencv-python-headless==4.13.0.92
-camera-ui-sdk==1.0.96
+camera-ui-sdk==1.0.97

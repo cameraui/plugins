@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.55",
-    "@camera.ui/sdk": "^0.0.8",
+    "@camera.ui/sdk": "^0.0.9",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.0.1",
     "@typescript-eslint/parser": "^8.62.0",
@@ -30,11 +30,11 @@
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
     "globals": "^17.7.0",
-    "prettier": "^3.8.5",
+    "prettier": "^3.9.1",
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.62.0",
-    "updates": "^17.18.0"
+    "updates": "^17.18.1"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
