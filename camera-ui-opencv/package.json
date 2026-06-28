@@ -1,7 +1,7 @@
 {
   "displayName": "OpenCV",
   "name": "@camera.ui/camera-ui-opencv",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "description": "Motion detection for camera.ui using OpenCV.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
