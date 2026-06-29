@@ -34,7 +34,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.recordingSession.updateRecordingConfiguration(configuration);
   }
 
-  public async *handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
+  public async *handleRecordingStreamRequest(streamId: number, signal?: AbortSignal): AsyncGenerator<RecordingPacket> {
     if (this.activeStreamId !== undefined) {
       this.logger.warn(this.logPrefix, `Stream ${streamId} rejected: stream ${this.activeStreamId} already active`);
       throw new HDSProtocolError(HDSProtocolSpecificErrorReason.BUSY);
@@ -48,7 +48,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     let isFirstPacket = true;
 
     try {
-      for await (const buffer of this.recordingSession.getRecordingStream()) {
+      for await (const buffer of this.recordingSession.getRecordingStream(signal)) {
         if (isFirstPacket) {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
           this.logger.debug(this.logPrefix, `Initialization fragment sent after ${elapsed}s`);
@@ -85,7 +85,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.logger.log(this.logPrefix, `Stream ${streamId} closed: ${getHdsReason(reason)}`);
 
     if (this.activeStreamId === streamId) {
-      this.recordingSession.stop();
+      this.recordingSession.closeCurrentRecording();
       this.cleanup(streamId);
     }
   }
