@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 
 function runCommandsInDirectory(directoryPath: string) {
   try {
-    const cmd = 'npm run lint:fix --if-present';
+    const cmd = 'npm run lint --if-present';
     const fullPath = resolve(__dirname, directoryPath);
 
     console.log(chalk.cyan('USER:', userInfo().username));

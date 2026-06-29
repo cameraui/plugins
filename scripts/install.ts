@@ -9,15 +9,13 @@ const __dirname = dirname(__filename);
 
 function runCommandsInDirectory(directoryPath: string) {
   try {
-    const cmds = ['npm i --save --ignore-scripts'];
+    const cmds = ['npm run install-updates --if-present'];
     const fullPath = resolve(__dirname, directoryPath);
 
     const withBuild = process.argv.includes('--with-build');
     if (withBuild) {
       cmds.push('npm run build --if-present');
     }
-
-    cmds.push('npm i --save');
 
     cmds.forEach((cmd) => {
       console.log(chalk.cyan('USER:', userInfo().username));
