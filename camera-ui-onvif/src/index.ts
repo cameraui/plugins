@@ -199,7 +199,6 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
         useForSnapshot: media.snapshot === media.high && !!media.high.snapshotUri,
         hotMode: true,
         preload: true,
-        prebuffer: false,
       });
     }
 
@@ -212,7 +211,6 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
         useForSnapshot: false,
         hotMode: false,
         preload: false,
-        prebuffer: false,
       });
     }
 
@@ -225,7 +223,6 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
         useForSnapshot: false,
         hotMode: false,
         preload: false,
-        prebuffer: false,
       });
     }
 
@@ -237,7 +234,6 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
         useForSnapshot: false,
         hotMode: false,
         preload: false,
-        prebuffer: false,
       });
     } else if (media.snapshot?.isSnapshot) {
       // JPEG RTSP stream as snapshot fallback (e.g. Tapo cameras)
@@ -249,7 +245,6 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
         useForSnapshot: false,
         hotMode: false,
         preload: false,
-        prebuffer: false,
       });
     }
 

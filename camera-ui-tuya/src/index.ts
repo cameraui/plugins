@@ -182,7 +182,6 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
           useForSnapshot: true,
           hotMode: false,
           preload: false,
-          prebuffer: false,
         },
       ],
     };

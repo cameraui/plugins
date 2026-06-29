@@ -131,7 +131,6 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
                 "useForSnapshot": True,
                 "hotMode": False,
                 "preload": False,
-                "prebuffer": False,
             },
             {
                 "name": "SD Stream",
@@ -140,7 +139,6 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
                 "useForSnapshot": False,
                 "hotMode": False,
                 "preload": False,
-                "prebuffer": False,
             },
         ]
 

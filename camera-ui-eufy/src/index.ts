@@ -221,7 +221,6 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
           useForSnapshot: true,
           hotMode: false,
           preload: false,
-          prebuffer: false,
         },
       ],
     };

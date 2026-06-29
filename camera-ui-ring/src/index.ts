@@ -215,7 +215,6 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
           useForSnapshot: false,
           hotMode: false,
           preload: false,
-          prebuffer: false,
         },
         {
           name: 'Snapshot',
@@ -223,7 +222,6 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
           useForSnapshot: false,
           hotMode: false,
           preload: false,
-          prebuffer: false,
         },
       ],
     };
