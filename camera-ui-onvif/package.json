@@ -1,7 +1,7 @@
 {
   "displayName": "Onvif",
   "name": "@camera.ui/camera-ui-onvif",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "ONVIF integration for camera.ui. Provides camera discovery, PTZ control, and motion, object, audio and face events via ONVIF.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "type": "module",
