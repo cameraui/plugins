@@ -1,7 +1,7 @@
 {
   "displayName": "Eufy",
   "name": "@camera.ui/camera-ui-eufy",
-  "version": "0.0.38",
+  "version": "0.0.39",
   "description": "Integrates Eufy security cameras and doorbells into camera.ui, with device discovery, live streaming, and motion, object, battery and doorbell events.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
