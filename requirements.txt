@@ -7,7 +7,7 @@ mypy==2.1.0
 numpy==2.4.6
 lmdbm==0.0.6
 lmdb==2.2.1
-typing-extensions==4.15.0
+typing-extensions==4.16.0
 cachetools==7.1.4
 aiohttp==3.14.1
 Pillow==12.3.0
