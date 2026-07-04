@@ -1,7 +1,7 @@
 {
   "displayName": "Tuya",
   "name": "@camera.ui/camera-ui-tuya",
-  "version": "0.0.40",
+  "version": "1.0.0",
   "description": "Integrates Tuya / Smart Life cameras into camera.ui, with device discovery and live streaming.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
