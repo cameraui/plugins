@@ -1,7 +1,7 @@
 {
   "displayName": "Ring",
   "name": "@camera.ui/camera-ui-ring",
-  "version": "0.0.68",
+  "version": "1.0.0",
   "description": "Integrates Ring cameras and doorbells into camera.ui, with device discovery, live streaming, and motion, battery, light, siren and doorbell events.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
