@@ -20,10 +20,10 @@
     "update": "updates --update ./ && cupdate"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.57",
+    "@camera.ui/cli": "^0.0.59",
     "@camera.ui/sdk": "^0.0.11",
     "cross-env": "^10.1.0",
-    "updates": "^17.18.1"
+    "updates": "^17.18.2"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
@@ -32,6 +32,8 @@
     "camera.ui": ">=0.0.50",
     "node": ">=22.0.0"
   },
+  "os": [],
+  "cpu": [],
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-onnx#readme",
   "keywords": [
     "camera-ui-plugin",

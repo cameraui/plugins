@@ -32,6 +32,13 @@
     "camera.ui": ">=0.0.50",
     "node": ">=22.0.0"
   },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-coral#readme",
   "keywords": [
     "camera-ui-plugin",

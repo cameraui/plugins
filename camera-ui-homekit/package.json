@@ -27,7 +27,7 @@
     "werift": "^0.23.0"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.57",
+    "@camera.ui/cli": "^0.0.59",
     "@camera.ui/sdk": "^0.0.11",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.0",
@@ -41,7 +41,7 @@
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.62.1",
-    "updates": "^17.18.1"
+    "updates": "^17.18.2"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
@@ -50,6 +50,8 @@
     "camera.ui": ">=0.0.66",
     "node": ">=22.0.0"
   },
+  "os": [],
+  "cpu": [],
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-homekit#readme",
   "keywords": [
     "camera-ui-plugin",
