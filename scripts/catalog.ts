@@ -12,6 +12,7 @@ const RAW_BASE = 'https://raw.githubusercontent.com/cameraui/plugins/main';
 type Category = 'detection' | 'camera-source' | 'notification' | 'recording' | 'automation' | 'ai-model' | 'utility' | 'other';
 
 interface CatalogEntry {
+  displayName?: string;
   category: Category;
   featured: boolean;
   tagline: string;
@@ -46,6 +47,7 @@ const FEATURED = new Set<string>(['camera-ui-homekit', 'camera-ui-rust-motion', 
 // when this script runs. Their metadata is maintained here by hand.
 const EXTERNAL_PLUGINS: Record<string, CatalogEntry> = {
   '@camera.ui/camera-ui-nvr': {
+    displayName: 'NVR',
     category: 'recording',
     featured: true,
     tagline: 'Manage and store video recordings from your cameras.',
@@ -101,6 +103,7 @@ function buildEntry(folder: string): { name: string; entry: CatalogEntry } {
   const name: string = pkg.name;
 
   const entry: CatalogEntry = {
+    ...(pkg.displayName ? { displayName: pkg.displayName as string } : {}),
     category: CATEGORY_OVERRIDES[folder] ?? deriveCategory(dir),
     featured: FEATURED.has(folder),
     tagline: firstSentence(pkg.description),
