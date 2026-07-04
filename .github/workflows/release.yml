@@ -68,7 +68,7 @@ jobs:
           fi
 
       - name: Install plugin dependencies
-        run: npm --prefix "$PLUGIN" install --ignore-scripts
+        run: npm --prefix "$PLUGIN" install --ignore-scripts --force
 
       - name: Build
         run: npm --prefix "$PLUGIN" run build
