@@ -14,6 +14,15 @@ _CHUNK = 1024 * 1024
 
 
 class BaseModelManager(ABC):
+    CLIP_PROCESSOR_FILENAMES = (
+        "preprocessor_config.json",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+        "special_tokens_map.json",
+        "tokenizer.json",
+    )
+
     def __init__(self, storage_path: str, logger: LoggerService, version: str) -> None:
         self.logger = logger
         self.model_path = os.path.join(storage_path, "models", version)
@@ -29,12 +38,28 @@ class BaseModelManager(ABC):
     def reset(self) -> None:
         self._load_tasks.clear()
 
+    def clip_processor_files(self) -> Mapping[str, tuple[str, str]]:
+        """CLIP processor (tokenizer + image preprocessor) files: key → (url, path relative to
+        ``model_path``). Empty (default) = plugin has no CLIP; CLIP plugins must override this."""
+        return {}
+
+    async def ensure_clip_processor(self) -> str | None:
+        files = self.clip_processor_files()
+        if not files:
+            return None
+        for url, rel in files.values():
+            await self._download(url, rel)
+        first_rel = next(iter(files.values()))[1]
+        return os.path.dirname(os.path.join(self.model_path, first_rel))
+
     @abstractmethod
     def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
         """Map of file key → (download_url, path relative to ``model_path``)."""
 
     @abstractmethod
-    async def build_backend(self, model_name: str, paths: Mapping[str, str]) -> InferenceBackend:
+    async def build_backend(
+        self, model_name: str, paths: Mapping[str, str]
+    ) -> InferenceBackend:
         """Build the runtime backend from the (already downloaded) local paths."""
 
     async def _load(self, model_name: str) -> InferenceBackend:
@@ -42,7 +67,10 @@ class BaseModelManager(ABC):
         for url, rel in files.values():
             await self._download(url, rel)
 
-        paths = {key: os.path.join(self.model_path, rel) for key, (_url, rel) in files.items()}
+        paths = {
+            key: os.path.join(self.model_path, rel)
+            for key, (_url, rel) in files.items()
+        }
         return await self.build_backend(model_name, paths)
 
     async def _download(self, url: str, rel: str) -> None:
