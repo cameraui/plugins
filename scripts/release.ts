@@ -13,9 +13,12 @@ import { fileURLToPath } from 'node:url';
 //   tsx scripts/release.ts camera-ui-eufy 1.2.0
 //   tsx scripts/release.ts camera-ui-coreml 0.1.0-beta.1 --yes
 //
-// Pass ALL instead of a plugin name to release every camera-ui-* plugin in this
-// monorepo in one go (only the bump specs major/minor/patch are allowed there):
+// Several plugins can be released in one go by listing them before the spec;
+// ALL releases every camera-ui-* plugin in this monorepo. With more than one
+// plugin (or ALL) only the bump specs major/minor/patch are allowed, since an
+// explicit version rarely fits plugins with divergent version histories:
 //
+//   tsx scripts/release.ts camera-ui-homekit camera-ui-eufy patch
 //   tsx scripts/release.ts ALL patch
 //   tsx scripts/release.ts ALL minor --yes --skip-checks
 
@@ -46,12 +49,13 @@ function usage(): never {
   console.log(
     [
       '',
-      chalk.bold('Usage:') + ' tsx scripts/release.ts <plugin|ALL> <version|major|minor|patch> [--yes] [--skip-checks]',
+      chalk.bold('Usage:') + ' tsx scripts/release.ts <plugin...|ALL> <version|major|minor|patch> [--yes] [--skip-checks]',
       '',
       'Examples:',
       '  tsx scripts/release.ts camera-ui-homekit patch',
       '  tsx scripts/release.ts camera-ui-eufy 1.2.0',
       '  tsx scripts/release.ts camera-ui-coreml 0.1.0-beta.1 --yes',
+      '  tsx scripts/release.ts camera-ui-homekit camera-ui-eufy camera-ui-ring patch',
       '  tsx scripts/release.ts ALL patch',
       '  tsx scripts/release.ts ALL minor --yes',
       '',
@@ -60,7 +64,8 @@ function usage(): never {
       '  --skip-checks   Skip the local lint + build pre-flight (the workflow still runs it).',
       '',
       'Notes:',
-      '  ALL releases every camera-ui-* plugin and only accepts major/minor/patch.',
+      '  ALL releases every camera-ui-* plugin.',
+      '  More than one plugin (or ALL) only accepts major/minor/patch.',
       '',
     ].join('\r\n'),
   );
@@ -149,16 +154,21 @@ function commitAndTag(plan: PluginPlan): void {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const target = args[0];
-  const spec = args[1];
   const yes = args.includes('--yes') || args.includes('-y');
   const skipChecks = args.includes('--skip-checks');
+  const positionals = args.filter((arg) => !arg.startsWith('-'));
 
-  if (!target || !spec) usage();
+  if (positionals.length < 2) usage();
 
-  const all = target === 'ALL';
-  if (all && !isBumpSpec(spec)) {
-    fail(`ALL only accepts major/minor/patch (got '${spec}').`);
+  const spec = positionals[positionals.length - 1];
+  const targets = [...new Set(positionals.slice(0, -1))];
+
+  const all = targets.includes('ALL');
+  if (all && targets.length > 1) {
+    fail('ALL cannot be combined with plugin names.');
+  }
+  if ((all || targets.length > 1) && !isBumpSpec(spec)) {
+    fail(`Multiple plugins (or ALL) only accept major/minor/patch (got '${spec}').`);
   }
 
   // Safety: clean tree, on main, not behind origin.
@@ -177,7 +187,7 @@ async function main(): Promise<void> {
   }
 
   // Build the release plan (validates everything before any mutation).
-  const names = all ? discoverPlugins() : [target];
+  const names = all ? discoverPlugins() : targets;
   if (!names.length) fail('No camera-ui-* plugins found.');
   const plans = names.map((name) => planPlugin(name, spec));
 
