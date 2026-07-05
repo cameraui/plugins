@@ -24,8 +24,8 @@
     "ring-client-api": "file:../externals/ring"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.59",
-    "@camera.ui/sdk": "^0.0.11",
+    "@camera.ui/cli": "^0.0.60",
+    "@camera.ui/sdk": "^0.0.12",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.0",
     "@types/ws": "^8.18.1",
