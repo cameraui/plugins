@@ -33,7 +33,7 @@
   },
   "@camera.ui/camera-ui-hailo": {
     "displayName": "Hailo",
-    "category": "detection",
+    "category": "ai-model",
     "featured": false,
     "tagline": "Hailo Edge AI (HailoRT) detection backend for camera.ui.",
     "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/camera-ui-hailo/logo.png",

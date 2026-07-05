@@ -36,8 +36,10 @@ function runCommandsInDirectories(directories: string[]) {
 
 const directories = [
   '../camera-ui-audio-yamnet',
+  '../camera-ui-coral',
   '../camera-ui-coreml',
   '../camera-ui-eufy',
+  '../camera-ui-hailo',
   '../camera-ui-homekit',
   '../camera-ui-ncnn',
   '../camera-ui-onnx',
