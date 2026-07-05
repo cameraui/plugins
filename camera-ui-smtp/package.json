@@ -1,7 +1,7 @@
 {
   "displayName": "SMTP",
   "name": "@camera.ui/camera-ui-smtp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Motion detection for camera.ui via SMTP. Runs a small SMTP server that turns camera e-mail alerts into motion events.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
