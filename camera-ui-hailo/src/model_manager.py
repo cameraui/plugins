@@ -45,6 +45,8 @@ class HailoModelManager(BaseModelManager):
         self._arch = _detect_arch()
         if self._arch is None:
             logger.warn(f"Could not detect Hailo device; assuming {_DEFAULT_ARCH}")
+        else:
+            logger.log(f"Available devices: {_ARCH_DISPLAY.get(self._arch, self._arch)}")
 
     def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
         arch = self._arch or _DEFAULT_ARCH

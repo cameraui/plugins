@@ -4,6 +4,7 @@ import asyncio
 import shutil
 from typing import Any
 
+import ncnn
 from camera_ui_ml import (
     BoxDetector,
     Embedder,
@@ -68,6 +69,8 @@ class NCNNPlugin(
 ):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
+        gpu_count = ncnn.get_gpu_count()
+        self.logger.log(f"Available devices: CPU{f', Vulkan GPU x{gpu_count}' if gpu_count > 0 else ''}")
         self.model_manager = NcnnModelManager(api.storagePath, logger, self._resolve_use_vulkan)
 
         self.object_detectors: dict[str, BoxDetector] = {}
@@ -87,7 +90,10 @@ class NCNNPlugin(
                 "type": "boolean",
                 "key": "use_vulkan",
                 "title": "Use Vulkan (GPU)",
-                "description": "Run inference on the GPU via Vulkan when available; falls back to CPU otherwise.",
+                "description": (
+                    "Run inference on the GPU via Vulkan when available; falls back to CPU otherwise. "
+                    f"Vulkan GPU detected on this system: {'yes' if ncnn.get_gpu_count() > 0 else 'no'}."
+                ),
                 "store": True,
                 "defaultValue": DEFAULT_USE_VULKAN,
                 "onSet": self._on_vulkan_change,
@@ -107,81 +113,9 @@ class NCNNPlugin(
                 "title": "Re-download Models",
                 "description": "Clear the local model cache and download the latest models again.",
                 "color": "info",
-                "group": "Manage",
                 "onSet": self._redownload_models,
             },
         ]
-
-    def _active_hardware(self) -> str:
-        backends = [
-            detector.backend.device
-            for detector in (
-                *self.object_detectors.values(),
-                *self.face_detectors.values(),
-                *self.plate_detectors.values(),
-                *self.face_embedders.values(),
-                *self.ocr_models.values(),
-            )
-            if detector.backend is not None
-        ]
-        if not backends:
-            return "No models loaded yet"
-        return ", ".join(dict.fromkeys(backends))
-
-    def _resolve_use_vulkan(self) -> bool:
-        return bool(self.storage.values.get("use_vulkan", DEFAULT_USE_VULKAN))
-
-    async def _on_vulkan_change(self, new_value: object, old_value: object) -> None:
-        if new_value == old_value:
-            return
-        self.logger.log(f"Vulkan setting changed ({old_value} -> {new_value}); reloading models")
-        await self._reload_models()
-
-    async def _reload_models(self) -> None:
-        obj = list(self.object_detectors)
-        fdet = list(self.face_detectors)
-        femb = list(self.face_embedders)
-        pdet = list(self.plate_detectors)
-        ocr = list(self.ocr_models)
-
-        await self._close_all()
-        self.model_manager.reset()
-
-        await asyncio.gather(
-            *(self.get_object_detector(n) for n in obj),
-            *(self.get_face_detector(n) for n in fdet),
-            *(self.get_face_embedder(n) for n in femb),
-            *(self.get_plate_detector(n) for n in pdet),
-            *(self.get_ocr(n) for n in ocr),
-        )
-
-    async def _redownload_models(self) -> None:
-        self.logger.log("Re-downloading models (clearing cache)...")
-        shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
-        await self._reload_models()
-        self.logger.success("Models re-downloaded")
-
-    async def _close_all(self) -> None:
-        await asyncio.gather(
-            *(d.close() for d in self.object_detectors.values()),
-            *(d.close() for d in self.face_detectors.values()),
-            *(d.close() for d in self.plate_detectors.values()),
-            *(e.close() for e in self.face_embedders.values()),
-            *(o.close() for o in self.ocr_models.values()),
-        )
-        self.object_detectors.clear()
-        self.face_detectors.clear()
-        self.face_embedders.clear()
-        self.plate_detectors.clear()
-        self.ocr_models.clear()
-
-    async def _on_shutdown(self) -> None:
-        for sensors in self._sensors.values():
-            for sensor in sensors.values():
-                await sensor.destroy()
-        self._sensors.clear()
-
-        await self._close_all()
 
     async def configureCameras(self, cameras: list[CameraDevice]) -> None:
         for camera in cameras:
@@ -194,23 +128,6 @@ class NCNNPlugin(
         sensors = self._sensors.pop(cameraId, {})
         for sensor in sensors.values():
             await sensor.destroy()
-
-    async def _add_sensors(self, camera: CameraDevice) -> None:
-        sensors: dict[str, Any] = {}
-
-        obj = NCNNObjectSensor(self, self.logger)
-        await camera.addSensor(obj)
-        sensors["object"] = obj
-
-        face = NCNNFaceSensor(self, self.logger)
-        await camera.addSensor(face)
-        sensors["face"] = face
-
-        lpd = NCNNLPDSensor(self, self.logger)
-        await camera.addSensor(lpd)
-        sensors["lpd"] = lpd
-
-        self._sensors[camera.id] = sensors
 
     async def get_object_detector(self, model_name: str) -> BoxDetector:
         detector = self.object_detectors.get(model_name)
@@ -511,6 +428,94 @@ class NCNNPlugin(
                 )
 
         return {"detected": len(detections) > 0, "detections": detections}
+
+    async def _add_sensors(self, camera: CameraDevice) -> None:
+        sensors: dict[str, Any] = {}
+
+        obj = NCNNObjectSensor(self, self.logger)
+        await camera.addSensor(obj)
+        sensors["object"] = obj
+
+        face = NCNNFaceSensor(self, self.logger)
+        await camera.addSensor(face)
+        sensors["face"] = face
+
+        lpd = NCNNLPDSensor(self, self.logger)
+        await camera.addSensor(lpd)
+        sensors["lpd"] = lpd
+
+        self._sensors[camera.id] = sensors
+
+    def _active_hardware(self) -> str:
+        backends = [
+            detector.backend.device
+            for detector in (
+                *self.object_detectors.values(),
+                *self.face_detectors.values(),
+                *self.plate_detectors.values(),
+                *self.face_embedders.values(),
+                *self.ocr_models.values(),
+            )
+            if detector.backend is not None
+        ]
+        if not backends:
+            return "No models loaded yet"
+        return ", ".join(dict.fromkeys(backends))
+
+    def _resolve_use_vulkan(self) -> bool:
+        return bool(self.storage.values.get("use_vulkan", DEFAULT_USE_VULKAN))
+
+    async def _on_vulkan_change(self, new_value: object, old_value: object) -> None:
+        if new_value == old_value:
+            return
+        self.logger.log(f"Vulkan setting changed ({old_value} -> {new_value}); reloading models")
+        await self._reload_models()
+
+    async def _reload_models(self) -> None:
+        obj = list(self.object_detectors)
+        fdet = list(self.face_detectors)
+        femb = list(self.face_embedders)
+        pdet = list(self.plate_detectors)
+        ocr = list(self.ocr_models)
+
+        await self._close_all()
+        self.model_manager.reset()
+
+        await asyncio.gather(
+            *(self.get_object_detector(n) for n in obj),
+            *(self.get_face_detector(n) for n in fdet),
+            *(self.get_face_embedder(n) for n in femb),
+            *(self.get_plate_detector(n) for n in pdet),
+            *(self.get_ocr(n) for n in ocr),
+        )
+
+    async def _redownload_models(self) -> None:
+        self.logger.log("Re-downloading models (clearing cache)...")
+        shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
+        await self._reload_models()
+        self.logger.success("Models re-downloaded")
+
+    async def _close_all(self) -> None:
+        await asyncio.gather(
+            *(d.close() for d in self.object_detectors.values()),
+            *(d.close() for d in self.face_detectors.values()),
+            *(d.close() for d in self.plate_detectors.values()),
+            *(e.close() for e in self.face_embedders.values()),
+            *(o.close() for o in self.ocr_models.values()),
+        )
+        self.object_detectors.clear()
+        self.face_detectors.clear()
+        self.face_embedders.clear()
+        self.plate_detectors.clear()
+        self.ocr_models.clear()
+
+    async def _on_shutdown(self) -> None:
+        for sensors in self._sensors.values():
+            for sensor in sensors.values():
+                await sensor.destroy()
+        self._sensors.clear()
+
+        await self._close_all()
 
 
 def __main__() -> type[NCNNPlugin]:

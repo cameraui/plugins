@@ -10,6 +10,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+import pyopencl as cl
 from camera_ui_sdk import (
     API_EVENT,
     BasePlugin,
@@ -24,7 +25,13 @@ from camera_ui_sdk import (
     VideoFrameData,
 )
 
-from detector_defaults import DEFAULT_ALPHA, DEFAULT_AREA, DEFAULT_BLUR, DEFAULT_DILT, DEFAULT_THRESHOLD
+from detector_defaults import (
+    DEFAULT_ALPHA,
+    DEFAULT_AREA,
+    DEFAULT_BLUR,
+    DEFAULT_DILT,
+    DEFAULT_THRESHOLD,
+)
 from opencl_detector import OpenCLMotionDetector, create_program
 from sensor import OpenCLMotionSensor
 
@@ -32,6 +39,7 @@ from sensor import OpenCLMotionSensor
 class OpenCL(BasePlugin, MotionDetectionInterface):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage) -> None:
         super().__init__(logger, api, storage)
+        self._log_available_devices()
 
         self.sensors: dict[str, OpenCLMotionSensor] = {}
         self.motion_detection_running = False
@@ -258,7 +266,13 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
                 )
 
                 dets = await asyncio.get_event_loop().run_in_executor(
-                    executor, opencl_detector.process_frame, gray, threshold, dilation, area, DEFAULT_ALPHA
+                    executor,
+                    opencl_detector.process_frame,
+                    gray,
+                    threshold,
+                    dilation,
+                    area,
+                    DEFAULT_ALPHA,
                 )
 
                 for x1, y1, x2, y2 in dets:
@@ -279,6 +293,21 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
             del opencl_detector
 
         return {"detected": len(all_detections) > 0, "detections": all_detections}
+
+    def _log_available_devices(self) -> None:
+        try:
+            platforms = cl.get_platforms()
+        except Exception:
+            platforms = []
+        if not platforms:
+            self.logger.warn(
+                "No OpenCL platform found — install an OpenCL ICD / GPU driver, motion detection cannot start"
+            )
+            return
+        described = "; ".join(
+            f"{p.name}: {', '.join(d.name for d in p.get_devices()) or 'no devices'}" for p in platforms
+        )
+        self.logger.log(f"Available OpenCL devices: {described}")
 
 
 def __main__() -> type[OpenCL]:

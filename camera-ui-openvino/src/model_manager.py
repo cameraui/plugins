@@ -51,10 +51,22 @@ class OpenVinoModelManager(BaseModelManager):
                 continue
             tried.append(dev)
             try:
-                return self._core.compile_model(model, dev, config), dev
+                compiled = self._core.compile_model(model, dev, config)
+                return compiled, self._describe_device(compiled, dev)
             except Exception as error:
                 self.logger.log(f"compile_model on {dev} failed ({error}); trying fallback")
         raise RuntimeError(f"Could not compile model on any device (tried {tried})")
+
+    @staticmethod
+    def _describe_device(compiled: Any, requested: str) -> str:
+        # Selectors like AUTO hide what actually runs — report the resolved device(s) too.
+        try:
+            resolved = ",".join(compiled.get_property("EXECUTION_DEVICES"))
+        except Exception:
+            return requested
+        if not resolved or resolved == requested:
+            return requested
+        return f"{requested} -> {resolved}"
 
     @staticmethod
     def _rel_files(model_name: str) -> tuple[str, str]:

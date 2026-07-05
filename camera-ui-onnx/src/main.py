@@ -80,6 +80,7 @@ class ONNXPlugin(
 ):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
+        self.logger.log(f"Available providers: {', '.join(ort.get_available_providers())}")
         self.model_manager = OnnxModelManager(api.storagePath, logger, self._resolve_provider_lists)
 
         self.object_detectors: dict[str, BoxDetector] = {}
@@ -105,7 +106,8 @@ class ONNXPlugin(
                     "Hardware backend for inference. 'auto' selects CoreML on macOS, "
                     "CUDA on Linux/Windows (x86_64), CPU otherwise. 'tensorrt' uses the NVIDIA "
                     "TensorRT provider (slower first run while it builds/caches an engine). "
-                    "Always falls back to CPU."
+                    "Always falls back to CPU. "
+                    f"Available on this system: {', '.join(ort.get_available_providers())}."
                 ),
                 "enum": EXECUTION_PROVIDERS,
                 "store": True,
@@ -140,139 +142,9 @@ class ONNXPlugin(
                 "title": "Re-download Models",
                 "description": "Clear the local model cache and download the latest models again.",
                 "color": "info",
-                "group": "Manage",
                 "onSet": self._redownload_models,
             },
         ]
-
-    def _active_hardware(self) -> str:
-        backends = [
-            detector.backend.device
-            for detector in (
-                *self.object_detectors.values(),
-                *self.face_detectors.values(),
-                *self.plate_detectors.values(),
-                *self.face_embedders.values(),
-                *self.ocr_models.values(),
-            )
-            if detector.backend is not None
-        ]
-        backends += [enc.vision.device for enc in self.clip_encoders.values() if enc.vision is not None]
-        if not backends:
-            return "No models loaded yet"
-        return ", ".join(dict.fromkeys(backends))
-
-    def _device_ids(self) -> list[int]:
-        raw = str(self.storage.values.get("device_ids", "0"))
-        ids = [int(part.strip()) for part in raw.split(",") if part.strip().isdigit()]
-        return ids or [0]
-
-    def _resolve_provider_lists(self) -> list[ProviderList]:
-        pref = self.storage.values.get("execution_provider", DEFAULT_EXECUTION_PROVIDER)
-        system = platform.system()
-        machine = platform.machine()
-        available: set[str] = set(ort.get_available_providers())
-
-        x86 = machine in ("x86_64", "AMD64")
-        use_cuda = pref == "cuda" or (pref == "auto" and system in ("Linux", "Windows") and x86)
-        use_coreml = pref == "coreml" or (pref == "auto" and system == "Darwin")
-
-        if pref == "tensorrt" and "TensorrtExecutionProvider" in available:
-            cache_dir = os.path.join(self.api.storagePath, "trt-engine-cache")
-            os.makedirs(cache_dir, exist_ok=True)
-            return [
-                [
-                    (
-                        "TensorrtExecutionProvider",
-                        {
-                            "device_id": device_id,
-                            "trt_engine_cache_enable": True,
-                            "trt_engine_cache_path": cache_dir,
-                            "trt_fp16_enable": True,
-                        },
-                    ),
-                    ("CUDAExecutionProvider", {"device_id": device_id}),
-                    "CPUExecutionProvider",
-                ]
-                for device_id in self._device_ids()
-            ]
-        if use_cuda and "CUDAExecutionProvider" in available:
-            return [
-                [
-                    ("CUDAExecutionProvider", {"device_id": device_id}),
-                    "CPUExecutionProvider",
-                ]
-                for device_id in self._device_ids()
-            ]
-        if use_coreml and "CoreMLExecutionProvider" in available:
-            return [["CoreMLExecutionProvider", "CPUExecutionProvider"]]
-        return [["CPUExecutionProvider"]]
-
-    async def _on_provider_change(self, new_value: object, old_value: object) -> None:
-        if new_value == old_value:
-            return
-        self.logger.log(f"Execution provider setting changed ({old_value} -> {new_value}); reloading models")
-        await self._reload_models()
-
-    async def _reload_models(self) -> None:
-        obj = list(self.object_detectors)
-        fdet = list(self.face_detectors)
-        femb = list(self.face_embedders)
-        pdet = list(self.plate_detectors)
-        ocr = list(self.ocr_models)
-        clip = list(self.clip_encoders)
-
-        await self._close_all()
-        self.model_manager.reset()
-
-        await asyncio.gather(
-            *(self.get_object_detector(n) for n in obj),
-            *(self.get_face_detector(n) for n in fdet),
-            *(self.get_face_embedder(n) for n in femb),
-            *(self.get_plate_detector(n) for n in pdet),
-            *(self.get_ocr(n) for n in ocr),
-            *(self.get_clip_encoder(n) for n in clip),
-        )
-
-    async def _redownload_models(self) -> None:
-        self.logger.log("Re-downloading models (clearing cache)...")
-        shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
-        await self._reload_models()
-        self.logger.success("Models re-downloaded")
-
-    async def _close_all(self) -> None:
-        await asyncio.gather(
-            *(d.close() for d in self.object_detectors.values()),
-            *(d.close() for d in self.face_detectors.values()),
-            *(d.close() for d in self.plate_detectors.values()),
-            *(e.close() for e in self.face_embedders.values()),
-            *(e.close() for e in self.clip_encoders.values()),
-            *(o.close() for o in self.ocr_models.values()),
-        )
-        self.object_detectors.clear()
-        self.face_detectors.clear()
-        self.face_embedders.clear()
-        self.plate_detectors.clear()
-        self.ocr_models.clear()
-        self.clip_encoders.clear()
-
-    async def _on_start(self) -> None:
-        asyncio.create_task(self._preload_clip())
-
-    async def _preload_clip(self) -> None:
-        try:
-            await self.get_clip_encoder(DEFAULT_CLIP_VISION)
-            self.logger.log("CLIP models preloaded")
-        except Exception as e:
-            self.logger.error(f"Failed to preload CLIP models: {e}")
-
-    async def _on_shutdown(self) -> None:
-        for sensors in self._sensors.values():
-            for sensor in sensors.values():
-                await sensor.destroy()
-        self._sensors.clear()
-
-        await self._close_all()
 
     async def configureCameras(self, cameras: list[CameraDevice]) -> None:
         for camera in cameras:
@@ -285,27 +157,6 @@ class ONNXPlugin(
         sensors = self._sensors.pop(cameraId, {})
         for sensor in sensors.values():
             await sensor.destroy()
-
-    async def _add_sensors(self, camera: CameraDevice) -> None:
-        sensors: dict[str, Any] = {}
-
-        obj = ONNXObjectSensor(self, self.logger)
-        await camera.addSensor(obj)
-        sensors["object"] = obj
-
-        face = ONNXFaceSensor(self, self.logger)
-        await camera.addSensor(face)
-        sensors["face"] = face
-
-        lpd = ONNXLPDSensor(self, self.logger)
-        await camera.addSensor(lpd)
-        sensors["lpd"] = lpd
-
-        clip = ONNXClipSensor(self, self.logger)
-        await camera.addSensor(clip)
-        sensors["clip"] = clip
-
-        self._sensors[camera.id] = sensors
 
     async def get_object_detector(self, model_name: str) -> BoxDetector:
         detector = self.object_detectors.get(model_name)
@@ -678,6 +529,156 @@ class ONNXPlugin(
 
         embedding = await encoder.embed_text(text)
         return {"embedding": embedding, "embeddingModel": encoder.embedding_model}
+
+    async def _add_sensors(self, camera: CameraDevice) -> None:
+        sensors: dict[str, Any] = {}
+
+        obj = ONNXObjectSensor(self, self.logger)
+        await camera.addSensor(obj)
+        sensors["object"] = obj
+
+        face = ONNXFaceSensor(self, self.logger)
+        await camera.addSensor(face)
+        sensors["face"] = face
+
+        lpd = ONNXLPDSensor(self, self.logger)
+        await camera.addSensor(lpd)
+        sensors["lpd"] = lpd
+
+        clip = ONNXClipSensor(self, self.logger)
+        await camera.addSensor(clip)
+        sensors["clip"] = clip
+
+        self._sensors[camera.id] = sensors
+
+    def _active_hardware(self) -> str:
+        backends = [
+            detector.backend.device
+            for detector in (
+                *self.object_detectors.values(),
+                *self.face_detectors.values(),
+                *self.plate_detectors.values(),
+                *self.face_embedders.values(),
+                *self.ocr_models.values(),
+            )
+            if detector.backend is not None
+        ]
+        backends += [enc.vision.device for enc in self.clip_encoders.values() if enc.vision is not None]
+        if not backends:
+            return "No models loaded yet"
+        return ", ".join(dict.fromkeys(backends))
+
+    def _device_ids(self) -> list[int]:
+        raw = str(self.storage.values.get("device_ids", "0"))
+        ids = [int(part.strip()) for part in raw.split(",") if part.strip().isdigit()]
+        return ids or [0]
+
+    def _resolve_provider_lists(self) -> list[ProviderList]:
+        pref = self.storage.values.get("execution_provider", DEFAULT_EXECUTION_PROVIDER)
+        system = platform.system()
+        machine = platform.machine()
+        available: set[str] = set(ort.get_available_providers())
+
+        x86 = machine in ("x86_64", "AMD64")
+        use_cuda = pref == "cuda" or (pref == "auto" and system in ("Linux", "Windows") and x86)
+        use_coreml = pref == "coreml" or (pref == "auto" and system == "Darwin")
+
+        if pref == "tensorrt" and "TensorrtExecutionProvider" in available:
+            cache_dir = os.path.join(self.api.storagePath, "trt-engine-cache")
+            os.makedirs(cache_dir, exist_ok=True)
+            return [
+                [
+                    (
+                        "TensorrtExecutionProvider",
+                        {
+                            "device_id": device_id,
+                            "trt_engine_cache_enable": True,
+                            "trt_engine_cache_path": cache_dir,
+                            "trt_fp16_enable": True,
+                        },
+                    ),
+                    ("CUDAExecutionProvider", {"device_id": device_id}),
+                    "CPUExecutionProvider",
+                ]
+                for device_id in self._device_ids()
+            ]
+        if use_cuda and "CUDAExecutionProvider" in available:
+            return [
+                [
+                    ("CUDAExecutionProvider", {"device_id": device_id}),
+                    "CPUExecutionProvider",
+                ]
+                for device_id in self._device_ids()
+            ]
+        if use_coreml and "CoreMLExecutionProvider" in available:
+            return [["CoreMLExecutionProvider", "CPUExecutionProvider"]]
+        return [["CPUExecutionProvider"]]
+
+    async def _on_provider_change(self, new_value: object, old_value: object) -> None:
+        if new_value == old_value:
+            return
+        self.logger.log(f"Execution provider setting changed ({old_value} -> {new_value}); reloading models")
+        await self._reload_models()
+
+    async def _reload_models(self) -> None:
+        obj = list(self.object_detectors)
+        fdet = list(self.face_detectors)
+        femb = list(self.face_embedders)
+        pdet = list(self.plate_detectors)
+        ocr = list(self.ocr_models)
+        clip = list(self.clip_encoders)
+
+        await self._close_all()
+        self.model_manager.reset()
+
+        await asyncio.gather(
+            *(self.get_object_detector(n) for n in obj),
+            *(self.get_face_detector(n) for n in fdet),
+            *(self.get_face_embedder(n) for n in femb),
+            *(self.get_plate_detector(n) for n in pdet),
+            *(self.get_ocr(n) for n in ocr),
+            *(self.get_clip_encoder(n) for n in clip),
+        )
+
+    async def _redownload_models(self) -> None:
+        self.logger.log("Re-downloading models (clearing cache)...")
+        shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
+        await self._reload_models()
+        self.logger.success("Models re-downloaded")
+
+    async def _close_all(self) -> None:
+        await asyncio.gather(
+            *(d.close() for d in self.object_detectors.values()),
+            *(d.close() for d in self.face_detectors.values()),
+            *(d.close() for d in self.plate_detectors.values()),
+            *(e.close() for e in self.face_embedders.values()),
+            *(e.close() for e in self.clip_encoders.values()),
+            *(o.close() for o in self.ocr_models.values()),
+        )
+        self.object_detectors.clear()
+        self.face_detectors.clear()
+        self.face_embedders.clear()
+        self.plate_detectors.clear()
+        self.ocr_models.clear()
+        self.clip_encoders.clear()
+
+    async def _on_start(self) -> None:
+        asyncio.create_task(self._preload_clip())
+
+    async def _preload_clip(self) -> None:
+        try:
+            await self.get_clip_encoder(DEFAULT_CLIP_VISION)
+            self.logger.log("CLIP models preloaded")
+        except Exception as e:
+            self.logger.error(f"Failed to preload CLIP models: {e}")
+
+    async def _on_shutdown(self) -> None:
+        for sensors in self._sensors.values():
+            for sensor in sensors.values():
+                await sensor.destroy()
+        self._sensors.clear()
+
+        await self._close_all()
 
 
 def __main__() -> type[ONNXPlugin]:

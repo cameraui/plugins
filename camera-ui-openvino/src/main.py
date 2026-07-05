@@ -80,6 +80,7 @@ class OpenVinoPlugin(
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
         self._core = ov.Core()
+        self.logger.log(f"Available devices: {', '.join(self._core.available_devices)}")
         self.model_manager = OpenVinoModelManager(api.storagePath, logger, self._resolve_device)
 
         self.object_detectors: dict[str, BoxDetector] = {}
@@ -103,7 +104,8 @@ class OpenVinoPlugin(
                 "title": "Device",
                 "description": (
                     "OpenVINO inference device. 'Default' auto-detects (NPU/GPU/CPU); "
-                    "AUTO lets OpenVINO choose; CPU/GPU/NPU force a specific device."
+                    "AUTO lets OpenVINO choose; CPU/GPU/NPU force a specific device. "
+                    f"Available on this system: {', '.join(self._core.available_devices)}."
                 ),
                 "enum": OPENVINO_DEVICES,
                 "store": True,
@@ -126,129 +128,9 @@ class OpenVinoPlugin(
                 "title": "Re-download Models",
                 "description": "Clear the local model cache and download the latest models again.",
                 "color": "info",
-                "group": "Manage",
                 "onSet": self._redownload_models,
             },
         ]
-
-    def _active_hardware(self) -> str:
-        backends = [
-            detector.backend.device
-            for detector in (
-                *self.object_detectors.values(),
-                *self.face_detectors.values(),
-                *self.plate_detectors.values(),
-                *self.face_embedders.values(),
-                *self.ocr_models.values(),
-            )
-            if detector.backend is not None
-        ]
-        backends += [enc.vision.device for enc in self.clip_encoders.values() if enc.vision is not None]
-        if not backends:
-            return "No models loaded yet"
-        return ", ".join(dict.fromkeys(backends))
-
-    def _resolve_device(self) -> str:
-        mode = self.storage.values.get("device", DEFAULT_OPENVINO_DEVICE)
-        if mode and mode != "Default":
-            return str(mode)
-
-        try:
-            devices = list(self._core.available_devices)
-        except Exception:
-            return "AUTO"
-
-        has_npu = any("NPU" in d for d in devices)
-        gpus = [d for d in devices if "GPU" in d]  # "GPU", or "GPU.0"/"GPU.1" when multiple
-        has_gpu = bool(gpus)
-        dgpus: list[str] = []
-        for d in gpus:
-            try:
-                name = str(self._core.get_property(d, "FULL_DEVICE_NAME"))
-            except Exception:
-                name = ""
-            if "NVIDIA" in name and "dGPU" in name:
-                dgpus.append(d)
-
-        if has_npu and has_gpu:
-            return "AUTO:NPU,GPU,CPU"
-        if has_npu:
-            return "AUTO:NPU,CPU"
-        if dgpus:
-            # OpenVINO can't reliably split one model across multiple NVIDIA dGPUs; let AUTO pick one.
-            return f"AUTO:{','.join(dgpus)},CPU"
-        if len(gpus) > 1:
-            # Multiple (e.g. Intel Arc) GPUs → MULTI round-robins requests across them.
-            return "MULTI:" + ",".join(gpus)
-        if has_gpu:
-            return "GPU"
-        return "AUTO"
-
-    async def _on_device_change(self, new_value: object, old_value: object) -> None:
-        if new_value == old_value:
-            return
-        self.logger.log(f"Device setting changed ({old_value} -> {new_value}); reloading models")
-        await self._reload_models()
-
-    async def _reload_models(self) -> None:
-        obj = list(self.object_detectors)
-        fdet = list(self.face_detectors)
-        femb = list(self.face_embedders)
-        pdet = list(self.plate_detectors)
-        ocr = list(self.ocr_models)
-        clip = list(self.clip_encoders)
-
-        await self._close_all()
-        self.model_manager.reset()
-
-        await asyncio.gather(
-            *(self.get_object_detector(n) for n in obj),
-            *(self.get_face_detector(n) for n in fdet),
-            *(self.get_face_embedder(n) for n in femb),
-            *(self.get_plate_detector(n) for n in pdet),
-            *(self.get_ocr(n) for n in ocr),
-            *(self.get_clip_encoder(n) for n in clip),
-        )
-
-    async def _redownload_models(self) -> None:
-        self.logger.log("Re-downloading models (clearing cache)...")
-        shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
-        await self._reload_models()
-        self.logger.success("Models re-downloaded")
-
-    async def _close_all(self) -> None:
-        await asyncio.gather(
-            *(d.close() for d in self.object_detectors.values()),
-            *(d.close() for d in self.face_detectors.values()),
-            *(d.close() for d in self.plate_detectors.values()),
-            *(e.close() for e in self.face_embedders.values()),
-            *(e.close() for e in self.clip_encoders.values()),
-            *(o.close() for o in self.ocr_models.values()),
-        )
-        self.object_detectors.clear()
-        self.face_detectors.clear()
-        self.face_embedders.clear()
-        self.plate_detectors.clear()
-        self.ocr_models.clear()
-        self.clip_encoders.clear()
-
-    async def _on_start(self) -> None:
-        asyncio.create_task(self._preload_clip())
-
-    async def _preload_clip(self) -> None:
-        try:
-            await self.get_clip_encoder(DEFAULT_CLIP_VISION)
-            self.logger.log("CLIP models preloaded")
-        except Exception as e:
-            self.logger.error(f"Failed to preload CLIP models: {e}")
-
-    async def _on_shutdown(self) -> None:
-        for sensors in self._sensors.values():
-            for sensor in sensors.values():
-                await sensor.destroy()
-        self._sensors.clear()
-
-        await self._close_all()
 
     async def configureCameras(self, cameras: list[CameraDevice]) -> None:
         for camera in cameras:
@@ -261,27 +143,6 @@ class OpenVinoPlugin(
         sensors = self._sensors.pop(cameraId, {})
         for sensor in sensors.values():
             await sensor.destroy()
-
-    async def _add_sensors(self, camera: CameraDevice) -> None:
-        sensors: dict[str, Any] = {}
-
-        obj = OpenVinoObjectSensor(self, self.logger)
-        await camera.addSensor(obj)
-        sensors["object"] = obj
-
-        face = OpenVinoFaceSensor(self, self.logger)
-        await camera.addSensor(face)
-        sensors["face"] = face
-
-        lpd = OpenVinoLPDSensor(self, self.logger)
-        await camera.addSensor(lpd)
-        sensors["lpd"] = lpd
-
-        clip = OpenVinoClipSensor(self, self.logger)
-        await camera.addSensor(clip)
-        sensors["clip"] = clip
-
-        self._sensors[camera.id] = sensors
 
     async def get_object_detector(self, model_name: str) -> BoxDetector:
         detector = self.object_detectors.get(model_name)
@@ -656,6 +517,146 @@ class OpenVinoPlugin(
 
         embedding = await encoder.embed_text(text)
         return {"embedding": embedding, "embeddingModel": encoder.embedding_model}
+
+    async def _add_sensors(self, camera: CameraDevice) -> None:
+        sensors: dict[str, Any] = {}
+
+        obj = OpenVinoObjectSensor(self, self.logger)
+        await camera.addSensor(obj)
+        sensors["object"] = obj
+
+        face = OpenVinoFaceSensor(self, self.logger)
+        await camera.addSensor(face)
+        sensors["face"] = face
+
+        lpd = OpenVinoLPDSensor(self, self.logger)
+        await camera.addSensor(lpd)
+        sensors["lpd"] = lpd
+
+        clip = OpenVinoClipSensor(self, self.logger)
+        await camera.addSensor(clip)
+        sensors["clip"] = clip
+
+        self._sensors[camera.id] = sensors
+
+    def _active_hardware(self) -> str:
+        backends = [
+            detector.backend.device
+            for detector in (
+                *self.object_detectors.values(),
+                *self.face_detectors.values(),
+                *self.plate_detectors.values(),
+                *self.face_embedders.values(),
+                *self.ocr_models.values(),
+            )
+            if detector.backend is not None
+        ]
+        backends += [enc.vision.device for enc in self.clip_encoders.values() if enc.vision is not None]
+        if not backends:
+            return "No models loaded yet"
+        return ", ".join(dict.fromkeys(backends))
+
+    def _resolve_device(self) -> str:
+        mode = self.storage.values.get("device", DEFAULT_OPENVINO_DEVICE)
+        if mode and mode != "Default":
+            return str(mode)
+
+        try:
+            devices = list(self._core.available_devices)
+        except Exception:
+            return "AUTO"
+
+        has_npu = any("NPU" in d for d in devices)
+        gpus = [d for d in devices if "GPU" in d]  # "GPU", or "GPU.0"/"GPU.1" when multiple
+        has_gpu = bool(gpus)
+        dgpus: list[str] = []
+        for d in gpus:
+            try:
+                name = str(self._core.get_property(d, "FULL_DEVICE_NAME"))
+            except Exception:
+                name = ""
+            if "NVIDIA" in name and "dGPU" in name:
+                dgpus.append(d)
+
+        if has_npu and has_gpu:
+            return "AUTO:NPU,GPU,CPU"
+        if has_npu:
+            return "AUTO:NPU,CPU"
+        if dgpus:
+            # OpenVINO can't reliably split one model across multiple NVIDIA dGPUs; let AUTO pick one.
+            return f"AUTO:{','.join(dgpus)},CPU"
+        if len(gpus) > 1:
+            # Multiple (e.g. Intel Arc) GPUs → MULTI round-robins requests across them.
+            return "MULTI:" + ",".join(gpus)
+        if has_gpu:
+            return "GPU"
+        return "AUTO"
+
+    async def _on_device_change(self, new_value: object, old_value: object) -> None:
+        if new_value == old_value:
+            return
+        self.logger.log(f"Device setting changed ({old_value} -> {new_value}); reloading models")
+        await self._reload_models()
+
+    async def _reload_models(self) -> None:
+        obj = list(self.object_detectors)
+        fdet = list(self.face_detectors)
+        femb = list(self.face_embedders)
+        pdet = list(self.plate_detectors)
+        ocr = list(self.ocr_models)
+        clip = list(self.clip_encoders)
+
+        await self._close_all()
+        self.model_manager.reset()
+
+        await asyncio.gather(
+            *(self.get_object_detector(n) for n in obj),
+            *(self.get_face_detector(n) for n in fdet),
+            *(self.get_face_embedder(n) for n in femb),
+            *(self.get_plate_detector(n) for n in pdet),
+            *(self.get_ocr(n) for n in ocr),
+            *(self.get_clip_encoder(n) for n in clip),
+        )
+
+    async def _redownload_models(self) -> None:
+        self.logger.log("Re-downloading models (clearing cache)...")
+        shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
+        await self._reload_models()
+        self.logger.success("Models re-downloaded")
+
+    async def _close_all(self) -> None:
+        await asyncio.gather(
+            *(d.close() for d in self.object_detectors.values()),
+            *(d.close() for d in self.face_detectors.values()),
+            *(d.close() for d in self.plate_detectors.values()),
+            *(e.close() for e in self.face_embedders.values()),
+            *(e.close() for e in self.clip_encoders.values()),
+            *(o.close() for o in self.ocr_models.values()),
+        )
+        self.object_detectors.clear()
+        self.face_detectors.clear()
+        self.face_embedders.clear()
+        self.plate_detectors.clear()
+        self.ocr_models.clear()
+        self.clip_encoders.clear()
+
+    async def _on_start(self) -> None:
+        asyncio.create_task(self._preload_clip())
+
+    async def _preload_clip(self) -> None:
+        try:
+            await self.get_clip_encoder(DEFAULT_CLIP_VISION)
+            self.logger.log("CLIP models preloaded")
+        except Exception as e:
+            self.logger.error(f"Failed to preload CLIP models: {e}")
+
+    async def _on_shutdown(self) -> None:
+        for sensors in self._sensors.values():
+            for sensor in sensors.values():
+                await sensor.destroy()
+        self._sensors.clear()
+
+        await self._close_all()
 
 
 def __main__() -> type[OpenVinoPlugin]:
