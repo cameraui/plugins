@@ -1,7 +1,7 @@
 {
   "displayName": "OpenCL",
   "name": "@camera.ui/camera-ui-opencl",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "GPU-accelerated motion detection for camera.ui using OpenCL.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
