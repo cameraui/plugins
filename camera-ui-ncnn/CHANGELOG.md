@@ -1,3 +1,7 @@
+## [1.0.3]
+
+- Bugfixes and improvements
+
 ## [1.0.2]
 
 - Bugfixes and improvements
