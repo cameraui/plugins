@@ -1,7 +1,7 @@
 {
   "displayName": "WASM Motion",
   "name": "@camera.ui/camera-ui-wasm-motion",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Motion detection for camera.ui running as a WebAssembly module. Portable, dependency-free pixel motion analysis.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
