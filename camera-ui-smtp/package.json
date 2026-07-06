@@ -20,8 +20,8 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "mailparser": "^3.9.12",
-    "smtp-server": "^3.19.1"
+    "mailparser": "^3.9.14",
+    "smtp-server": "^3.19.2"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.60",

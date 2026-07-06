@@ -1,6 +1,6 @@
 ruff==0.15.20
 camera-ui-sdk==1.0.100
-camera-ui-common==1.0.17
+camera-ui-common==1.0.19
 nats-py==2.15.0
 deepdiff==9.1.0
 mypy==2.1.0
@@ -11,7 +11,7 @@ typing-extensions==4.16.0
 cachetools==7.1.4
 aiohttp==3.14.1
 Pillow==12.3.0
-virtualenv==21.5.1
+virtualenv==21.5.2
 setproctitle==1.3.7
 requests==2.34.2
 tabulate==0.10.0
