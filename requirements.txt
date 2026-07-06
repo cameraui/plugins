@@ -4,7 +4,7 @@ camera-ui-common==1.0.19
 nats-py==2.15.0
 deepdiff==9.1.0
 mypy==2.1.0
-numpy==2.4.6
+numpy==2.5.1
 lmdbm==0.0.6
 lmdb==2.2.1
 typing-extensions==4.16.0
