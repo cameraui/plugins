@@ -122,7 +122,6 @@ class CoreMLPlugin(
                 "key": "redownload_models",
                 "title": "Re-download Models",
                 "description": "Clear the local model cache and download the latest models again.",
-                "color": "info",
                 "onSet": self._redownload_models,
             },
         ]

@@ -11,6 +11,7 @@ import type {
   DeviceStorage,
   DiscoveredCamera,
   DiscoveryProvider,
+  FormSubmitResponse,
   JsonSchema,
   JsonSchemaWithoutCallbacks,
   LoggerService,
@@ -99,6 +100,13 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         defaultValue: 'West America',
         enum: AVAILABLE_REGIONS.map((region) => region.description),
         onSet: this.scheduleConnect.bind(this),
+      },
+      {
+        type: 'submit',
+        key: 'onLogin',
+        title: 'Login',
+        description: 'Login to Tuya',
+        onClick: this.onFormSubmit.bind(this, 'onLogin'),
       },
     ];
   }
@@ -274,6 +282,50 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
       await this.updateDiscoveredDevices(devices);
     } catch (error: any) {
       this.logger.error('An error occured during connecting:', error);
+    }
+  }
+
+  private async onFormSubmit(actionId: string, values: TuyaConfig): Promise<FormSubmitResponse | void> {
+    switch (actionId) {
+      case 'onLogin':
+        try {
+          const email = values.email ?? this.storage.values.email;
+          const password = values.password ?? this.storage.values.password;
+          const clientId = values.clientId ?? this.storage.values.clientId;
+          const clientSecret = values.clientSecret ?? this.storage.values.clientSecret;
+          const uid = values.uid ?? this.storage.values.uid;
+          const region = AVAILABLE_REGIONS.find((r) => r.description === (values.region ?? this.storage.values.region));
+
+          if (!region) {
+            return { toast: { message: 'Invalid region selected. Please select a valid region.', type: 'error' } };
+          }
+
+          const useSmartApi = !!(email && password);
+          const useCloudApi = !!(clientId && clientSecret && uid);
+
+          if (!useSmartApi && !useCloudApi) {
+            return { toast: { message: 'Please provide either Tuya Smart API or Tuya Cloud API credentials.', type: 'error' } };
+          }
+
+          if (useSmartApi) {
+            const smartApi = new TuyaSmartApiClient(region.host, email, password);
+            await smartApi.login();
+          }
+
+          if (useCloudApi) {
+            const cloudApi = new TuyaCloudApiClient(region.cloudHost, uid, clientId, clientSecret);
+            await cloudApi.login();
+          }
+
+          await this.scheduleConnect();
+
+          return { toast: { message: 'Successfully logged in to Tuya', type: 'success' } };
+        } catch (error: any) {
+          const message = `Failed to Authenticate. Reason: ${error.message}`;
+          this.logger.error(message);
+
+          return { toast: { message, type: 'error' } };
+        }
     }
   }
 

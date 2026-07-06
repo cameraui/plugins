@@ -129,7 +129,6 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         key: 'onLogin',
         title: 'Login',
         description: 'Login to Eufy',
-        color: 'success',
         onClick: this.onFormSubmit.bind(this, 'onLogin'),
       },
     ];
@@ -571,7 +570,7 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
   }
 
   private credentialsKey(home: EufyHome): string {
-    return [home.username, home.password, getCountryCode(home.country), home.deviceName ?? ''].join(' ');
+    return [home.username, home.password, getCountryCode(home.country), home.deviceName ?? ''].join('\0');
   }
 
   private async getClient(home: EufyHome): Promise<EufySecurity> {

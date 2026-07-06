@@ -100,7 +100,6 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
                 "key": "onLogin",
                 "title": "Login",
                 "description": "Login to Wyze",
-                "color": "success",
                 "onClick": partial(self._on_form_submit, "onLogin"),
             },
         ]

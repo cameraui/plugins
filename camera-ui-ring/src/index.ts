@@ -127,7 +127,6 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
         key: 'onLogin',
         title: 'Login',
         description: 'Sign in to your Ring account.',
-        color: 'success',
         onClick: this.onFormSubmit.bind(this, 'onLogin'),
       },
     ];
