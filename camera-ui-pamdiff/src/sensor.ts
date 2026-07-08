@@ -219,9 +219,9 @@ export class PamDiffMotionSensor extends MotionDetectorSensor<PamDiffStorageValu
 
   private async resetToDefaults(): Promise<void> {
     if (this.storage) {
-      this.storage.setValue('difference', DEFAULT_DIFFERENCE);
-      this.storage.setValue('percentage', DEFAULT_PERCENTAGE);
-      this.storage.setValue('mode', DEFAULT_MODE);
+      await this.storage.setValue('difference', DEFAULT_DIFFERENCE);
+      await this.storage.setValue('percentage', DEFAULT_PERCENTAGE);
+      await this.storage.setValue('mode', DEFAULT_MODE);
     }
   }
 }

@@ -184,10 +184,10 @@ export class WASMMotionSensor extends MotionDetectorSensor<WASMMotionStorageValu
 
   private async resetToDefaults(): Promise<void> {
     if (this.storage) {
-      this.storage.setValue('area', DEFAULT_MOTION_AREA);
-      this.storage.setValue('threshold', DEFAULT_THRESHOLD);
-      this.storage.setValue('blurRadius', DEFAULT_BLUR_RADIUS);
-      this.storage.setValue('dilationSize', DEFAULT_DILATION_SIZE);
+      await this.storage.setValue('area', DEFAULT_MOTION_AREA);
+      await this.storage.setValue('threshold', DEFAULT_THRESHOLD);
+      await this.storage.setValue('blurRadius', DEFAULT_BLUR_RADIUS);
+      await this.storage.setValue('dilationSize', DEFAULT_DILATION_SIZE);
     }
   }
 }

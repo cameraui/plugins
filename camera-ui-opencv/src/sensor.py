@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, TypedDict
 
@@ -211,6 +212,7 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
         if self._executor is None:
             self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="OpenCV")
 
+        loop = asyncio.get_event_loop()
         detections: list[tuple[float, float, float, float]] = []
 
         if self.storage.values["motion_detector"] == "Frame Difference":
@@ -218,8 +220,12 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
                 self._prev_frame = current_frame
                 return {"detected": False, "detections": []}
 
-            detections = get_detections_fd(
-                self._prev_frame, current_frame, self.storage.values["frame_difference_area"]
+            detections = await loop.run_in_executor(
+                self._executor,
+                get_detections_fd,
+                self._prev_frame,
+                current_frame,
+                self.storage.values["frame_difference_area"],
             )
             self._prev_frame = current_frame
 
@@ -227,7 +233,9 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
             if self._back_sub is None:
                 self._back_sub = cv2.createBackgroundSubtractorMOG2(varThreshold=18, detectShadows=False)
 
-            detections = get_detections_bs(
+            detections = await loop.run_in_executor(
+                self._executor,
+                get_detections_bs,
                 current_frame,
                 self._back_sub,
                 self.storage.values["background_substraction_threshold"],
@@ -246,7 +254,9 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
                 self._prev_frame = blurred_frame
                 return {"detected": False, "detections": []}
 
-            detections = get_detections(
+            detections = await loop.run_in_executor(
+                self._executor,
+                get_detections,
                 self._prev_frame,
                 blurred_frame,
                 self.storage.values["default_threshold"],

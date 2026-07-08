@@ -42,11 +42,12 @@ def _detect_arch() -> str | None:
 class HailoModelManager(BaseModelManager):
     def __init__(self, storage_path: str, logger: LoggerService) -> None:
         super().__init__(storage_path, logger, model_version)
-        self._arch = _detect_arch()
-        if self._arch is None:
-            logger.warn(f"Could not detect Hailo device; assuming {_DEFAULT_ARCH}")
-        else:
-            logger.log(f"Available devices: {_ARCH_DISPLAY.get(self._arch, self._arch)}")
+        self._arch: str | None = None
+        self._arch_task: asyncio.Task[None] | None = None
+
+    async def ensure_backend(self, model_name: str) -> InferenceBackend:
+        await self._ensure_arch()
+        return await super().ensure_backend(model_name)
 
     def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
         arch = self._arch or _DEFAULT_ARCH
@@ -59,3 +60,15 @@ class HailoModelManager(BaseModelManager):
         backend = await asyncio.to_thread(HailoBackend, paths["hef"], device)
         self.logger.success(f"Loaded model: {model_name} ({device})")
         return backend
+
+    async def _ensure_arch(self) -> None:
+        if self._arch_task is None:
+            self._arch_task = asyncio.create_task(self._detect_arch_async())
+        await self._arch_task
+
+    async def _detect_arch_async(self) -> None:
+        self._arch = await asyncio.to_thread(_detect_arch)
+        if self._arch is None:
+            self.logger.warn(f"Could not detect Hailo device; assuming {_DEFAULT_ARCH}")
+        else:
+            self.logger.log(f"Available devices: {_ARCH_DISPLAY.get(self._arch, self._arch)}")

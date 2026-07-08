@@ -107,7 +107,11 @@ class CoralPlugin(BasePlugin, ObjectDetectionInterface):
             # Coral emits the raw YOLOv9 head (decoded on the host); apply NMS to dedupe boxes.
             detector = BoxDetector(self.model_manager, self.logger, name="object detector", apply_nms=True)
             self.object_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.object_detectors.pop(model_name, None)
+                raise
             # tflite carries no embedded class names; inject the trained labels.
             detector.labels = {index: str(label) for index, label in OBJECT_LABELS.items()}
         return detector
@@ -199,7 +203,7 @@ class CoralPlugin(BasePlugin, ObjectDetectionInterface):
         await self._close_all()
         self.model_manager.reset()
 
-        await asyncio.gather(*(self.get_object_detector(n) for n in obj))
+        await asyncio.gather(*(self.get_object_detector(n) for n in obj), return_exceptions=True)
 
     async def _redownload_models(self) -> None:
         self.logger.log("Re-downloading models (clearing cache)...")

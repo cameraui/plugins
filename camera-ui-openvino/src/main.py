@@ -148,7 +148,11 @@ class OpenVinoPlugin(
         if not detector:
             detector = BoxDetector(self.model_manager, self.logger, name="object detector")
             self.object_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.object_detectors.pop(model_name, None)
+                raise
             # OpenVINO IR has no embedded class names; inject the trained labels.
             detector.labels = {index: str(label) for index, label in OBJECT_LABELS.items()}
         return detector
@@ -158,7 +162,11 @@ class OpenVinoPlugin(
         if not detector:
             detector = BoxDetector(self.model_manager, self.logger, name="face detector")
             self.face_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.face_detectors.pop(model_name, None)
+                raise
         return detector
 
     async def get_face_embedder(self, model_name: str) -> Embedder:
@@ -167,7 +175,11 @@ class OpenVinoPlugin(
             size = FACE_EMBEDDER_MODELS.get(model_name, FACE_EMBEDDER_INPUT_SIZE)
             embedder = Embedder(self.model_manager, self.logger, size=size)
             self.face_embedders[model_name] = embedder
-            await embedder.initialize(model_name)
+            try:
+                await embedder.initialize(model_name)
+            except Exception:
+                self.face_embedders.pop(model_name, None)
+                raise
         return embedder
 
     async def get_plate_detector(self, model_name: str) -> BoxDetector:
@@ -181,7 +193,11 @@ class OpenVinoPlugin(
                 threshold=0.25,
             )
             self.plate_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.plate_detectors.pop(model_name, None)
+                raise
         return detector
 
     async def get_ocr(self, model_name: str) -> PlateOcr:
@@ -197,7 +213,11 @@ class OpenVinoPlugin(
                 pad_char=OCR_PAD_CHAR,
             )
             self.ocr_models[model_name] = ocr
-            await ocr.initialize(model_name)
+            try:
+                await ocr.initialize(model_name)
+            except Exception:
+                self.ocr_models.pop(model_name, None)
+                raise
         return ocr
 
     async def get_clip_encoder(self, model_name: str) -> ClipEncoder:
@@ -205,7 +225,11 @@ class OpenVinoPlugin(
         if not encoder:
             encoder = ClipEncoder(self.model_manager, self.logger)
             self.clip_encoders[model_name] = encoder
-            await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
+            try:
+                await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
+            except Exception:
+                self.clip_encoders.pop(model_name, None)
+                raise
         return encoder
 
     async def objectDetectionSettings(self) -> list[JsonSchema] | None:
@@ -615,6 +639,7 @@ class OpenVinoPlugin(
             *(self.get_plate_detector(n) for n in pdet),
             *(self.get_ocr(n) for n in ocr),
             *(self.get_clip_encoder(n) for n in clip),
+            return_exceptions=True,
         )
 
     async def _redownload_models(self) -> None:

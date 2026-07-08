@@ -79,7 +79,11 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
         if not detector:
             detector = HailoDetector(self.model_manager, self.logger, COCO_TO_CLASS)
             self.object_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.object_detectors.pop(model_name, None)
+                raise
             # HEF carries no embedded class names; inject the (mapped) labels.
             detector.labels = {index: str(label) for index, label in OBJECT_LABELS.items()}
         return detector
@@ -160,7 +164,7 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
         obj = list(self.object_detectors)
         await self._close_all()
         self.model_manager.reset()
-        await asyncio.gather(*(self.get_object_detector(n) for n in obj))
+        await asyncio.gather(*(self.get_object_detector(n) for n in obj), return_exceptions=True)
 
     async def _redownload_models(self) -> None:
         self.logger.log("Re-downloading models (clearing cache)...")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from typing import Any, TypedDict
@@ -13,7 +14,13 @@ from camera_ui_sdk import (
     VideoFrameData,
 )
 
-from detector_defaults import DEFAULT_ALPHA, DEFAULT_AREA, DEFAULT_BLUR, DEFAULT_DILT, DEFAULT_THRESHOLD
+from detector_defaults import (
+    DEFAULT_ALPHA,
+    DEFAULT_AREA,
+    DEFAULT_BLUR,
+    DEFAULT_DILT,
+    DEFAULT_THRESHOLD,
+)
 from opencl_detector import OpenCLMotionDetector, create_program
 
 
@@ -114,15 +121,25 @@ class OpenCLMotionSensor(MotionDetectorSensor[OpenCLStorageValues]):
         width = frame["width"]
         height = frame["height"]
 
-        if self._opencl_detector is None:
-            self._opencl_detector = OpenCLMotionDetector(
-                self._opencl_ctx, width, height, self.storage.values["blur"], self._camera_device.logger
-            )
-
         if self._executor is None:
             self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="OpenCL")
 
-        detections = self._opencl_detector.process_frame(
+        loop = asyncio.get_event_loop()
+
+        if self._opencl_detector is None:
+            self._opencl_detector = await loop.run_in_executor(
+                self._executor,
+                OpenCLMotionDetector,
+                self._opencl_ctx,
+                width,
+                height,
+                self.storage.values["blur"],
+                self._camera_device.logger,
+            )
+
+        detections = await loop.run_in_executor(
+            self._executor,
+            self._opencl_detector.process_frame,
             current_frame,
             self.storage.values["threshold"],
             self.storage.values["dilation"],

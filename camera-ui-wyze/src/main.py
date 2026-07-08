@@ -217,10 +217,10 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
 
         await self._update_discovered_cameras(cameras)
 
-    def _on_token_update(self, token: Token) -> None:
+    async def _on_token_update(self, token: Token) -> None:
         self.storage.values["accessToken"] = token.access_token
         self.storage.values["refreshToken"] = token.refresh_token
-        self.storage.save()
+        await self.storage.save()
 
     async def _update_discovered_cameras(self, cameras: list[WyzeCamera]) -> None:
         for camera in cameras:
@@ -302,7 +302,7 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
             )
 
             self.storage.values = values
-            self.storage.save()
+            await self.storage.save()
 
             self._wyze_client.register_for_token_callback(self._on_token_update)
 

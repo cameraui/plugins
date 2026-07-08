@@ -103,10 +103,9 @@ class ONNXPlugin(
                 "key": "execution_provider",
                 "title": "Execution Provider",
                 "description": (
-                    "Hardware backend for inference. 'auto' selects CoreML on macOS, "
-                    "CUDA on Linux/Windows (x86_64), CPU otherwise. 'tensorrt' uses the NVIDIA "
-                    "TensorRT provider (slower first run while it builds/caches an engine). "
-                    "Always falls back to CPU. "
+                    "Hardware backend for inference. 'auto' selects CUDA on Linux/Windows "
+                    "(x86_64), CPU otherwise. 'tensorrt' uses the NVIDIA TensorRT provider "
+                    "(slower first run while it builds/caches an engine). Always falls back to CPU. "
                     f"Available on this system: {', '.join(ort.get_available_providers())}."
                 ),
                 "enum": EXECUTION_PROVIDERS,
@@ -162,7 +161,11 @@ class ONNXPlugin(
         if not detector:
             detector = BoxDetector(self.model_manager, self.logger, name="object detector", multiclass=True)
             self.object_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.object_detectors.pop(model_name, None)
+                raise
         return detector
 
     async def get_face_detector(self, model_name: str) -> BoxDetector:
@@ -170,7 +173,11 @@ class ONNXPlugin(
         if not detector:
             detector = BoxDetector(self.model_manager, self.logger, name="face detector")
             self.face_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.face_detectors.pop(model_name, None)
+                raise
         return detector
 
     async def get_face_embedder(self, model_name: str) -> Embedder:
@@ -179,7 +186,11 @@ class ONNXPlugin(
             size = FACE_EMBEDDER_MODELS.get(model_name, FACE_EMBEDDER_INPUT_SIZE)
             embedder = Embedder(self.model_manager, self.logger, size=size)
             self.face_embedders[model_name] = embedder
-            await embedder.initialize(model_name)
+            try:
+                await embedder.initialize(model_name)
+            except Exception:
+                self.face_embedders.pop(model_name, None)
+                raise
         return embedder
 
     async def get_plate_detector(self, model_name: str) -> BoxDetector:
@@ -193,7 +204,11 @@ class ONNXPlugin(
                 threshold=0.25,
             )
             self.plate_detectors[model_name] = detector
-            await detector.initialize(model_name)
+            try:
+                await detector.initialize(model_name)
+            except Exception:
+                self.plate_detectors.pop(model_name, None)
+                raise
         return detector
 
     async def get_ocr(self, model_name: str) -> PlateOcr:
@@ -209,7 +224,11 @@ class ONNXPlugin(
                 pad_char=OCR_PAD_CHAR,
             )
             self.ocr_models[model_name] = ocr
-            await ocr.initialize(model_name)
+            try:
+                await ocr.initialize(model_name)
+            except Exception:
+                self.ocr_models.pop(model_name, None)
+                raise
         return ocr
 
     async def get_clip_encoder(self, model_name: str) -> ClipEncoder:
@@ -217,7 +236,11 @@ class ONNXPlugin(
         if not encoder:
             encoder = ClipEncoder(self.model_manager, self.logger)
             self.clip_encoders[model_name] = encoder
-            await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
+            try:
+                await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
+            except Exception:
+                self.clip_encoders.pop(model_name, None)
+                raise
         return encoder
 
     async def objectDetectionSettings(self) -> list[JsonSchema] | None:
@@ -572,6 +595,14 @@ class ONNXPlugin(
         ids = [int(part.strip()) for part in raw.split(",") if part.strip().isdigit()]
         return ids or [0]
 
+    @staticmethod
+    def _cuda_options(device_id: int) -> dict[str, Any]:
+        return {
+            "device_id": device_id,
+            "cudnn_conv_algo_search": "HEURISTIC",
+            "cudnn_conv_use_max_workspace": "1",
+        }
+
     def _resolve_provider_lists(self) -> list[ProviderList]:
         pref = self.storage.values.get("execution_provider", DEFAULT_EXECUTION_PROVIDER)
         system = platform.system()
@@ -580,7 +611,6 @@ class ONNXPlugin(
 
         x86 = machine in ("x86_64", "AMD64")
         use_cuda = pref == "cuda" or (pref == "auto" and system in ("Linux", "Windows") and x86)
-        use_coreml = pref == "coreml" or (pref == "auto" and system == "Darwin")
 
         if pref == "tensorrt" and "TensorrtExecutionProvider" in available:
             cache_dir = os.path.join(self.api.storagePath, "trt-engine-cache")
@@ -596,7 +626,7 @@ class ONNXPlugin(
                             "trt_fp16_enable": True,
                         },
                     ),
-                    ("CUDAExecutionProvider", {"device_id": device_id}),
+                    ("CUDAExecutionProvider", self._cuda_options(device_id)),
                     "CPUExecutionProvider",
                 ]
                 for device_id in self._device_ids()
@@ -604,13 +634,11 @@ class ONNXPlugin(
         if use_cuda and "CUDAExecutionProvider" in available:
             return [
                 [
-                    ("CUDAExecutionProvider", {"device_id": device_id}),
+                    ("CUDAExecutionProvider", self._cuda_options(device_id)),
                     "CPUExecutionProvider",
                 ]
                 for device_id in self._device_ids()
             ]
-        if use_coreml and "CoreMLExecutionProvider" in available:
-            return [["CoreMLExecutionProvider", "CPUExecutionProvider"]]
         return [["CPUExecutionProvider"]]
 
     async def _on_provider_change(self, new_value: object, old_value: object) -> None:
@@ -637,6 +665,7 @@ class ONNXPlugin(
             *(self.get_plate_detector(n) for n in pdet),
             *(self.get_ocr(n) for n in ocr),
             *(self.get_clip_encoder(n) for n in clip),
+            return_exceptions=True,
         )
 
     async def _redownload_models(self) -> None:
