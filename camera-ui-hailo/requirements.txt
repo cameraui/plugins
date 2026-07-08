@@ -1,7 +1,7 @@
 hailort @ https://github.com/frigate-nvr/hailort/releases/download/v4.21.0/hailort-4.21.0-cp311-cp311-linux_aarch64.whl ; platform_machine=="aarch64" and python_version=="3.11"
 hailort @ https://github.com/frigate-nvr/hailort/releases/download/v4.21.0/hailort-4.21.0-cp311-cp311-linux_x86_64.whl ; platform_machine=="x86_64" and python_version=="3.11"
-camera-ui-sdk==1.1.0
-camera-ui-ml==1.2.2
+camera-ui-sdk==1.1.1
+camera-ui-ml==1.2.3
 numpy==2.4.6
 Pillow==12.3.0
 aiohttp==3.14.1
