@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "camera-ui-ml"
-version = "1.2.2"
+version = "1.2.3"
 description = "Shared ML inference framework for camera.ui detection plugins (onnx, openvino, coreml, ncnn)"
 keywords = ["camera.ui", "python", "ml", "inference", "detection"]
 readme = "README.md"
