@@ -51,7 +51,7 @@ class AudioDetector:
                 return
 
             labels_path = os.path.join(self.model_path, labels_file)
-            self.labels = self._load_labels(labels_path)
+            self.labels = await asyncio.to_thread(self._load_labels, labels_path)
 
             model_path = os.path.join(self.model_path, model_file)
             self.interpreter = await asyncio.to_thread(self._load_model, model_path)
