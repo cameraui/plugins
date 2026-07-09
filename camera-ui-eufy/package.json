@@ -20,7 +20,7 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "@seydx/rtsp": "^0.0.7",
+    "@seydx/rtsp": "^1.0.0",
     "eufy-security-client": "^4.2.0"
   },
   "devDependencies": {
@@ -33,7 +33,7 @@
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
     "globals": "^17.7.0",
-    "prettier": "^3.9.4",
+    "prettier": "^3.9.5",
     "rimraf": "^6.1.3",
     "tsx": "^4.23.0",
     "typescript": "5.9.3",
@@ -61,5 +61,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-eufy"
+  },
+  "allowScripts": {
+    "node-av@6.1.1": true
   }
 }
