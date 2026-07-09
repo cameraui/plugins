@@ -25,6 +25,7 @@ export interface EufyHome {
   debug?: boolean;
   maxLiveStreamDuration?: number;
   ignoreDevices?: string[];
+  localOnly?: boolean;
 }
 
 export interface EufyCameraStorage {

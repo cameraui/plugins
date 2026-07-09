@@ -24,6 +24,10 @@ import type {
 import type { Camera as EufyCamera, EufySecurityConfig, Logger, LoginOptions } from 'eufy-security-client';
 import type { DeviceContainer, EufyConnectionResponse, EufyHome, StorageValues } from './types.js';
 
+function isBestEffortLegacyError(error: Error): boolean {
+  return error?.message?.includes('Invalid passport profile response') ?? false;
+}
+
 export default class Eufy extends BasePlugin<StorageValues> implements DiscoveryProvider {
   private existingCameras = new Map<string, CameraDevice>();
   private eufyCameras = new Map<string, Camera>();
@@ -106,8 +110,17 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         description: 'Max duration of live stream in seconds',
         required: false,
         defaultValue: 86400,
-        minimum: 60,
+        minimum: 10,
         maximum: 86400,
+        store: true,
+      },
+      {
+        type: 'boolean',
+        key: 'localOnly',
+        title: 'Local Only',
+        description: 'Connect to cameras only on the local network (lower latency, no cloud relay). Disables remote streaming access.',
+        required: false,
+        defaultValue: false,
         store: true,
       },
       {
@@ -299,17 +312,26 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
           return;
         }
 
-        eufyClient.once('connect', () => {
-          resolve();
-        });
+        const client = eufyClient;
+        let settled = false;
+        const settle = (fn: () => void): void => {
+          if (settled) return;
+          settled = true;
+          client.removeListener('connect', onConnect);
+          client.removeListener('connection error', onError);
+          client.removeListener('close', onClose);
+          fn();
+        };
+        const onConnect = (): void => settle(() => resolve());
+        const onError = (error: Error): void => {
+          if (isBestEffortLegacyError(error)) return;
+          settle(() => reject(error));
+        };
+        const onClose = (): void => settle(() => reject(new Error('Connection closed')));
 
-        eufyClient.once('connection error', (error: Error) => {
-          reject(error);
-        });
-
-        eufyClient.once('close', () => {
-          reject(new Error('Connection closed'));
-        });
+        client.on('connect', onConnect);
+        client.on('connection error', onError);
+        client.on('close', onClose);
       });
 
     try {
@@ -337,15 +359,24 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
 
       eufyClient.on('connection error', async (error: Error) => {
         this.logger.debug(home.name, `Error: ${error}`);
+        if (isBestEffortLegacyError(error)) {
+          return;
+        }
         this.closeClient(home);
       });
 
       eufyClient.once('captcha request', async () => {
+        if (eufyClient!.isConnected()) {
+          return;
+        }
         this.logger.error(home.name, 'CAPTCHA Required! Please re-authenticate via UI and restart Plugin!');
         this.closeClient(home);
       });
 
       eufyClient.on('tfa request', async () => {
+        if (eufyClient!.isConnected()) {
+          return;
+        }
         this.logger.error(home.name, 'Two-Factor Authentication (2FA) Requested! Please re-authenticate via UI and restart Plugin!');
         this.closeClient(home);
       });
@@ -540,7 +571,10 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
       const onConnect = (): void => finish(() => resolve({ connected: true }));
       const onTfa = (): void => finish(() => resolve({ connected: false, is2FA: true }));
       const onCaptcha = (id: string, captcha: string): void => finish(() => resolve({ connected: false, isCaptcha: { id, captcha } }));
-      const onError = (error: Error): void => finish(() => reject(error));
+      const onError = (error: Error): void => {
+        if (isBestEffortLegacyError(error)) return;
+        finish(() => reject(error));
+      };
 
       eufyClient.once('connect', onConnect);
       eufyClient.once('tfa request', onTfa);
@@ -563,6 +597,9 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
 
       try {
         await eufyClient.connect(loginOptions);
+        if (eufyClient.isConnected()) {
+          finish(() => resolve({ connected: true }));
+        }
       } catch (error: any) {
         finish(() => reject(error));
       }
@@ -622,9 +659,10 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
       trustedDeviceName: home.deviceName,
       language: 'en',
       persistentDir,
-      p2pConnectionSetup: P2PConnectionType.QUICKEST,
+      p2pConnectionSetup: home.localOnly ? P2PConnectionType.ONLY_LOCAL : P2PConnectionType.QUICKEST,
       pollingIntervalMinutes: 10,
       eventDurationSeconds: 10,
+      acceptInvitations: true,
     };
 
     const eufyClient = await EufySecurity.initialize(eufyConfig, logger);
