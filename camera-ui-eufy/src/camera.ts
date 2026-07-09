@@ -213,7 +213,9 @@ export class Camera {
 
     this.relay.on('stop', () => this.resetTalkback());
 
-    this.rtspServer = await this.relay.serveRtsp({ path: 'live', backchannel: { ...TALKBACK_ADVERTISE } });
+    // Eufy P2P AAC is unreliable (some models emit ADTS headers the RTP muxer's
+    // bitstream filter cannot adapt), so normalize it by re-encoding.
+    this.rtspServer = await this.relay.serveRtsp({ path: 'live', backchannel: { ...TALKBACK_ADVERTISE }, audioTranscode: { codec: 'aac' } });
     this.rtspServer.on('backchannel', (rtp) => this.handleTalkbackRtp(rtp));
 
     this.cameraLogger.log('P2P RTSP relay started');
@@ -252,6 +254,14 @@ export class Camera {
 
     if (rtspUrl && rtspUrl !== '') {
       return rtspUrl;
+    }
+
+    if (!this.eufyDevice.hasProperty(PropertyName.DeviceRTSPStream)) {
+      throw new Error('This Eufy device does not support native RTSP — enable "Use P2P" for this camera.');
+    }
+
+    if (!this.eufyDevice.getPropertyValue(PropertyName.DeviceRTSPStream)) {
+      await this.eufyClient.setDeviceProperty(this.eufyDevice.getSerial(), PropertyName.DeviceRTSPStream, true);
     }
 
     let attempts = 0;
