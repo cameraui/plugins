@@ -17,14 +17,6 @@ export class EufyP2PSource implements Source {
     this.closed = false;
     const stream = await this.manager.getLocalLivestream();
 
-    const { videoCodec, videoFPS, videoWidth, videoHeight, audioCodec } = stream.metadata;
-    this.logger?.debug?.('Stream metadata:', {
-      video: VideoCodec[videoCodec],
-      resolution: `${videoWidth}x${videoHeight}`,
-      fps: videoFPS,
-      audio: AudioCodec[audioCodec],
-    });
-
     // Consumer may have given up during the slow P2P negotiation — release the livestream and abort.
     if (this.closed) {
       this.manager.stopLocalLiveStream();

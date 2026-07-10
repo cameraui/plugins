@@ -213,9 +213,7 @@ export class Camera {
 
     this.relay.on('stop', () => this.resetTalkback());
 
-    // Eufy P2P AAC is unreliable (some models emit ADTS headers the RTP muxer's
-    // bitstream filter cannot adapt), so normalize it by re-encoding.
-    this.rtspServer = await this.relay.serveRtsp({ path: 'live', backchannel: { ...TALKBACK_ADVERTISE }, audioTranscode: { codec: 'aac' } });
+    this.rtspServer = await this.relay.serveRtsp({ path: 'live', backchannel: { ...TALKBACK_ADVERTISE }, audioTranscode: { codec: 'aac', bitRate: 48000 } });
     this.rtspServer.on('backchannel', (rtp) => this.handleTalkbackRtp(rtp));
 
     this.cameraLogger.log('P2P RTSP relay started');
