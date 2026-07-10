@@ -217,7 +217,7 @@ export class Camera {
       path: 'live',
       backchannel: { ...TALKBACK_ADVERTISE },
       audioTranscode: { codec: 'aac', bitRate: 48000 },
-      sdpTimeout: 30,
+      sdpTimeout: 30000,
     });
 
     this.rtspServer.on('backchannel', (rtp) => this.handleTalkbackRtp(rtp));
