@@ -207,13 +207,19 @@ export class Camera {
     // Lazy relay: acquires the Eufy livestream on first viewer, releases it after idleTimeout when the last leaves.
     this.relay = new Relay({
       source: new EufyP2PSource(this.localLivestreamManager, this.relayLogger),
-      idleTimeout: 5_000,
+      idleTimeout: 10_000,
       logger: this.relayLogger,
     });
 
     this.relay.on('stop', () => this.resetTalkback());
 
-    this.rtspServer = await this.relay.serveRtsp({ path: 'live', backchannel: { ...TALKBACK_ADVERTISE }, audioTranscode: { codec: 'aac', bitRate: 48000 } });
+    this.rtspServer = await this.relay.serveRtsp({
+      path: 'live',
+      backchannel: { ...TALKBACK_ADVERTISE },
+      audioTranscode: { codec: 'aac', bitRate: 48000 },
+      sdpTimeout: 30,
+    });
+
     this.rtspServer.on('backchannel', (rtp) => this.handleTalkbackRtp(rtp));
 
     this.cameraLogger.log('P2P RTSP relay started');
