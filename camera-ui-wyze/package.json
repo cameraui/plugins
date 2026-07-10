@@ -1,7 +1,7 @@
 {
   "displayName": "Wyze",
   "name": "@camera.ui/camera-ui-wyze",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Integrates Wyze cameras into camera.ui, with device discovery, live streaming and motion events.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
