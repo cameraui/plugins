@@ -1,7 +1,7 @@
 {
   "displayName": "Rust Motion",
   "name": "@camera.ui/camera-ui-rust-motion",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Native motion detection for camera.ui, powered by a Rust detector for low CPU usage.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
