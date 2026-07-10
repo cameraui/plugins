@@ -7,7 +7,8 @@
   "main": "./bundle/dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "rimraf dist && tsc",
+    "build": "rimraf dist && npm run build:eufy && tsc",
+    "build:eufy": "npm --prefix ../externals/eufy-security-client ci --ignore-scripts && npm --prefix ../externals/eufy-security-client run build",
     "bundle": "npm run format && npm run lint && npm run build && cui bundle",
     "bundle:dev": "npm run format && npm run lint && npm run build && cross-env MODE=development cui bundle",
     "format": "prettier --write \"src/\" --ignore-unknown --no-error-on-unmatched-pattern",
@@ -21,7 +22,7 @@
   },
   "dependencies": {
     "@seydx/rtsp": "^1.0.0",
-    "eufy-security-client": "^4.2.0"
+    "eufy-security-client": "file:../externals/eufy-security-client"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.62",
