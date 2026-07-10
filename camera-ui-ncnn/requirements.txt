@@ -1,5 +1,5 @@
 ncnn==1.0.20260526
-camera-ui-sdk==1.1.1
+camera-ui-sdk==1.1.2
 camera-ui-ml==1.2.3
 numpy==2.4.6
 Pillow==12.3.0

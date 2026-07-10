@@ -24,8 +24,8 @@
     "ring-client-api": "file:../externals/ring"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.62",
-    "@camera.ui/sdk": "^0.0.14",
+    "@camera.ui/cli": "^0.0.63",
+    "@camera.ui/sdk": "^0.0.15",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.1",
     "@types/ws": "^8.18.1",
@@ -34,7 +34,7 @@
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
     "globals": "^17.7.0",
-    "prettier": "^3.9.4",
+    "prettier": "^3.9.5",
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.63.0",

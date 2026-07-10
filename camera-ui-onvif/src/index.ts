@@ -84,6 +84,7 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
             id: device.id,
             name: device.name,
             model: device.model,
+            address: device.onvif.hostname,
           },
         ]);
       }
@@ -117,6 +118,7 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
           id: device.id,
           name: device.name,
           model: device.model,
+          address: device.onvif.hostname,
         });
       }
     }

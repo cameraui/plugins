@@ -75,6 +75,7 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         key: 'clientSecret',
         title: 'Client Secret',
         description: 'Client secret from your Tuya IoT cloud project.',
+        format: 'password',
         required: true,
         store: true,
         group: 'Cloud API',
