@@ -308,9 +308,9 @@ export class Camera {
         type: 'boolean',
         key: 'useP2P',
         title: 'Use P2P',
-        description: 'Stream over P2P instead of RTSP. Use this if your camera has no RTSP.',
+        description: 'Stream over P2P instead of RTSP. Use this if your camera has no RTSP enabled.',
         required: false,
-        defaultValue: false,
+        defaultValue: true,
         store: true,
         onSet: async (useP2P: boolean) => {
           await this.onUseP2PChanged(useP2P);
