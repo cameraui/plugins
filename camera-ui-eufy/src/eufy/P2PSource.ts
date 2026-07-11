@@ -1,11 +1,16 @@
-import { MultiSource } from '@seydx/rtsp';
+import { buildAacEldConfig, MultiSource, RawAudioTranscoder } from '@seydx/rtsp';
 import { AudioCodec, VideoCodec } from 'eufy-security-client';
 
 import type { Logger, MediaPacket, MultiSourceInput, Source, StreamInfo } from '@seydx/rtsp';
 import type { LocalLivestreamManager } from './LocalLiveStreamManager.js';
 
+const ELD_SAMPLE_RATE = 16000;
+const ELD_CHANNELS = 1;
+const ELD_FRAME_LENGTH = 480;
+
 export class EufyP2PSource implements Source {
   private multi?: MultiSource;
+  private eldTranscoder?: RawAudioTranscoder;
   private closed = false;
 
   constructor(
@@ -31,7 +36,26 @@ export class EufyP2PSource implements Source {
       },
     ];
     if (hasAudio(stream.metadata.audioCodec)) {
-      inputs.push({ input: stream.audiostream, format: 'aac' });
+      if (stream.metadata.audioCodec === AudioCodec.AAC_ELD) {
+        this.eldTranscoder = new RawAudioTranscoder({
+          from: {
+            codec: 'aac',
+            decoder: 'libfdk_aac',
+            sampleRate: ELD_SAMPLE_RATE,
+            channels: ELD_CHANNELS,
+            samplesPerFrame: ELD_FRAME_LENGTH,
+            config: buildAacEldConfig(ELD_SAMPLE_RATE, ELD_CHANNELS, ELD_FRAME_LENGTH),
+          },
+          to: { bitRate: 32000 },
+          logger: this.logger,
+          onError: (error) => this.logger?.error?.('Eufy ELD audio transcode failed — audio stops until the next stream start:', error),
+        });
+        await this.eldTranscoder.start();
+        stream.audiostream.on('data', (frame: Buffer) => this.eldTranscoder?.push(frame));
+        inputs.push({ input: this.eldTranscoder.stream, format: 'aac' });
+      } else {
+        inputs.push({ input: stream.audiostream, format: 'aac' });
+      }
     }
 
     this.multi = new MultiSource(inputs, { logger: this.logger });
@@ -49,6 +73,8 @@ export class EufyP2PSource implements Source {
       await this.multi?.close();
     } finally {
       this.multi = undefined;
+      await this.eldTranscoder?.close().catch(() => undefined);
+      this.eldTranscoder = undefined;
       this.manager.stopLocalLiveStream();
     }
   }
