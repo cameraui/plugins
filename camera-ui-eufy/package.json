@@ -21,12 +21,12 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "@seydx/rtsp": "^1.0.4",
+    "@seydx/rtsp": "^1.0.5",
     "eufy-security-client": "file:../externals/eufy-security-client"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.63",
-    "@camera.ui/sdk": "^0.0.16",
+    "@camera.ui/sdk": "^0.0.17",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.1",
     "@typescript-eslint/parser": "^8.63.0",
