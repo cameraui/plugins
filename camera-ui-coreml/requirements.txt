@@ -4,4 +4,4 @@ camera-ui-ml==1.2.3
 numpy==2.4.6
 Pillow==12.3.0
 aiohttp==3.14.1
-transformers==5.13.0
+transformers==5.13.1
