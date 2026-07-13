@@ -54,9 +54,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install Python deps (shared tools + plugin-specific)
+      - name: Install Python deps (mypy for build + plugin requirements)
         if: needs.resolve.outputs.runtime == 'python'
-        run: pip install -r requirements.txt -r "$PLUGIN/requirements.txt"
+        run: pip install mypy -r "$PLUGIN/requirements.txt"
 
       - name: Verify tag matches plugin package.json version
         run: |

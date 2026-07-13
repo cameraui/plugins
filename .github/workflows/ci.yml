@@ -36,7 +36,6 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/scripts/select-plugins.mjs'
             shared-python:
-              - 'requirements.txt'
               - '.github/workflows/ci.yml'
               - '.github/scripts/select-plugins.mjs'
             camera-ui-homekit: ['camera-ui-homekit/**']
@@ -106,8 +105,8 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install deps (shared tools + plugin-specific)
-        run: pip install -r requirements.txt -r ${{ matrix.plugin }}/requirements.txt
+      - name: Install deps (lint/type tools + plugin requirements)
+        run: pip install ruff mypy -r ${{ matrix.plugin }}/requirements.txt
 
       - name: Format (ruff)
         run: cd ${{ matrix.plugin }} && ruff format

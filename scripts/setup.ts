@@ -54,8 +54,7 @@ function setupPython(): void {
     ok('virtualenv already present');
   }
 
-  const rootReq = join(ROOT, 'requirements.txt');
-  if (existsSync(rootReq)) run(`"${python}" -m pip install -r "${rootReq}"`);
+  run(`"${python}" -m pip install ruff mypy cupdate`);
 
   const reqFiles = pluginRequirements();
   if (reqFiles.length === 0) {
