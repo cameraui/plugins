@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.63",
-    "@camera.ui/sdk": "^0.0.15",
+    "@camera.ui/sdk": "^0.0.18",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.1",
     "@typescript-eslint/parser": "^8.63.0",
