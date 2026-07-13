@@ -1,3 +1,8 @@
+## [1.1.2]
+
+- Fixed motion/detection events never arriving on cameras that report an internal or wrong address for their event subscription — event polling now always uses the configured host and port
+- Debug logging for incoming ONVIF events (topic, parsed motion state, dropped events) — enable the camera's debug log level to trace event delivery
+
 ## [1.1.1]
 
 - Bugfixes and improvements

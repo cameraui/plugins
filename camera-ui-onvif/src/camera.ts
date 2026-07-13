@@ -205,10 +205,17 @@ export class OnvifCamera {
   }
 
   private handleEvent(message: NotificationMessage, capabilities: OnvifCapabilities): void {
+    this.camera.logger.debug('ONVIF event received:', message.topic?._ ?? '(no topic)');
+
     const motionData = parseMotionEvent(message);
-    if (motionData && this.motionSensor) {
-      this.motionSensor.handleMotion(motionData);
+    if (motionData) {
       this.trackDynamicCapability('motion', capabilities);
+      if (this.motionSensor) {
+        this.camera.logger.debug('ONVIF motion event:', motionData.isMotion);
+        this.motionSensor.handleMotion(motionData);
+      } else {
+        this.camera.logger.debug('ONVIF motion event dropped — no motion sensor registered');
+      }
       return;
     }
 
@@ -259,6 +266,7 @@ export class OnvifCamera {
       username,
       password,
       port: port ? parseInt(port) : 80,
+      preserveAddress: true,
     });
 
     return await device.connect();
