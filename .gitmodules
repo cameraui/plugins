@@ -10,3 +10,6 @@
 [submodule "externals/eufy-security-client"]
 	path = externals/eufy-security-client
 	url = https://github.com/seydx/eufy-security-client.git
+[submodule "externals/reolinkproxy"]
+	path = externals/reolinkproxy
+	url = https://github.com/seydx/reolinkproxy.git
