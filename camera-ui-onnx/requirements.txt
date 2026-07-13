@@ -1,6 +1,6 @@
 onnxruntime-gpu==1.26.0; sys_platform != "darwin" and platform_machine != "aarch64"
 onnxruntime==1.27.0
-camera-ui-sdk==1.1.2
+camera-ui-sdk==1.1.4
 camera-ui-ml==1.2.3
 numpy==2.4.6
 Pillow==12.3.0
