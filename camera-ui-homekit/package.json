@@ -27,11 +27,11 @@
     "werift": "^0.23.0"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.63",
-    "@camera.ui/sdk": "^0.0.18",
+    "@camera.ui/cli": "^0.0.64",
+    "@camera.ui/sdk": "^0.0.19",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.1",
-    "@typescript-eslint/parser": "^8.63.0",
+    "@typescript-eslint/parser": "^8.64.0",
     "concurrently": "^10.0.3",
     "cpy-cli": "^7.0.0",
     "cross-env": "^10.1.0",
@@ -40,7 +40,7 @@
     "prettier": "^3.9.5",
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.63.0",
+    "typescript-eslint": "^8.64.0",
     "updates": "^17.18.2"
   },
   "bugs": {
