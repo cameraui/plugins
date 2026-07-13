@@ -21,6 +21,7 @@ jobs:
     outputs:
       node: ${{ steps.select.outputs.node }}
       python: ${{ steps.select.outputs.python }}
+      go: ${{ steps.select.outputs.go }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -29,15 +30,23 @@ jobs:
           filters: |
             shared-node:
               - 'externals/**'
+              - '!externals/reolinkproxy'
+              - '!externals/reolinkproxy/**'
               - 'package.json'
               - 'package-lock.json'
               - 'tsconfig.json'
               - 'scripts/**'
               - '.github/workflows/ci.yml'
               - '.github/scripts/select-plugins.mjs'
+              - '.github/scripts/plugins.mjs'
             shared-python:
               - '.github/workflows/ci.yml'
               - '.github/scripts/select-plugins.mjs'
+              - '.github/scripts/plugins.mjs'
+            shared-go:
+              - '.github/workflows/ci.yml'
+              - '.github/scripts/select-plugins.mjs'
+              - '.github/scripts/plugins.mjs'
             camera-ui-homekit: ['camera-ui-homekit/**']
             camera-ui-onvif: ['camera-ui-onvif/**']
             camera-ui-ring: ['camera-ui-ring/**']
@@ -57,6 +66,7 @@ jobs:
             camera-ui-opencv: ['camera-ui-opencv/**']
             camera-ui-openvino: ['camera-ui-openvino/**']
             camera-ui-wyze: ['camera-ui-wyze/**']
+            camera-ui-reolink: ['camera-ui-reolink/**', 'externals/reolinkproxy', 'externals/reolinkproxy/**']
       - id: select
         env:
           CHANGED: ${{ steps.filter.outputs.changes }}
@@ -89,6 +99,47 @@ jobs:
 
       - name: Lint
         run: npm --prefix ${{ matrix.plugin }} run lint
+
+  go-plugins:
+    needs: changes
+    if: needs.changes.outputs.go != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.go) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Init submodules
+        if: matrix.externals != ''
+        run: git submodule update --init --depth 1 ${{ matrix.externals }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ matrix.plugin }}/go.mod
+          cache-dependency-path: ${{ matrix.plugin }}/go.sum
+
+      - name: Install
+        run: npm --prefix ${{ matrix.plugin }} install --ignore-scripts
+
+      - name: Build
+        run: npm --prefix ${{ matrix.plugin }} run build
+
+      - name: Install Go lint tools
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+
+      - name: Lint
+        run: npm --prefix ${{ matrix.plugin }} run lint
+
+      - name: Test
+        run: npm --prefix ${{ matrix.plugin }} test
 
   python-plugins:
     needs: changes

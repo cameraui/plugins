@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs';
 
-import { NODE, PYTHON } from './plugins.mjs';
+import { GO, NODE, PYTHON } from './plugins.mjs';
 
 const tag = process.env.GITHUB_REF_NAME || process.argv[2] || '';
 
@@ -18,15 +18,16 @@ const [, plugin, version] = match;
 
 const isNode = Object.prototype.hasOwnProperty.call(NODE, plugin);
 const isPython = PYTHON.includes(plugin);
-if (!isNode && !isPython) {
+const isGo = Object.prototype.hasOwnProperty.call(GO, plugin);
+if (!isNode && !isPython && !isGo) {
   console.error(
     `::error::Unknown plugin '${plugin}'. Add it to .github/scripts/plugins.mjs.`,
   );
   process.exit(1);
 }
 
-const runtime = isPython ? 'python' : 'node';
-const externals = isNode ? NODE[plugin] : '';
+const runtime = isPython ? 'python' : isGo ? 'go' : 'node';
+const externals = isNode ? NODE[plugin] : isGo ? GO[plugin] : '';
 
 // dist-tag derives from the semver prerelease label. cui publish only knows
 // --alpha / --beta / --latest, so anything else is rejected up front.

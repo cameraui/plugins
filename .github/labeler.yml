@@ -37,6 +37,9 @@ openvino:
 pamdiff:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-pamdiff/**'
+reolink:
+  - changed-files:
+      - any-glob-to-any-file: 'camera-ui-reolink/**'
 ring:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-ring/**'

@@ -34,6 +34,7 @@ const CATEGORY_OVERRIDES: Record<string, Category> = {
   'camera-ui-opencv': 'ai-model',
   'camera-ui-openvino': 'ai-model',
   'camera-ui-pamdiff': 'detection',
+  'camera-ui-reolink': 'camera-source',
   'camera-ui-ring': 'camera-source',
   'camera-ui-rust-motion': 'detection',
   'camera-ui-smtp': 'detection',
@@ -57,13 +58,15 @@ const EXTERNAL_PLUGINS: Record<string, CatalogEntry> = {
   },
 };
 
+const DRAFT_PLUGINS = new Set<string>([]);
+
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif']);
 
 function discoverPlugins(): string[] {
   return readdirSync(ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('camera-ui-'))
     .map((entry) => entry.name)
-    .filter((name) => existsSync(resolve(ROOT, name, 'package.json')))
+    .filter((name) => existsSync(resolve(ROOT, name, 'package.json')) && !DRAFT_PLUGINS.has(name))
     .sort();
 }
 

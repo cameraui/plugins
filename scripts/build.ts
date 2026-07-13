@@ -48,6 +48,7 @@ const directories = [
   '../camera-ui-opencv',
   '../camera-ui-openvino',
   '../camera-ui-pamdiff',
+  '../camera-ui-reolink',
   '../camera-ui-ring',
   '../camera-ui-rust-motion',
   '../camera-ui-smtp',

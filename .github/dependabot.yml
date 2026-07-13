@@ -19,3 +19,8 @@ updates:
       - "/camera-ui-*"
     schedule:
       interval: daily
+  - package-ecosystem: "gomod"
+    directories:
+      - "/camera-ui-*"
+    schedule:
+      interval: daily

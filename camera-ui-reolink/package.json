@@ -1,0 +1,52 @@
+{
+  "displayName": "Reolink",
+  "name": "@camera.ui/camera-ui-reolink",
+  "version": "1.0.0",
+  "description": "Integrates Reolink cameras and doorbells into camera.ui via the native Baichuan protocol, with device discovery, live streaming, two-way audio, and motion, AI object, battery and doorbell events.",
+  "author": "seydx (https://github.com/cameraui/plugins)",
+  "main": "./bundle/main.go",
+  "type": "module",
+  "scripts": {
+    "build": "rimraf dist && go build -o /dev/null ./src/",
+    "bundle": "npm run build && cui bundle",
+    "bundle:dev": "npm run build && cross-env MODE=development cui bundle",
+    "format": "gofmt -w ./src/* && go fix ./src/...",
+    "install-updates": "npm i --save --force && go mod tidy",
+    "lint": "staticcheck ./src/... && golangci-lint run ./src/...",
+    "prepublishOnly": "node -e \"if(!process.env.SAFE_PUBLISH){console.error('Error: Please use @camera.ui/cli to publish the plugin:\\n  npm run publish:alpha\\n  npm run publish:beta\\n  npm run publish:latest\\n');process.exit(1)}\"",
+    "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
+    "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
+    "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
+    "test": "go test ./...",
+    "update": "updates --update ./"
+  },
+  "devDependencies": {
+    "@camera.ui/cli": "~0.0.64",
+    "@camera.ui/sdk": "~0.0.19",
+    "@types/node": "^26.1.1",
+    "cross-env": "^10.1.0",
+    "rimraf": "^6.1.3",
+    "typescript": "5.9.3",
+    "updates": "^17.18.2"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cameraui/plugins/issues"
+  },
+  "engines": {
+    "camera.ui": ">=2.0.6",
+    "node": ">=22.0.0"
+  },
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-reolink#readme",
+  "keywords": [
+    "camera-ui-plugin",
+    "reolink",
+    "baichuan"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cameraui/plugins.git"
+  },
+  "os": [],
+  "cpu": []
+}

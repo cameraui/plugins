@@ -10,6 +10,10 @@ export const NODE = {
   'camera-ui-wasm-motion': '',
 };
 
+export const GO = {
+  'camera-ui-reolink': 'externals/reolinkproxy',
+};
+
 export const PYTHON = [
   'camera-ui-audio-yamnet',
   'camera-ui-coral',

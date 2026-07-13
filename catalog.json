@@ -111,6 +111,14 @@
     "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/camera-ui-pamdiff/logo.png",
     "screenshots": []
   },
+  "@camera.ui/camera-ui-reolink": {
+    "displayName": "Reolink",
+    "category": "camera-source",
+    "featured": false,
+    "tagline": "Integrates Reolink cameras and doorbells into camera.ui via the native Baichuan protocol, with device discovery, live streaming, two-way audio, and motion, AI object, battery and doorbell events.",
+    "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/camera-ui-reolink/logo.png",
+    "screenshots": []
+  },
   "@camera.ui/camera-ui-ring": {
     "displayName": "Ring",
     "category": "camera-source",
