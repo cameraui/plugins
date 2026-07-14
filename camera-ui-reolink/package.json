@@ -50,7 +50,7 @@
   "os": [],
   "cpu": [],
   "optionalDependencies": {
-    "@camera.ui/camera-ui-reolink-darwin-arm64": "1.0.0",
+    "@camera.ui/camera-ui-reolink-darwin-arm64": "1.0.1",
     "@camera.ui/camera-ui-reolink-darwin-amd64": "1.0.0",
     "@camera.ui/camera-ui-reolink-linux-amd64": "1.0.0",
     "@camera.ui/camera-ui-reolink-linux-arm64": "0.0.1",
