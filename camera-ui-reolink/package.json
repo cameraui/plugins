@@ -1,7 +1,7 @@
 {
   "displayName": "Reolink",
   "name": "@camera.ui/camera-ui-reolink",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Integrates Reolink cameras and doorbells into camera.ui via the native Baichuan protocol, with device discovery, live streaming, two-way audio, and motion, AI object, battery and doorbell events.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/main.go",
@@ -48,5 +48,15 @@
     "url": "git+https://github.com/cameraui/plugins.git"
   },
   "os": [],
-  "cpu": []
+  "cpu": [],
+  "optionalDependencies": {
+    "@camera.ui/camera-ui-reolink-darwin-arm64": "0.0.1",
+    "@camera.ui/camera-ui-reolink-darwin-amd64": "0.0.1",
+    "@camera.ui/camera-ui-reolink-linux-amd64": "0.0.1",
+    "@camera.ui/camera-ui-reolink-linux-arm64": "0.0.1",
+    "@camera.ui/camera-ui-reolink-windows-amd64": "0.0.1",
+    "@camera.ui/camera-ui-reolink-windows-arm64": "0.0.1",
+    "@camera.ui/camera-ui-reolink-linux-amd64-musl": "0.0.1",
+    "@camera.ui/camera-ui-reolink-linux-arm64-musl": "0.0.1"
+  }
 }
