@@ -1,5 +1,5 @@
 coremltools==9.0
-camera-ui-sdk==1.1.5
+camera-ui-sdk==1.1.6
 camera-ui-ml==1.2.3
 numpy==2.4.6
 Pillow==12.3.0
