@@ -1,7 +1,7 @@
 {
   "displayName": "HomeKit",
   "name": "@camera.ui/camera-ui-homekit",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Exposes camera.ui cameras and sensors to Apple HomeKit, bridging motion, doorbell, battery, contact, light, switch, siren, security system and audio events into the Home app.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
