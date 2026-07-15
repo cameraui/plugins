@@ -1,3 +1,7 @@
+## [1.1.4]
+
+- fix: use always fresh snapshots
+
 ## [1.1.3]
 
 - Bump camera.ui engine and SDK
