@@ -1,4 +1,13 @@
-import { getAllSupportedDetectionTypes, getSupportedDetectionTypes, Onvif, parseAudioEvent, parseDetectionEvent, parseMotionEvent } from '@seydx/onvif';
+import {
+  categorizeEvent,
+  extractTopicPaths,
+  getAllSupportedDetectionTypes,
+  getSupportedDetectionTypes,
+  Onvif,
+  parseAudioEvent,
+  parseDetectionEvent,
+  parseMotionEvent,
+} from '@seydx/onvif';
 import { OnvifAudioSensor, OnvifFaceSensor, OnvifMotionSensor, OnvifObjectSensor, OnvifPTZSensor } from './sensors/index.js';
 
 import type { CameraDevice, DeviceStorage, LoggerService } from '@camera.ui/sdk';
@@ -141,28 +150,34 @@ export class OnvifCamera {
     const types = this.capabilities?.advertisedTypes ?? [];
 
     if (types.includes('motion')) {
-      this.motionSensor = new OnvifMotionSensor(this.camera);
+      this.motionSensor = new OnvifMotionSensor(this.camera, this.topicsForTypes(['motion']));
       await this.camera.addSensor(this.motionSensor);
       this.motionSensor.onAssignmentChanged.subscribe(() => this.updateEventLoop());
     }
 
     if (types.includes('person') || types.includes('vehicle') || types.includes('animal')) {
-      this.objectSensor = new OnvifObjectSensor(this.camera);
+      this.objectSensor = new OnvifObjectSensor(this.camera, this.topicsForTypes(['person', 'vehicle', 'animal']));
       await this.camera.addSensor(this.objectSensor);
       this.objectSensor.onAssignmentChanged.subscribe(() => this.updateEventLoop());
     }
 
     if (types.includes('face')) {
-      this.faceSensor = new OnvifFaceSensor(this.camera);
+      this.faceSensor = new OnvifFaceSensor(this.camera, this.topicsForTypes(['face']));
       await this.camera.addSensor(this.faceSensor);
       this.faceSensor.onAssignmentChanged.subscribe(() => this.updateEventLoop());
     }
 
     if (types.includes('audio')) {
-      this.audioSensor = new OnvifAudioSensor(this.camera);
+      this.audioSensor = new OnvifAudioSensor(this.camera, this.topicsForTypes(['audio']));
       await this.camera.addSensor(this.audioSensor);
       this.audioSensor.onAssignmentChanged.subscribe(() => this.updateEventLoop());
     }
+  }
+
+  private topicsForTypes(types: EventCategory[]): string[] {
+    const topicSet = this.capabilities?.eventProperties?.topicSet;
+    if (!topicSet) return [];
+    return extractTopicPaths(topicSet).filter((topic) => types.includes(categorizeEvent(topic)));
   }
 
   private updateEventLoop(): void {

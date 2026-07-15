@@ -1,6 +1,6 @@
 import { PTZCapability, PTZControl } from '@camera.ui/sdk';
 
-import type { CameraDevice, PTZDirection, PTZPosition, PTZRelativeMove } from '@camera.ui/sdk';
+import type { CameraDevice, JsonSchema, PTZDirection, PTZPosition, PTZRelativeMove } from '@camera.ui/sdk';
 import type { Onvif, PTZStatus } from '@seydx/onvif';
 
 const POLL_INTERVAL_MS = 200;
@@ -27,6 +27,45 @@ export class OnvifPTZSensor extends PTZControl {
     super(name);
     this.cameraDevice = cameraDevice;
     this.device = device;
+  }
+
+  // live values via onGet: capabilities are only known after initialize()
+  override get storageSchema(): JsonSchema[] {
+    const has = (cap: PTZCapability) => this.capabilities.includes(cap);
+    return [
+      {
+        type: 'string',
+        key: 'infoAxes',
+        title: 'Axes',
+        description: 'Movement axes reported by the camera.',
+        readonly: true,
+        onGet: async () => [has(PTZCapability.Pan) && 'Pan', has(PTZCapability.Tilt) && 'Tilt', has(PTZCapability.Zoom) && 'Zoom'].filter(Boolean).join(', ') || 'None',
+      },
+      {
+        type: 'string',
+        key: 'infoMoveSupport',
+        title: 'Move Support',
+        description: 'Move commands the camera accepts.',
+        readonly: true,
+        onGet: async () =>
+          [
+            has(PTZCapability.RelativeMove) && 'Displacement (FOV)',
+            has(PTZCapability.AbsolutePosition) && 'Absolute position',
+            has(PTZCapability.VelocityControl) && 'Velocity',
+            has(PTZCapability.Home) && 'Home',
+          ]
+            .filter(Boolean)
+            .join(', ') || 'None',
+      },
+      {
+        type: 'string',
+        key: 'infoPresets',
+        title: 'Presets',
+        description: 'Presets discovered on the camera.',
+        readonly: true,
+        onGet: async () => (this.presets.length ? this.presets.join(', ') : 'None'),
+      },
+    ];
   }
 
   protected override onAssigned(): void {
