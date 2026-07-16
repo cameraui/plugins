@@ -86,9 +86,9 @@ export class OnvifCamera {
         'ONVIF capabilities:',
         JSON.stringify({ hasPTZ: this.capabilities.hasPTZ, hasEvents: this.capabilities.hasEvents, advertisedTypes: this.capabilities.advertisedTypes }),
       );
-      if (this.capabilities.eventProperties) {
-        this.camera.logger.trace('ONVIF event properties', JSON.stringify(this.capabilities.eventProperties, null, 2));
-      }
+      // if (this.capabilities.eventProperties) {
+      //   this.camera.logger.trace('ONVIF event properties', JSON.stringify(this.capabilities.eventProperties, null, 2));
+      // }
 
       if (this.capabilities.hasPTZ) {
         await this.setupPTZSensor(this.device);
