@@ -60,7 +60,7 @@ jobs:
 
       - name: Setup Go
         if: needs.resolve.outputs.runtime == 'go'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: ${{ needs.resolve.outputs.plugin }}/go.mod
           cache-dependency-path: ${{ needs.resolve.outputs.plugin }}/go.sum
