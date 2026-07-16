@@ -1,7 +1,7 @@
 {
   "displayName": "Coral",
   "name": "@camera.ui/camera-ui-coral",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Coral Edge TPU (TFLite) detection backend for camera.ui. Runs object detection on a Coral Edge TPU with CPU fallback.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
