@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import cv2
 import numpy as np
@@ -23,7 +23,7 @@ from detector_defaults import (
     DEFAULT_LEARNING_RATE,
     DEFAULT_MODEL,
     DEFAULT_THRESHOLD,
-    DEFAULT_THRESHOLD_BS,
+    DEFAULT_VAR_THRESHOLD_BS,
 )
 from opencv_utils import get_detections, get_detections_bs, get_detections_fd
 
@@ -33,9 +33,9 @@ class OpenCVStorageValues(TypedDict):
     default_area: int
     default_threshold: int
     default_blur: int
-    default_dilation: int
+    default_dilation_size: int
     background_substraction_area: int
-    background_substraction_threshold: int
+    background_substraction_var_threshold: int
     background_substraction_learning_rate: float
     frame_difference_area: int
 
@@ -112,14 +112,14 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
             },
             {
                 "type": "number",
-                "key": "default_dilation",
+                "key": "default_dilation_size",
                 "title": "Dilation",
                 "description": "Expansion of detected motion areas",
                 "store": True,
                 "defaultValue": DEFAULT_DILT,
                 "minimum": 1,
                 "maximum": 21,
-                "step": 1,
+                "step": 2,
                 "required": True,
                 "group": "Default",
             },
@@ -147,16 +147,17 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
             },
             {
                 "type": "number",
-                "key": "background_substraction_threshold",
+                "key": "background_substraction_var_threshold",
                 "title": "Threshold",
                 "description": "Sensitivity of motion detection (higher = less sensitive)",
                 "store": True,
-                "defaultValue": DEFAULT_THRESHOLD_BS,
-                "minimum": 1,
-                "maximum": 255,
+                "defaultValue": DEFAULT_VAR_THRESHOLD_BS,
+                "minimum": 4,
+                "maximum": 200,
                 "step": 1,
                 "required": True,
                 "group": "Background Substraction",
+                "onSet": self._on_var_threshold_changed,
             },
             {
                 "type": "number",
@@ -231,14 +232,16 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
 
         elif self.storage.values["motion_detector"] == "Background Substraction":
             if self._back_sub is None:
-                self._back_sub = cv2.createBackgroundSubtractorMOG2(varThreshold=18, detectShadows=False)
+                self._back_sub = cv2.createBackgroundSubtractorMOG2(
+                    varThreshold=self.storage.values["background_substraction_var_threshold"],
+                    detectShadows=False,
+                )
 
             detections = await loop.run_in_executor(
                 self._executor,
                 get_detections_bs,
                 current_frame,
                 self._back_sub,
-                self.storage.values["background_substraction_threshold"],
                 self.storage.values["background_substraction_area"],
                 self.storage.values["background_substraction_learning_rate"],
             )
@@ -254,6 +257,10 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
                 self._prev_frame = blurred_frame
                 return {"detected": False, "detections": []}
 
+            dilation = self.storage.values["default_dilation_size"]
+            if dilation % 2 == 0:
+                dilation += 1
+
             detections = await loop.run_in_executor(
                 self._executor,
                 get_detections,
@@ -261,6 +268,7 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
                 blurred_frame,
                 self.storage.values["default_threshold"],
                 self.storage.values["default_area"],
+                dilation,
             )
             self._prev_frame = blurred_frame
 
@@ -294,6 +302,10 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
     def on_deassigned(self) -> None:
         self.resetState()
 
+    async def _on_var_threshold_changed(self, new_value: object, old_value: object) -> None:
+        if self._back_sub is not None:
+            self._back_sub.setVarThreshold(cast(float, new_value))
+
     async def _reset_all_settings(self) -> None:
         if self.storage:
             await self.storage.setValue("motion_detector", DEFAULT_MODEL)
@@ -306,12 +318,12 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
             await self.storage.setValue("default_area", DEFAULT_AREA)
             await self.storage.setValue("default_threshold", DEFAULT_THRESHOLD)
             await self.storage.setValue("default_blur", DEFAULT_BLUR)
-            await self.storage.setValue("default_dilation", DEFAULT_DILT)
+            await self.storage.setValue("default_dilation_size", DEFAULT_DILT)
 
     async def _reset_bs_settings(self) -> None:
         if self.storage:
             await self.storage.setValue("background_substraction_area", DEFAULT_AREA_BS)
-            await self.storage.setValue("background_substraction_threshold", DEFAULT_THRESHOLD_BS)
+            await self.storage.setValue("background_substraction_var_threshold", DEFAULT_VAR_THRESHOLD_BS)
             await self.storage.setValue("background_substraction_learning_rate", DEFAULT_LEARNING_RATE)
         self._back_sub = None
 

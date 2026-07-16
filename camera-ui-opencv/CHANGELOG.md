@@ -1,3 +1,9 @@
+## [1.1.4]
+
+- **The Threshold slider for the Background Substraction detector now works.** It never had any effect before, apart from the maximum position, which silently switched motion detection off completely. If you had it at maximum, detection starts working again. The slider resets to a value that matches the previous detection behaviour.
+- **The Dilation setting on the Default detector now works.** It never had any effect before. It resets to a value that matches the previous detection behaviour, so nothing changes until you move it.
+- **The Learning Rate setting now applies to the motion test panel and to motion automation nodes.** Both ignored it and ran a fixed value. Background Substraction results there will shift, and now match what the camera does live.
+
 ## [1.1.3]
 
 - Bump camera.ui engine and SDK

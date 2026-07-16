@@ -1,10 +1,11 @@
-from typing import Any, cast
+from typing import Any
 
 import cv2
 import numpy as np
 
 DEFAULT_AREA_THRESHOLD = 500
 DEFAULT_THRESHOLD = 50
+DEFAULT_DILATION_SIZE = 5
 DEFAULT_MASK_KERNEL = np.array((9, 9), dtype=np.uint8)
 DEFAULT_LEARNING_RATE = 0.08
 
@@ -26,14 +27,12 @@ def get_mask(
     return mask
 
 
-def get_motion_mask(
-    fg_mask: cv2.typing.MatLike,
-    threshold: int = DEFAULT_THRESHOLD,
-) -> cv2.typing.MatLike:
-    thresh = cv2.threshold(fg_mask, threshold, 255, cv2.THRESH_BINARY)[1]
+# fg_mask is binary only while the subtractors run detectShadows=False; with shadows on,
+# the 127 shadow pixels need a threshold gate here before they reach findContours
+def get_motion_mask(fg_mask: cv2.typing.MatLike) -> cv2.typing.MatLike:
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
-    motion_mask = cv2.medianBlur(thresh, 3)
+    motion_mask = cv2.medianBlur(fg_mask, 3)
     motion_mask = cv2.morphologyEx(motion_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     motion_mask = cv2.morphologyEx(motion_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
@@ -58,10 +57,12 @@ def get_detections(
     blurred_frame2: cv2.typing.MatLike,
     threshold: int = DEFAULT_THRESHOLD,
     area_threshold: int = DEFAULT_AREA_THRESHOLD,
+    dilation_size: int = DEFAULT_DILATION_SIZE,
 ) -> list[tuple[float, float, float, float]]:
     delta_frame = cv2.absdiff(blurred_frame1, blurred_frame2)
     thresh_frame = cv2.threshold(delta_frame, threshold, 255, cv2.THRESH_BINARY)[1]
-    thresh_frame = cast(cv2.typing.MatLike, cv2.dilate(thresh_frame, None, iterations=2))  # type: ignore
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (dilation_size, dilation_size))
+    thresh_frame = cv2.dilate(thresh_frame, kernel, iterations=1)
     return get_contour_detections(thresh_frame, area_threshold)
 
 
@@ -77,10 +78,9 @@ def get_detections_fd(
 def get_detections_bs(
     frame: np.ndarray[Any, Any],
     backSub: cv2.BackgroundSubtractorMOG2 | cv2.BackgroundSubtractorKNN,
-    threshold: int = DEFAULT_THRESHOLD,
     area_threshold: int = DEFAULT_AREA_THRESHOLD,
     learning_rate: float = DEFAULT_LEARNING_RATE,
 ) -> list[tuple[float, float, float, float]]:
     fg_mask = backSub.apply(frame, learningRate=learning_rate)
-    motion_mask = get_motion_mask(fg_mask, threshold=threshold)
+    motion_mask = get_motion_mask(fg_mask)
     return get_contour_detections(motion_mask, area_threshold)

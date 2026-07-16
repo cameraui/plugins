@@ -33,7 +33,7 @@ from detector_defaults import (
     DEFAULT_LEARNING_RATE,
     DEFAULT_MODEL,
     DEFAULT_THRESHOLD,
-    DEFAULT_THRESHOLD_BS,
+    DEFAULT_VAR_THRESHOLD_BS,
 )
 from opencv_utils import get_detections, get_detections_bs, get_detections_fd
 from sensor import OpenCVMotionSensor
@@ -132,14 +132,14 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
             },
             {
                 "type": "number",
-                "key": "default_dilation",
+                "key": "default_dilation_size",
                 "title": "Dilation",
                 "description": "Expansion of detected motion areas",
                 "store": False,
                 "defaultValue": DEFAULT_DILT,
                 "minimum": 1,
                 "maximum": 21,
-                "step": 1,
+                "step": 2,
                 "required": True,
                 "group": "Default",
             },
@@ -158,13 +158,13 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
             },
             {
                 "type": "number",
-                "key": "background_substraction_threshold",
+                "key": "background_substraction_var_threshold",
                 "title": "Threshold",
                 "description": "Sensitivity of motion detection (higher = less sensitive)",
                 "store": False,
-                "defaultValue": DEFAULT_THRESHOLD_BS,
-                "minimum": 1,
-                "maximum": 255,
+                "defaultValue": DEFAULT_VAR_THRESHOLD_BS,
+                "minimum": 4,
+                "maximum": 200,
                 "step": 1,
                 "required": True,
                 "group": "Background Substraction",
@@ -278,24 +278,35 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
 
                     elif detector_model == "Background Substraction":
                         if backSub is None:
-                            backSub = cv2.createBackgroundSubtractorMOG2(varThreshold=18, detectShadows=False)
+                            var_threshold = config.get(
+                                "background_substraction_var_threshold", DEFAULT_VAR_THRESHOLD_BS
+                            )
+                            backSub = cv2.createBackgroundSubtractorMOG2(
+                                varThreshold=var_threshold, detectShadows=False
+                            )
 
-                        threshold = config.get("background_substraction_threshold", DEFAULT_THRESHOLD_BS)
                         area = config.get("background_substraction_area", DEFAULT_AREA_BS)
+                        learning_rate = config.get(
+                            "background_substraction_learning_rate", DEFAULT_LEARNING_RATE
+                        )
 
                         dets = await asyncio.get_event_loop().run_in_executor(
                             executor,
                             get_detections_bs,
                             gray,
                             backSub,
-                            threshold,
                             area,
+                            learning_rate,
                         )
 
                     else:
                         blur = config.get("default_blur", DEFAULT_BLUR)
                         threshold = config.get("default_threshold", DEFAULT_THRESHOLD)
                         area = config.get("default_area", DEFAULT_AREA)
+
+                        dilation = config.get("default_dilation_size", DEFAULT_DILT)
+                        if dilation % 2 == 0:
+                            dilation += 1
 
                         gray = cv2.stackBlur(gray, (blur, blur))
 
@@ -310,6 +321,7 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
                             gray,
                             threshold,
                             area,
+                            dilation,
                         )
 
                         previous_frame = gray
@@ -384,11 +396,16 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
 
                 elif detector_model == "Background Substraction":
                     if backSub is None:
-                        backSub = cv2.createBackgroundSubtractorMOG2(varThreshold=18, detectShadows=False)
-                    threshold = cfg.get("background_substraction_threshold", DEFAULT_THRESHOLD_BS)
+                        var_threshold = cfg.get(
+                            "background_substraction_var_threshold", DEFAULT_VAR_THRESHOLD_BS
+                        )
+                        backSub = cv2.createBackgroundSubtractorMOG2(
+                            varThreshold=var_threshold, detectShadows=False
+                        )
                     area = cfg.get("background_substraction_area", DEFAULT_AREA_BS)
+                    learning_rate = cfg.get("background_substraction_learning_rate", DEFAULT_LEARNING_RATE)
                     dets = await asyncio.get_event_loop().run_in_executor(
-                        executor, get_detections_bs, gray, backSub, threshold, area
+                        executor, get_detections_bs, gray, backSub, area, learning_rate
                     )
 
                 else:
@@ -401,8 +418,11 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
                         continue
                     threshold = cfg.get("default_threshold", DEFAULT_THRESHOLD)
                     area = cfg.get("default_area", DEFAULT_AREA)
+                    dilation = cfg.get("default_dilation_size", DEFAULT_DILT)
+                    if dilation % 2 == 0:
+                        dilation += 1
                     dets = await asyncio.get_event_loop().run_in_executor(
-                        executor, get_detections, previous_frame, gray, threshold, area
+                        executor, get_detections, previous_frame, gray, threshold, area, dilation
                     )
                     previous_frame = gray
 
