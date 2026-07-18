@@ -32,6 +32,7 @@ export class StreamingSession {
   private streamingSession?: RtpSession;
   private prepareStreamRequest: PrepareStreamRequest;
   private cameraLogger: LoggerService;
+  private stopPromise?: Promise<void>;
 
   private lastPacketLoss = 0;
   private packetReceivedSubject = new Subject<void>();
@@ -168,12 +169,23 @@ export class StreamingSession {
     await this.run(session, startStreamRequest);
   }
 
-  public async stop(): Promise<void> {
+  public stop(): Promise<void> {
+    this.stopPromise ??= Promise.resolve().then(() => this.shutdown());
+    return this.stopPromise;
+  }
+
+  private async shutdown(): Promise<void> {
     this.cameraLogger.debug('Stopping stream');
-    await this.streamingSession?.stop();
-    this.audioSplitter.close();
-    this.videoSplitter.close();
-    this.cameraLogger.debug('Stream stopped');
+    const streamingSession = this.streamingSession;
+    this.streamingSession = undefined;
+
+    try {
+      await streamingSession?.stop();
+    } finally {
+      this.audioSplitter.close();
+      this.videoSplitter.close();
+      this.cameraLogger.debug('Stream stopped');
+    }
   }
 
   private selectStreamSource(startStreamRequest: StartStreamRequest, remote: boolean): CameraDeviceSource {

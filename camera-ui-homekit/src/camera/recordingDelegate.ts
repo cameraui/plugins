@@ -96,9 +96,9 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     }
   }
 
-  public stop(): void {
+  public async stop(): Promise<void> {
     this.logger.debug(this.logPrefix, 'Stopping recording delegate');
-    this.recordingSession.stop();
+    await this.recordingSession.stop();
     this.cleanup(this.activeStreamId);
   }
 

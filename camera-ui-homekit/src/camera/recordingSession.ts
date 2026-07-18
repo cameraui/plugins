@@ -1,22 +1,26 @@
 import { EventEmitter } from 'node:events';
 
 import { normalizeFragmentTfdt } from '../utils/fmp4.js';
-import { PromiseTimeout } from '../utils/utils.js';
 
 import type { CameraDevice, Fmp4Session, LoggerService } from '@camera.ui/sdk';
 import type { CameraRecordingConfiguration } from '../hap.js';
 import type { CameraAccessory } from './accessory.js';
 
 export class RecordingSession extends EventEmitter {
+  private static readonly maxLiveQueueFragments = 8;
+
   private readonly logPrefix = '[HKSV]';
   private readonly fragmentTimeout = 8000;
   private readonly sessionRestartDelay = 3000;
 
   private session?: Fmp4Session;
+  private sessionSubscriptions: { unsubscribe(): void }[] = [];
   private configuration?: CameraRecordingConfiguration;
 
   private recordingActive = false;
   private stopped = false;
+  private lifecycle = Promise.resolve();
+  private lifecycleRevision = 0;
 
   private prebuffer: Buffer[] = [];
   private prebufferMaxFragments = 2;
@@ -25,6 +29,7 @@ export class RecordingSession extends EventEmitter {
 
   private liveQueue: Buffer[] | null = null;
   private liveResolve: ((box: Buffer | null) => void) | null = null;
+  private liveError?: Error;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -42,9 +47,9 @@ export class RecordingSession extends EventEmitter {
     this.recordingActive = active;
 
     if (active) {
-      this.startPrebuffer();
+      this.restartPrebuffer();
     } else {
-      this.stopPrebuffer();
+      void this.stopPrebuffer();
     }
   }
 
@@ -58,7 +63,7 @@ export class RecordingSession extends EventEmitter {
       this.prebufferMaxFragments = Math.max(1, Math.ceil(prebufferLength / fragmentLength));
     }
 
-    if (this.recordingActive && configuration) {
+    if (this.recordingActive) {
       this.restartPrebuffer();
     }
   }
@@ -78,10 +83,11 @@ export class RecordingSession extends EventEmitter {
     const queue: Buffer[] = [];
     this.liveQueue = queue;
     this.liveResolve = null;
+    this.liveError = undefined;
 
     try {
       this.logger.debug(this.logPrefix, 'Yielding init segment');
-      const initSegment = await PromiseTimeout(session.initSegment, this.fragmentTimeout, undefined, 'Init segment timeout');
+      const initSegment = await this.waitForRecording(session.initSegment, signal, 'Init segment timeout');
       yield initSegment;
 
       if (buffered.length > 0) {
@@ -96,16 +102,20 @@ export class RecordingSession extends EventEmitter {
 
       this.logger.debug(this.logPrefix, 'Yielding live fragments');
       while (!signal?.aborted) {
+        if (this.liveError) {
+          const liveError = this.liveError as Error;
+          throw new Error(liveError.message, { cause: liveError });
+        }
+
         let box: Buffer | null;
         if (queue.length > 0) {
           box = queue.shift()!;
         } else {
-          box = await PromiseTimeout(
+          box = await this.waitForRecording(
             new Promise<Buffer | null>((resolve) => {
               this.liveResolve = resolve;
             }),
-            this.fragmentTimeout,
-            undefined,
+            signal,
             'Fragment timeout',
           );
         }
@@ -128,6 +138,7 @@ export class RecordingSession extends EventEmitter {
       if (this.liveQueue === queue) {
         this.liveQueue = null;
         this.liveResolve = null;
+        this.liveError = undefined;
       }
     }
   }
@@ -139,81 +150,142 @@ export class RecordingSession extends EventEmitter {
     resolve?.(null);
   }
 
-  public stop(): void {
+  public async stop(): Promise<void> {
     this.stopped = true;
     this.recordingActive = false;
-    this.stopPrebuffer();
+    await this.stopPrebuffer();
   }
 
-  private startPrebuffer(): void {
-    if (this.stopped || !this.configuration) {
-      return;
-    }
-    this.logger.debug(this.logPrefix, 'Starting prebuffer');
-    this.runPrebuffer();
-  }
-
-  private stopPrebuffer(): void {
-    if (this.restartTimeout) {
-      clearTimeout(this.restartTimeout);
-      this.restartTimeout = undefined;
-    }
-
+  private stopPrebuffer(): Promise<void> {
+    ++this.lifecycleRevision;
+    this.clearRestart();
     this.closeCurrentRecording();
-
     this.collectAbort?.abort();
-    this.collectAbort = undefined;
     this.prebuffer = [];
 
-    const session = this.session;
-    if (session) {
-      this.session = undefined;
-      this.logger.debug(this.logPrefix, 'Stopping FMP4 session');
-      session.stop().catch((error) => {
-        this.logger.error(this.logPrefix, 'Error stopping FMP4 session:', error);
-      });
-    }
+    return this.enqueueLifecycle(() => this.stopSession());
   }
 
   private restartPrebuffer(): void {
-    this.stopPrebuffer();
-    if (this.recordingActive && !this.stopped) {
-      this.startPrebuffer();
-    }
+    const revision = ++this.lifecycleRevision;
+    this.clearRestart();
+    this.closeCurrentRecording();
+    this.collectAbort?.abort();
+    this.prebuffer = [];
+
+    void this.enqueueLifecycle(async () => {
+      await this.stopSession();
+
+      if (revision !== this.lifecycleRevision || this.stopped || !this.recordingActive || !this.configuration) {
+        return;
+      }
+
+      try {
+        const session = await this.startSession();
+        if (revision !== this.lifecycleRevision || this.stopped || !this.recordingActive) {
+          await this.stopSession(session);
+          return;
+        }
+        this.startCollector(session);
+      } catch (error) {
+        this.logger.error(this.logPrefix, 'Failed to start prebuffer session:', error);
+        await this.stopSession();
+        this.scheduleRestart();
+      }
+    });
   }
 
-  private async runPrebuffer(): Promise<void> {
-    try {
-      await this.ensureSessionStarted();
-    } catch (error) {
-      this.logger.error(this.logPrefix, 'Failed to start prebuffer session:', error);
-      this.session = undefined;
-      this.scheduleRestart();
-      return;
-    }
+  private enqueueLifecycle(task: () => Promise<void>): Promise<void> {
+    const next = this.lifecycle.then(task, task);
+    this.lifecycle = next.catch((error) => {
+      this.logger.error(this.logPrefix, 'Session lifecycle error:', error);
+    });
+    return next;
+  }
 
-    const session = this.session;
-    if (!session) {
-      this.scheduleRestart();
-      return;
-    }
+  private async startSession(): Promise<Fmp4Session> {
+    this.logger.debug(this.logPrefix, 'Starting FMP4 session');
 
+    const session = this.cameraDevice.streamSource.createFmp4Session({
+      audio: true,
+      video: true,
+      backchannel: false,
+      gop: false,
+    });
+
+    this.session = session;
+    this.sessionSubscriptions = [
+      session.onError.subscribe((error) => {
+        this.logger.warn(this.logPrefix, 'FMP4 session error:', error.message);
+      }),
+      session.onEnded.subscribe(() => {
+        this.logger.debug(this.logPrefix, 'FMP4 session ended');
+        this.emit('session-ended');
+      }),
+    ];
+
+    await session.startStream({
+      supportedVideoCodecs: ['h264'],
+      supportedAudioCodecs: ['aac'],
+      boxMode: true,
+      fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,
+      hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
+      video: {
+        width: this.configuration?.videoCodec.resolution[0],
+        height: this.configuration?.videoCodec.resolution[1],
+        fps: this.configuration?.videoCodec.resolution[2],
+        bitrate: this.configuration?.videoCodec.parameters.bitRate ? this.configuration.videoCodec.parameters.bitRate * 1000 : undefined,
+      },
+    });
+
+    this.logger.debug(this.logPrefix, 'FMP4 session started');
+    return session;
+  }
+
+  private startCollector(session: Fmp4Session): void {
     const abort = new AbortController();
     this.collectAbort = abort;
 
-    try {
-      for await (const box of session.streamBoxes(abort.signal)) {
-        this.pushBox(box);
+    void (async () => {
+      try {
+        for await (const box of session.streamBoxes(abort.signal)) {
+          this.pushBox(box);
+        }
+      } catch (error) {
+        if (!abort.signal.aborted) {
+          this.logger.error(this.logPrefix, 'Prebuffer collection error:', error);
+        }
+      } finally {
+        if (this.collectAbort === abort) {
+          this.collectAbort = undefined;
+          await this.enqueueLifecycle(async () => {
+            if (this.session === session) {
+              await this.stopSession(session);
+              this.scheduleRestart();
+            }
+          });
+        }
       }
-    } catch (error) {
-      if (!abort.signal.aborted) {
-        this.logger.error(this.logPrefix, 'Prebuffer collection error:', error);
-      }
+    })();
+  }
+
+  private async stopSession(expectedSession?: Fmp4Session): Promise<void> {
+    const session = this.session;
+    if (!session || (expectedSession && session !== expectedSession)) {
+      return;
     }
 
-    if (this.collectAbort === abort) {
-      this.collectAbort = undefined;
-      this.scheduleRestart();
+    this.session = undefined;
+    this.collectAbort?.abort();
+    this.collectAbort = undefined;
+    this.sessionSubscriptions.forEach((subscription) => subscription.unsubscribe());
+    this.sessionSubscriptions = [];
+
+    this.logger.debug(this.logPrefix, 'Stopping FMP4 session');
+    try {
+      await session.stop();
+    } catch (error) {
+      this.logger.error(this.logPrefix, 'Error stopping FMP4 session:', error);
     }
   }
 
@@ -224,10 +296,16 @@ export class RecordingSession extends EventEmitter {
     this.restartTimeout = setTimeout(() => {
       this.restartTimeout = undefined;
       if (this.recordingActive && !this.stopped) {
-        this.session = undefined;
-        this.runPrebuffer();
+        this.restartPrebuffer();
       }
     }, this.sessionRestartDelay);
+  }
+
+  private clearRestart(): void {
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = undefined;
+    }
   }
 
   private pushBox(box: Buffer): void {
@@ -241,54 +319,39 @@ export class RecordingSession extends EventEmitter {
         const resolve = this.liveResolve;
         this.liveResolve = null;
         resolve(box);
+      } else if (this.liveQueue.length >= RecordingSession.maxLiveQueueFragments) {
+        this.liveError = new Error(`HKSV consumer too slow: recording ended after ${RecordingSession.maxLiveQueueFragments} queued fragments`);
+        this.liveQueue.length = 0;
       } else {
         this.liveQueue.push(box);
       }
     }
   }
 
-  private async ensureSessionStarted(): Promise<void> {
-    if (this.session) {
-      return;
+  private async waitForRecording<T>(promise: Promise<T>, signal: AbortSignal | undefined, errorMessage: string): Promise<T> {
+    if (signal?.aborted) {
+      throw new Error('Recording stream aborted');
     }
 
-    this.logger.debug(this.logPrefix, 'Starting FMP4 session');
-
-    const session = this.cameraDevice.streamSource.createFmp4Session({
-      audio: true,
-      video: true,
-      backchannel: false,
-      gop: false,
+    let timeoutId: NodeJS.Timeout | undefined;
+    let abortHandler: (() => void) | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(errorMessage)), this.fragmentTimeout);
     });
-
-    session.onError.subscribe((error) => {
-      this.logger.warn(this.logPrefix, 'FMP4 session error:', error.message);
-    });
-
-    session.onEnded.subscribe(() => {
-      this.logger.debug(this.logPrefix, 'FMP4 session ended; discarding');
-      if (this.session === session) {
-        this.session = undefined;
+    const aborted = new Promise<never>((_, reject) => {
+      if (signal) {
+        abortHandler = () => reject(new Error('Recording stream aborted'));
+        signal.addEventListener('abort', abortHandler, { once: true });
       }
-      this.emit('session-ended');
     });
 
-    this.session = session;
-
-    await session.startStream({
-      supportedVideoCodecs: ['h264'],
-      supportedAudioCodecs: ['aac'],
-      boxMode: true,
-      fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000, // in microseconds
-      hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
-      video: {
-        width: this.configuration?.videoCodec.resolution[0],
-        height: this.configuration?.videoCodec.resolution[1],
-        fps: this.configuration?.videoCodec.resolution[2],
-        bitrate: this.configuration?.videoCodec.parameters.bitRate ? this.configuration.videoCodec.parameters.bitRate * 1000 : undefined,
-      },
-    });
-
-    this.logger.debug(this.logPrefix, 'FMP4 session started');
+    try {
+      return await Promise.race([promise, timeout, aborted]);
+    } finally {
+      clearTimeout(timeoutId);
+      if (signal && abortHandler) {
+        signal.removeEventListener('abort', abortHandler);
+      }
+    }
   }
 }

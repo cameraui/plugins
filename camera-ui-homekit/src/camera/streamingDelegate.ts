@@ -25,6 +25,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   private cameraLogger: LoggerService;
 
   private sessions: Record<string, StreamingSession> = {};
+  private disposed = false;
 
   constructor(cameraAccessory: CameraAccessory, cameraDevice: CameraDevice) {
     this.cameraAccessory = cameraAccessory;
@@ -57,7 +58,13 @@ export class StreamingDelegate implements CameraStreamingDelegate {
 
     session
       .prepare()
-      .then(() => {
+      .then(async () => {
+        if (this.disposed) {
+          await session.stop();
+          callback(new Error('Streaming delegate stopped while preparing stream'));
+          return;
+        }
+
         this.cameraLogger.debug(`Stream prepared (${getDurationSeconds(start)}s)`);
 
         this.sessions[request.sessionID] = session;
@@ -77,9 +84,9 @@ export class StreamingDelegate implements CameraStreamingDelegate {
           },
         });
       })
-      .catch((error: any) => {
+      .catch(async (error: any) => {
         this.cameraLogger.error(`Failed to prepare stream (${getDurationSeconds(start)}s)`, error);
-        session.stop();
+        await session.stop();
         callback(error);
       });
   }
@@ -99,31 +106,38 @@ export class StreamingDelegate implements CameraStreamingDelegate {
 
       session
         .activate(request)
-        .then(() => {
+        .then(async () => {
+          if (this.disposed || this.sessions[sessionID] !== session) {
+            await session.stop();
+            callback(new Error('Streaming session stopped while activating'));
+            return;
+          }
+
           this.cameraLogger.log(`Streaming activated (${getDurationSeconds(session.start)}s)`);
           callback();
         })
-        .catch((error: any) => {
+        .catch(async (error: any) => {
           this.cameraLogger.error('Failed to activate stream', error);
-          session.stop();
+          if (this.sessions[sessionID] === session) {
+            delete this.sessions[sessionID];
+          }
+          await session.stop();
           callback(error);
         });
     } else if (requestType === StreamRequestTypes.STOP) {
       this.cameraLogger.log('Stopping stream...');
-      session.stop();
       delete this.sessions[sessionID];
-      callback();
+      session.stop().then(() => callback(), callback);
     } else {
       // ReconfigureStreamRequest
       callback();
     }
   }
 
-  public cleanup(): void {
-    for (const sessionID in this.sessions) {
-      this.sessions[sessionID].stop();
-    }
-
+  public async cleanup(): Promise<void> {
+    this.disposed = true;
+    const sessions = Object.values(this.sessions);
     this.sessions = {};
+    await Promise.allSettled(sessions.map((session) => session.stop()));
   }
 }

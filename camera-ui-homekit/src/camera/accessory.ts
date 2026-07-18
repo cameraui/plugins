@@ -79,19 +79,20 @@ export class CameraAccessory extends Subscribed {
   }
 
   public async teardown(destroy?: boolean): Promise<void> {
-    if (this.published) {
-      this.published = false;
+    const wasPublished = this.published;
+    this.published = false;
 
-      if (this.accessory) {
+    if (this.accessory) {
+      try {
         if (destroy) {
           this.cameraLogger.log('Removing...');
           await this.accessory.destroy();
-        } else {
+        } else if (wasPublished) {
           this.cameraLogger.log('Stopping...');
           await this.accessory.unpublish();
         }
-
-        this.resetAccessory(destroy);
+      } finally {
+        await this.resetAccessory(destroy);
         const advertiseAddress = await this.cameraStorage.getValue<string>('advertiseAddress')!;
         this.publishedExternalAccessories.delete(advertiseAddress);
       }
@@ -150,7 +151,7 @@ export class CameraAccessory extends Subscribed {
         this.published = true;
       } catch (error) {
         this.cameraLogger.error('Error publishing camera', error);
-        this.unpublishAccessory(true);
+        await this.unpublishAccessory(true);
       }
     }
   }
@@ -170,14 +171,14 @@ export class CameraAccessory extends Subscribed {
     await this.publishAccessory(!reset);
   }
 
-  private resetAccessory(destroy?: boolean): void {
+  private async resetAccessory(destroy?: boolean): Promise<void> {
     if (destroy) {
       this.accessoryPort = undefined;
     }
 
-    this.recordingDelegate?.stop();
+    await this.recordingDelegate?.stop();
     this.recordingDelegate = undefined;
-    this.streamingDelegate?.cleanup();
+    await this.streamingDelegate?.cleanup();
     this.streamingDelegate = undefined;
     this.cameraServices?.cleanup();
     this.cameraServices = undefined;
