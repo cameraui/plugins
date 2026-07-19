@@ -1,3 +1,7 @@
+## [1.1.6]
+
+- HKSV recording and live streams clean up reliably after retries, reconnects and failed starts. Long-running setups no longer build up CPU and memory when a camera keeps dropping.
+
 ## [1.1.5]
 
 - Bugfixes and improvements
