@@ -80,15 +80,21 @@ export class RingLightControl extends LightControl {
 
   protected override onAssigned(): void {
     if (this.ringCamera.data.led_status) {
-      if (this.ringCamera.data.led_status === 'on') void super.setOn();
-      else void super.setOff();
+      if (this.ringCamera.data.led_status === 'on') {
+        super.setOn();
+      } else {
+        super.setOff();
+      }
     }
 
     this.subscriptions.push(
       this.ringCamera.onData.subscribe((data) => {
         if (data.led_status) {
-          if (data.led_status === 'on') void super.setOn();
-          else void super.setOff();
+          if (data.led_status === 'on') {
+            super.setOn();
+          } else {
+            super.setOff();
+          }
         }
       }),
     );
@@ -129,15 +135,21 @@ export class RingSirenControl extends SirenControl {
 
   protected override onAssigned(): void {
     if (this.ringCamera.data.siren_status) {
-      if (this.ringCamera.data.siren_status.seconds_remaining > 0) void super.setActive();
-      else void super.setInactive();
+      if (this.ringCamera.data.siren_status.seconds_remaining > 0) {
+        super.setActive();
+      } else {
+        super.setInactive();
+      }
     }
 
     this.subscriptions.push(
       this.ringCamera.onData.subscribe((data) => {
         if (data.siren_status) {
-          if (data.siren_status.seconds_remaining > 0) void super.setActive();
-          else void super.setInactive();
+          if (data.siren_status.seconds_remaining > 0) {
+            super.setActive();
+          } else {
+            super.setInactive();
+          }
         }
       }),
     );
