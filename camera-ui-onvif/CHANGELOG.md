@@ -1,3 +1,7 @@
+## [1.1.10]
+
+- Already adopted cameras no longer reappear under Discovered after a while, sometimes twice with the same address. Some cameras report a new identity after a reboot; discovery now recognizes them by their address instead of listing them again
+
 ## [1.1.9]
 
 - Less log noise

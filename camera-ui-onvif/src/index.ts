@@ -93,12 +93,6 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
     this.existingCameras.delete(cameraId);
   }
 
-  private async initializeCamera(camera: CameraDevice, initialCredentials?: { username: string; password: string; url: string }): Promise<void> {
-    const onvifCamera = new OnvifCamera(camera, this.logger);
-    this.cameras.set(camera.id, onvifCamera);
-    await onvifCamera.initialize(initialCredentials);
-  }
-
   public async onDiscoverCameras(): Promise<DiscoveredCamera[]> {
     try {
       const devices = (await Discovery.probe({ timeout: 5000, resolve: true })) as Onvif[];
@@ -112,8 +106,7 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
 
     const discovered: DiscoveredCamera[] = [];
     for (const [discoveredId, device] of this.discoveredDevices) {
-      const existingCamera = Array.from(this.existingCameras.values()).find((c) => c.nativeId === discoveredId);
-      if (!existingCamera) {
+      if (!this.isAdopted(discoveredId, device)) {
         discovered.push({
           id: device.id,
           name: device.name,
@@ -254,6 +247,40 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
     return config;
   }
 
+  private async initializeCamera(camera: CameraDevice, initialCredentials?: { username: string; password: string; url: string }): Promise<void> {
+    const onvifCamera = new OnvifCamera(camera, this.logger);
+    this.cameras.set(camera.id, onvifCamera);
+    await onvifCamera.initialize(initialCredentials);
+  }
+
+  private isAdopted(discoveredId: string, device: OnvifDiscoveredDevice): boolean {
+    for (const camera of this.existingCameras.values()) {
+      if (camera.nativeId === discoveredId) {
+        return true;
+      }
+    }
+
+    const endpoint = `${device.onvif.hostname}:${device.onvif.port}`;
+    for (const onvifCamera of this.cameras.values()) {
+      const url = onvifCamera.storage.values.url;
+      if (!url) {
+        continue;
+      }
+
+      try {
+        const parsed = new URL(url);
+        const port = parsed.port || '80';
+        if (`${parsed.hostname}:${port}` === endpoint) {
+          return true;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return false;
+  }
+
   private async stop(): Promise<void> {
     for (const onvifCamera of this.cameras.values()) {
       onvifCamera.destroy();
@@ -266,6 +293,12 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
 
     if (this.discoveredDevices.has(id)) {
       return;
+    }
+
+    for (const [existingId, existing] of this.discoveredDevices) {
+      if (existing.onvif.hostname === device.hostname && existing.onvif.port === device.port) {
+        this.discoveredDevices.delete(existingId);
+      }
     }
 
     // discoveryInfo comes from WS-Discovery and is available without authentication.
