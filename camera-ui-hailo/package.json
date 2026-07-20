@@ -1,7 +1,7 @@
 {
   "displayName": "Hailo",
   "name": "@camera.ui/camera-ui-hailo",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Hailo Edge AI (HailoRT) detection backend for camera.ui. Runs object detection on a Hailo-8 / Hailo-8L accelerator.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
