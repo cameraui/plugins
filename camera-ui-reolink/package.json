@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@camera.ui/cli": "~0.0.67",
-    "@camera.ui/sdk": "~0.0.27",
+    "@camera.ui/sdk": "~0.0.28",
     "@types/node": "^26.1.1",
     "cross-env": "^10.1.0",
     "rimraf": "^6.1.3",

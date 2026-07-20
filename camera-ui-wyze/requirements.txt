@@ -1,2 +1,2 @@
-camera-ui-sdk==1.1.11
+camera-ui-sdk==1.1.12
 wyzeapy==0.6.1

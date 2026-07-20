@@ -1,5 +1,5 @@
 numpy==2.4.6
 opencv-python-headless==5.0.0.93
-camera-ui-sdk==1.1.11
+camera-ui-sdk==1.1.12
 pyopencl==2026.1.2
 siphash24==1.8
