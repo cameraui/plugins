@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { StreamRequestTypes } from '../hap.js';
 
+import { noSnapshotImage, placeholderImageFor } from '../utils/placeholder.js';
 import { getDurationSeconds } from '../utils/utils.js';
 import { StreamingSession } from './streamingSession.js';
 
@@ -16,8 +16,6 @@ import type {
   StreamingRequest,
 } from '../hap.js';
 import type { CameraAccessory } from './accessory.js';
-
-const noSnapshotPath = resolve(__dirname, './media/noSnapshot.png');
 
 export class StreamingDelegate implements CameraStreamingDelegate {
   private cameraAccessory: CameraAccessory;
@@ -34,6 +32,16 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   }
 
   public handleSnapshotRequest(_request: SnapshotRequest, callback: SnapshotRequestCallback): void {
+    const placeholder = placeholderImageFor(this.cameraDevice);
+    if (placeholder) {
+      try {
+        callback(undefined, readFileSync(placeholder));
+      } catch (error: any) {
+        callback(error);
+      }
+      return;
+    }
+
     const source = this.cameraDevice.snapshotSource ?? this.cameraDevice.streamSource;
 
     source
@@ -41,13 +49,23 @@ export class StreamingDelegate implements CameraStreamingDelegate {
       .then((snapshot) => {
         let snapshotBuffer = snapshot ? Buffer.from(snapshot) : undefined;
         if (!snapshotBuffer || snapshotBuffer.length === 0) {
-          snapshotBuffer = readFileSync(noSnapshotPath);
+          snapshotBuffer = readFileSync(noSnapshotImage);
         }
         callback(undefined, snapshotBuffer);
       })
       .catch((error: any) => {
-        callback(error);
+        try {
+          callback(undefined, readFileSync(noSnapshotImage));
+        } catch {
+          callback(error);
+        }
       });
+  }
+
+  public async stopAllSessions(): Promise<void> {
+    const sessions = Object.values(this.sessions);
+    this.sessions = {};
+    await Promise.allSettled(sessions.map((session) => session.stop()));
   }
 
   public prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback): void {

@@ -48,6 +48,7 @@ export class CameraAccessory extends Subscribed {
   private streamingDelegate?: StreamingDelegate;
 
   private published = false;
+  private publishing?: Promise<void>;
   private cameraSeenOnline = false;
 
   private publishedExternalAccessories: Map<MacAddress, Accessory>;
@@ -73,9 +74,15 @@ export class CameraAccessory extends Subscribed {
         await this.publishAccessory(this.cameraSeenOnline);
         this.cameraSeenOnline = true;
       } else {
-        await this.unpublishAccessory(false);
+        await this.streamingDelegate?.stopAllSessions();
       }
     });
+
+    this.cameraDevice.onPropertyChange('disabled').subscribe(() => {
+      this.streamingDelegate?.stopAllSessions();
+    });
+
+    this.publishAccessory();
   }
 
   public async teardown(destroy?: boolean): Promise<void> {
@@ -102,7 +109,14 @@ export class CameraAccessory extends Subscribed {
     }
   }
 
-  private async publishAccessory(republish?: boolean): Promise<void> {
+  private publishAccessory(republish?: boolean): Promise<void> {
+    this.publishing ??= this.runPublishAccessory(republish).finally(() => {
+      this.publishing = undefined;
+    });
+    return this.publishing;
+  }
+
+  private async runPublishAccessory(republish?: boolean): Promise<void> {
     if (!this.published) {
       try {
         const accessoryPin = await this.cameraStorage.getValue<string>('accessoryPin')!;

@@ -1,14 +1,17 @@
 import { Disposable, Subject } from '@camera.ui/sdk';
+import { spawn } from 'node:child_process';
 import { isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { isRtcp, RtcpPacketConverter, RtcpRrPacket, RtcpSenderInfo, RtcpSrPacket, SrtcpSession, SrtpSession } from 'werift';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../hap.js';
 
+import { placeholderImageFor } from '../utils/placeholder.js';
 import { RtpSplitter } from '../utils/rtp-splitter.js';
 import { generateSrtpOptions, generateSsrc, getSessionConfig } from '../utils/srtp.js';
 import { getDurationSeconds } from '../utils/utils.js';
 
 import type { CameraDevice, CameraDeviceSource, LoggerService, RtpSession } from '@camera.ui/sdk';
+import type { ChildProcess } from 'node:child_process';
 import type { RtpPacket } from 'werift';
 import type { PrepareStreamRequest, StartStreamRequest } from '../hap.js';
 import type { CameraAccessory } from './accessory.js';
@@ -30,6 +33,8 @@ export class StreamingSession {
   private cameraAccessory: CameraAccessory;
   private cameraDevice: CameraDevice;
   private streamingSession?: RtpSession;
+  private placeholderProcess?: ChildProcess;
+  private placeholderDisposables: Disposable[] = [];
   private prepareStreamRequest: PrepareStreamRequest;
   private cameraLogger: LoggerService;
   private stopPromise?: Promise<void>;
@@ -141,6 +146,13 @@ export class StreamingSession {
   public async activate(startStreamRequest: StartStreamRequest): Promise<void> {
     this.cameraLogger.debug('Starting stream:', startStreamRequest);
 
+    const placeholder = placeholderImageFor(this.cameraDevice);
+    if (placeholder) {
+      this.cameraLogger.log(`Camera unavailable, streaming placeholder (${this.cameraDevice.disabled ? 'disabled' : 'offline'})`);
+      await this.runPlaceholder(placeholder, startStreamRequest);
+      return;
+    }
+
     const allowAuto = this.cameraAccessory.cameraStorage.values.adaptiveStreamSource;
     const remote = this.isLowBandwidth(startStreamRequest);
     if (remote && allowAuto) {
@@ -182,9 +194,108 @@ export class StreamingSession {
     try {
       await streamingSession?.stop();
     } finally {
+      this.stopPlaceholderProcess();
       this.audioSplitter.close();
       this.videoSplitter.close();
       this.cameraLogger.debug('Stream stopped');
+    }
+  }
+
+  private async runPlaceholder(imagePath: string, startStreamRequest: StartStreamRequest): Promise<void> {
+    const ffmpegPath = await this.cameraAccessory.api.coreManager.getFFmpegPath();
+    const { targetAddress, video } = this.prepareStreamRequest;
+    const address = isIPv6(targetAddress) ? `[${targetAddress}]` : targetAddress;
+    const srtpParams = Buffer.concat([this.videoSrtp.srtp_key, this.videoSrtp.srtp_salt]).toString('base64');
+
+    const request = startStreamRequest.video;
+    const fps = request.fps || 15;
+    const bitrate = request.max_bit_rate || 300;
+
+    const args = [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-loop',
+      '1',
+      '-framerate',
+      String(fps),
+      '-i',
+      imagePath,
+      '-an',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-tune',
+      'stillimage',
+      '-pix_fmt',
+      'yuv420p',
+      '-vf',
+      `scale=${request.width}:${request.height}:force_original_aspect_ratio=decrease,pad=${request.width}:${request.height}:(ow-iw)/2:(oh-ih)/2`,
+      '-b:v',
+      `${bitrate}k`,
+      '-maxrate',
+      `${bitrate}k`,
+      '-bufsize',
+      `${bitrate * 2}k`,
+      '-g',
+      String(fps * 2),
+      '-payload_type',
+      String(request.pt),
+      '-ssrc',
+      String(this.videoSsrc),
+      '-f',
+      'rtp',
+      '-srtp_out_suite',
+      'AES_CM_128_HMAC_SHA1_80',
+      '-srtp_out_params',
+      srtpParams,
+      `srtp://${address}:${video.port}?rtcpport=${video.port}&pkt_size=${request.mtu || 1316}`,
+    ];
+
+    const process = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    this.placeholderProcess = process;
+
+    process.stderr?.on('data', (chunk: Buffer) => this.cameraLogger.debug(`Placeholder ffmpeg: ${chunk.toString().trim()}`));
+    process.on('exit', (code) => {
+      if (this.placeholderProcess === process && code !== 0 && code !== null) {
+        this.cameraLogger.warn(`Placeholder stream exited with code ${code}`);
+      }
+    });
+
+    this.setupPlaceholderInactivityDetection();
+  }
+
+  private setupPlaceholderInactivityDetection(): void {
+    let debounceTimer: NodeJS.Timeout | undefined;
+    const resetDebounce = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        this.cameraLogger.log(`Live stream appears to be inactive. (${getDurationSeconds(this.start)}s)`);
+        this.stopPlaceholderProcess();
+      }, 5000);
+    };
+    const initialTimer = setTimeout(resetDebounce, 15000);
+    const packetSub = this.packetReceivedSubject.subscribe(resetDebounce);
+    this.placeholderDisposables.push(
+      new Disposable(() => {
+        clearTimeout(initialTimer);
+        clearTimeout(debounceTimer);
+        packetSub.dispose();
+      }),
+    );
+  }
+
+  private stopPlaceholderProcess(): void {
+    for (const disposable of this.placeholderDisposables) {
+      disposable.dispose();
+    }
+    this.placeholderDisposables = [];
+
+    const process = this.placeholderProcess;
+    this.placeholderProcess = undefined;
+    if (process && !process.killed) {
+      process.kill('SIGKILL');
     }
   }
 
