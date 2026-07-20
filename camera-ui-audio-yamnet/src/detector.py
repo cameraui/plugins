@@ -21,6 +21,10 @@ class AudioDetector:
         self.logger = logger
 
         self.model_path = os.path.join(f"{self.api.storagePath}/models")
+        os.makedirs(self.model_path, exist_ok=True)
+        marker = os.path.join(self.model_path, ".backupignore")
+        if not os.path.isfile(marker):
+            open(marker, "a").close()
         self.initialized = False
         self.executor: ThreadPoolExecutor | None = ThreadPoolExecutor(max_workers=2)
 
