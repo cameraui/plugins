@@ -73,6 +73,7 @@ export class CameraAccessory extends Subscribed {
       if (connected) {
         await this.publishAccessory(this.cameraSeenOnline);
         this.cameraSeenOnline = true;
+        this.recordingDelegate?.refreshPrebuffer();
       } else {
         await this.streamingDelegate?.stopAllSessions();
       }
@@ -80,6 +81,7 @@ export class CameraAccessory extends Subscribed {
 
     this.cameraDevice.onPropertyChange('disabled').subscribe(() => {
       this.streamingDelegate?.stopAllSessions();
+      this.recordingDelegate?.refreshPrebuffer();
     });
 
     this.publishAccessory();

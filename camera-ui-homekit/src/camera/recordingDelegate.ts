@@ -34,6 +34,10 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.recordingSession.updateRecordingConfiguration(configuration);
   }
 
+  public refreshPrebuffer(): void {
+    this.recordingSession.refreshPrebuffer();
+  }
+
   public async *handleRecordingStreamRequest(streamId: number, signal?: AbortSignal): AsyncGenerator<RecordingPacket> {
     if (this.activeStreamId !== undefined) {
       this.logger.warn(this.logPrefix, `Stream ${streamId} rejected: stream ${this.activeStreamId} already active`);

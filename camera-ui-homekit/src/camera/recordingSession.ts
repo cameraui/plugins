@@ -53,6 +53,12 @@ export class RecordingSession extends EventEmitter {
     }
   }
 
+  public refreshPrebuffer(): void {
+    if (this.recordingActive && !this.stopped) {
+      this.restartPrebuffer();
+    }
+  }
+
   public updateRecordingConfiguration(configuration?: CameraRecordingConfiguration): void {
     this.configuration = configuration;
     this.logger.debug(this.logPrefix, 'Recording configuration updated:', configuration ?? 'No configuration');
@@ -177,6 +183,11 @@ export class RecordingSession extends EventEmitter {
       await this.stopSession();
 
       if (revision !== this.lifecycleRevision || this.stopped || !this.recordingActive || !this.configuration) {
+        return;
+      }
+
+      if (this.cameraDevice.disabled || !this.cameraDevice.connected) {
+        this.logger.debug(this.logPrefix, 'Camera unavailable, prebuffer deferred');
         return;
       }
 
