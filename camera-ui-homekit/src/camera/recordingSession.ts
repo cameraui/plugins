@@ -36,7 +36,6 @@ export class RecordingSession extends EventEmitter {
   private recordingFailures: number[] = [];
   private forceSoftwareDecoding = false;
   private lastRecoveryAt = 0;
-  private useHomekitSource?: boolean;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -251,24 +250,12 @@ export class RecordingSession extends EventEmitter {
   private async startSession(): Promise<Fmp4Session> {
     this.logger.debug(this.logPrefix, 'Starting FMP4 session');
 
-    const source = this.cameraDevice.streamSource;
-    if (this.useHomekitSource === undefined) {
-      const probe = await source.probeStream({ video: true }).catch(() => undefined);
-      this.useHomekitSource = probe?.video.some((stream) => stream.codec === 'hevc') ?? false;
-      if (this.useHomekitSource) {
-        this.logger.log(this.logPrefix, 'HEVC source detected; using the dedicated H.264 HomeKit stream');
-      }
-    }
-    const session = source.createFmp4Session(
-      this.useHomekitSource && source.homekitUrls
-        ? source.homekitUrls.rtsp.base
-        : {
-            audio: true,
-            video: true,
-            backchannel: false,
-            gop: false,
-          },
-    );
+    const session = this.cameraDevice.streamSource.createFmp4Session({
+      audio: true,
+      video: true,
+      backchannel: false,
+      gop: false,
+    });
 
     this.session = session;
     this.sessionSubscriptions = [

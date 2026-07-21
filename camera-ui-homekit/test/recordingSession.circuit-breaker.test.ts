@@ -31,7 +31,7 @@ describe('RecordingSession failure isolation', () => {
     const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const cameraAccessory = { cameraStorage: { values: { useHardwareAcceleration: false } } };
     const cameraDevice = {
-      streamSource: { createFmp4Session, probeStream: vi.fn().mockResolvedValue({ video: [] }) },
+      streamSource: { createFmp4Session },
       connected: true,
       disabled: false,
     };
