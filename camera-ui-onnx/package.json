@@ -20,7 +20,7 @@
     "update": "updates --update ./ && cupdate"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.67",
+    "@camera.ui/cli": "^0.0.68",
     "@camera.ui/sdk": "^0.0.28",
     "cross-env": "^10.1.0",
     "updates": "^17.19.1"
