@@ -12,6 +12,8 @@ export class RecordingSession extends EventEmitter {
   private readonly logPrefix = '[HKSV]';
   private readonly fragmentTimeout = 8000;
   private readonly sessionRestartDelay = 3000;
+  private readonly recordingFailureWindow = 60000;
+  private readonly recordingFailureThreshold = 3;
 
   private session?: Fmp4Session;
   private sessionSubscriptions: { unsubscribe(): void }[] = [];
@@ -30,6 +32,8 @@ export class RecordingSession extends EventEmitter {
   private liveQueue: Buffer[] | null = null;
   private liveResolve: ((box: Buffer | null) => void) | null = null;
   private liveError?: Error;
+  private recordingFailures: number[] = [];
+  private forceSoftwareDecoding = false;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -156,6 +160,25 @@ export class RecordingSession extends EventEmitter {
     resolve?.(null);
   }
 
+  public reportRecordingFailure(): void {
+    const now = Date.now();
+    this.recordingFailures = this.recordingFailures.filter((timestamp) => now - timestamp < this.recordingFailureWindow);
+    this.recordingFailures.push(now);
+
+    if (this.recordingFailures.length < this.recordingFailureThreshold) {
+      return;
+    }
+
+    this.recordingFailures = [];
+    if (!this.forceSoftwareDecoding && this.cameraAccessory.cameraStorage.values.useHardwareAcceleration) {
+      this.forceSoftwareDecoding = true;
+      this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; retrying this camera with software video decoding');
+    } else {
+      this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; restarting this camera\'s FMP4 session');
+    }
+    this.refreshPrebuffer();
+  }
+
   public async stop(): Promise<void> {
     this.stopped = true;
     this.recordingActive = false;
@@ -240,7 +263,7 @@ export class RecordingSession extends EventEmitter {
       supportedAudioCodecs: ['aac'],
       boxMode: true,
       fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,
-      hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
+      hardware: !this.forceSoftwareDecoding && this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
       video: {
         width: this.configuration?.videoCodec.resolution[0],
         height: this.configuration?.videoCodec.resolution[1],
