@@ -33,7 +33,6 @@ export class RecordingSession extends EventEmitter {
   private liveResolve: ((box: Buffer | null) => void) | null = null;
   private liveError?: Error;
   private recordingFailures: number[] = [];
-  private forceSoftwareDecoding = false;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -170,12 +169,7 @@ export class RecordingSession extends EventEmitter {
     }
 
     this.recordingFailures = [];
-    if (!this.forceSoftwareDecoding && this.cameraAccessory.cameraStorage.values.useHardwareAcceleration) {
-      this.forceSoftwareDecoding = true;
-      this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; retrying this camera with software video decoding');
-    } else {
-      this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; restarting this camera\'s FMP4 session');
-    }
+    this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; restarting this camera\'s FMP4 session');
     this.refreshPrebuffer();
   }
 
@@ -263,7 +257,7 @@ export class RecordingSession extends EventEmitter {
       supportedAudioCodecs: ['aac'],
       boxMode: true,
       fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,
-      hardware: !this.forceSoftwareDecoding && this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
+      hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
       video: {
         width: this.configuration?.videoCodec.resolution[0],
         height: this.configuration?.videoCodec.resolution[1],
