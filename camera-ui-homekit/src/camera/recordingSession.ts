@@ -14,6 +14,7 @@ export class RecordingSession extends EventEmitter {
   private readonly sessionRestartDelay = 3000;
   private readonly recordingFailureWindow = 60000;
   private readonly recordingFailureThreshold = 3;
+  private readonly recoveryCooldown = 30000;
 
   private session?: Fmp4Session;
   private sessionSubscriptions: { unsubscribe(): void }[] = [];
@@ -34,6 +35,7 @@ export class RecordingSession extends EventEmitter {
   private liveError?: Error;
   private recordingFailures: number[] = [];
   private forceSoftwareDecoding = false;
+  private lastRecoveryAt = 0;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -162,6 +164,9 @@ export class RecordingSession extends EventEmitter {
 
   public reportRecordingFailure(): void {
     const now = Date.now();
+    if (now - this.lastRecoveryAt < this.recoveryCooldown) {
+      return;
+    }
     this.recordingFailures = this.recordingFailures.filter((timestamp) => now - timestamp < this.recordingFailureWindow);
     this.recordingFailures.push(now);
 
@@ -170,6 +175,7 @@ export class RecordingSession extends EventEmitter {
     }
 
     this.recordingFailures = [];
+    this.lastRecoveryAt = now;
     if (!this.forceSoftwareDecoding && this.cameraAccessory.cameraStorage.values.useHardwareAcceleration) {
       this.forceSoftwareDecoding = true;
       this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; retrying this camera with software video decoding');
@@ -177,6 +183,10 @@ export class RecordingSession extends EventEmitter {
       this.logger.warn(this.logPrefix, 'Repeated HKSV recording failures; restarting this camera\'s FMP4 session');
     }
     this.refreshPrebuffer();
+  }
+
+  public reportRecordingSuccess(): void {
+    this.recordingFailures = [];
   }
 
   public async stop(): Promise<void> {
