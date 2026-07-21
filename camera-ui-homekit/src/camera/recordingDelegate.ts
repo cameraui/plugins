@@ -75,9 +75,6 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       }
 
       this.logger.log(this.logPrefix, `Recording stream ${streamId} completed (${packetCount} fragments)`);
-      if (packetCount > 0) {
-        this.recordingSession.reportRecordingSuccess();
-      }
     } catch (error) {
       this.logger.error(this.logPrefix, `Recording stream ${streamId} error:`, error);
       this.recordingSession.reportRecordingFailure();
