@@ -1,3 +1,7 @@
+## [1.1.7]
+
+- Added new camera settings flag to disable hardware acceleration
+
 ## [1.1.6]
 
 - Disabled and offline cameras stay in HomeKit and show a placeholder image instead of disappearing. Snapshots and live streams show "privacy mode" for disabled cameras, "offline" for disconnected ones, and a fallback image when no snapshot is available
