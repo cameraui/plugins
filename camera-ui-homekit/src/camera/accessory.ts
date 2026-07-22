@@ -389,6 +389,19 @@ export class CameraAccessory extends Subscribed {
           this.cameraLogger.log('Adaptive stream source:', state);
         },
       },
+      {
+        type: 'boolean',
+        key: 'useHardwareAccelerationForRecording',
+        title: 'Use Hardware Acceleration for HKSV',
+        description: 'Use the GPU for HomeKit Secure Video recording. Disable this per camera if its decoder is unstable.',
+        group: 'Advanced',
+        defaultValue: true,
+        store: true,
+        onSet: async (state: boolean) => {
+          this.cameraLogger.log('Use hardware acceleration for HKSV:', state);
+          this.recordingDelegate?.refreshPrebuffer();
+        },
+      },
     ]);
   }
 

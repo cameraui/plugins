@@ -240,7 +240,7 @@ export class RecordingSession extends EventEmitter {
       supportedAudioCodecs: ['aac'],
       boxMode: true,
       fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,
-      hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
+      hardware: this.cameraAccessory.cameraStorage.values.useHardwareAccelerationForRecording ? 'auto' : undefined,
       video: {
         width: this.configuration?.videoCodec.resolution[0],
         height: this.configuration?.videoCodec.resolution[1],

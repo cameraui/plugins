@@ -338,6 +338,8 @@ export class StreamingSession {
         payloadType: startStreamRequest.video.pt,
         fps: startStreamRequest.video.fps,
         width: startStreamRequest.video.width,
+        height: startStreamRequest.video.height,
+        bitrate: startStreamRequest.video.max_bit_rate * 1000,
       },
       audio: {
         codec: startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'aac',
