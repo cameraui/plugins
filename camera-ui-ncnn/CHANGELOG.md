@@ -1,3 +1,8 @@
+## [1.1.6]
+
+- No more "dlopen failed libvulkan.so.1" spam on systems without Vulkan. The GPU probe is skipped when the Vulkan library is not installed, inference runs on CPU as before.
+- Software Vulkan devices (llvmpipe/lavapipe) no longer count as GPUs. Inference on them is slower than the plain CPU path, so setups without a real GPU stay on CPU.
+
 ## [1.1.5]
 
 - Exclude downloaded models from backups
