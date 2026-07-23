@@ -1,4 +1,4 @@
 ai-edge-litert==2.1.6
 numpy==2.4.6
 camera-ui-sdk==1.1.12
-aiohttp==3.14.2
+aiohttp==3.14.3
