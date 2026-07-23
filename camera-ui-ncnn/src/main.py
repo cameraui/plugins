@@ -4,7 +4,6 @@ import asyncio
 import shutil
 from typing import Any
 
-import ncnn
 from camera_ui_ml import (
     BoxDetector,
     Embedder,
@@ -59,6 +58,7 @@ from model_manager import NcnnModelManager
 from sensors.face_sensor import NCNNFaceSensor
 from sensors.lpd_sensor import NCNNLPDSensor
 from sensors.object_sensor import NCNNObjectSensor
+from vulkan import gpu_count
 
 
 class NCNNPlugin(
@@ -69,8 +69,8 @@ class NCNNPlugin(
 ):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
-        gpu_count = ncnn.get_gpu_count()
-        self.logger.log(f"Available devices: CPU{f', Vulkan GPU x{gpu_count}' if gpu_count > 0 else ''}")
+        gpus = gpu_count()
+        self.logger.log(f"Available devices: CPU{f', Vulkan GPU x{gpus}' if gpus > 0 else ''}")
         self.model_manager = NcnnModelManager(api.storagePath, logger, self._resolve_use_vulkan)
 
         self.object_detectors: dict[str, BoxDetector] = {}
@@ -92,7 +92,7 @@ class NCNNPlugin(
                 "title": "Use Vulkan (GPU)",
                 "description": (
                     "Run inference on the GPU via Vulkan when available; falls back to CPU otherwise. "
-                    f"Vulkan GPU detected on this system: {'yes' if ncnn.get_gpu_count() > 0 else 'no'}."
+                    f"Vulkan GPU detected on this system: {'yes' if gpu_count() > 0 else 'no'}."
                 ),
                 "store": True,
                 "defaultValue": DEFAULT_USE_VULKAN,

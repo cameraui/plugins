@@ -17,6 +17,7 @@ from defaults import (
     model_version,
 )
 from inference import NcnnBackend
+from vulkan import gpu_count
 
 # pnnx-converted .param carries no input dims; sizes come from the registry.
 _BOX_INPUT_SIZES = {**OBJECT_MODELS, **FACE_DETECTOR_MODELS, **LPD_DETECTOR_MODELS}
@@ -41,11 +42,10 @@ class NcnnModelManager(BaseModelManager):
         }
 
     async def build_backend(self, model_name: str, paths: Mapping[str, str]) -> InferenceBackend:
-        use_vulkan = self._get_use_vulkan()
+        use_vulkan = self._get_use_vulkan() and gpu_count() > 0
         net = await asyncio.to_thread(self._build, paths["param"], paths["bin"], use_vulkan)
         size = _box_input_size(model_name)
-        # ncnn silently runs on CPU if Vulkan was requested but no GPU is present.
-        device = "Vulkan (GPU)" if use_vulkan and ncnn.get_gpu_count() > 0 else "CPU"
+        device = "Vulkan (GPU)" if use_vulkan else "CPU"
         self.logger.success(f"Loaded model: {model_name} ({device})")
         return NcnnBackend(net, size, device)
 
