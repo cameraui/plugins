@@ -24,7 +24,7 @@
     "@homebridge/hap-nodejs": "file:../externals/hap",
     "chacha": "^2.1.0",
     "pick-port": "^2.2.1",
-    "werift": "^0.23.0"
+    "werift": "^0.24.0"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.68",
