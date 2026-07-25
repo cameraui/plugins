@@ -1,3 +1,8 @@
+## [1.1.6]
+
+- Raise the default confidence threshold to 0.7, the old default let through almost every noise
+- Report one sound once, a bark no longer counts as both Bark and Dog
+
 ## [1.1.5]
 
 - Exclude downloaded models from backups

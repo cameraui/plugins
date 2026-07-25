@@ -9,10 +9,34 @@ from typing import TYPE_CHECKING, Any
 import aiohttp
 import numpy as np
 
-from defaults import YAMNET_LABELS_URL, YAMNET_MODEL_URL
+from defaults import YAMNET_LABELS_URL, YAMNET_MODEL_URL, YAMNET_TO_LABEL
 
 if TYPE_CHECKING:
-    from camera_ui_sdk import LoggerService, PluginAPI
+    from collections.abc import Iterable
+
+    from camera_ui_sdk import Detection, LoggerService, PluginAPI
+
+
+def build_detections(
+    scores: Iterable[tuple[str, float]], listen_set: set[str], threshold: float
+) -> list[Detection]:
+    best: dict[str, float] = {}
+    for label, score in scores:
+        if label not in listen_set or score < threshold:
+            continue
+        mapped = YAMNET_TO_LABEL.get(label, label)
+        if score > best.get(mapped, 0.0):
+            best[mapped] = score
+
+    return [
+        {
+            "label": "audio",
+            "confidence": score,
+            "box": {"x": 0, "y": 0, "width": 1, "height": 1},
+            "attribute": mapped,
+        }
+        for mapped, score in best.items()
+    ]
 
 
 class AudioDetector:

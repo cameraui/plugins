@@ -13,15 +13,14 @@ from camera_ui_sdk import (
     AudioMetadata,
     BasePlugin,
     CameraDevice,
-    Detection,
     DeviceStorage,
     JsonSchema,
     LoggerService,
     PluginAPI,
 )
 
-from defaults import DEFAULT_LISTEN_LABELS, DEFAULT_THRESHOLD, YAMNET_SAMPLES_PER_FRAME, YAMNET_TO_LABEL
-from detector import AudioDetector
+from defaults import DEFAULT_LISTEN_LABELS, DEFAULT_THRESHOLD, YAMNET_SAMPLES_PER_FRAME
+from detector import AudioDetector, build_detections
 from sensor import YAMNetAudioSensor
 
 
@@ -126,20 +125,7 @@ class YAMNetPlugin(BasePlugin, AudioDetectionInterface):
 
         listen_labels: list[str] = config.get("listen_labels", DEFAULT_LISTEN_LABELS)
         threshold: float = config.get("threshold", DEFAULT_THRESHOLD)
-        listen_set = set(listen_labels)
-        detections: list[Detection] = []
-
-        for label, score in all_scores.items():
-            if label in listen_set and score >= threshold:
-                mapped_label = YAMNET_TO_LABEL.get(label, label)
-                detections.append(
-                    {
-                        "label": "audio",
-                        "confidence": score,
-                        "box": {"x": 0, "y": 0, "width": 1, "height": 1},
-                        "attribute": mapped_label,
-                    }
-                )
+        detections = build_detections(all_scores.items(), set(listen_labels), threshold)
 
         return {
             "detected": len(detections) > 0,
@@ -160,7 +146,6 @@ class YAMNetPlugin(BasePlugin, AudioDetectionInterface):
         cfg = config or {}
         listen_labels: list[str] = cfg.get("listen_labels", DEFAULT_LISTEN_LABELS)
         threshold: float = cfg.get("threshold", DEFAULT_THRESHOLD)
-        listen_set = set(listen_labels)
 
         fmt = audio.get("format", "float32")
         if fmt == "pcm16":
@@ -184,18 +169,7 @@ class YAMNetPlugin(BasePlugin, AudioDetectionInterface):
                 if label not in all_scores or score > all_scores[label]:
                     all_scores[label] = score
 
-        detections: list[Detection] = []
-        for label, score in all_scores.items():
-            if label in listen_set and score >= threshold:
-                mapped_label = YAMNET_TO_LABEL.get(label, label)
-                detections.append(
-                    {
-                        "label": "audio",
-                        "confidence": score,
-                        "box": {"x": 0, "y": 0, "width": 1, "height": 1},
-                        "attribute": mapped_label,
-                    }
-                )
+        detections = build_detections(all_scores.items(), set(listen_labels), threshold)
 
         return {
             "detected": len(detections) > 0,

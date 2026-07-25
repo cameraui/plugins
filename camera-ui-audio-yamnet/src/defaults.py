@@ -31,7 +31,7 @@ DEFAULT_LISTEN_LABELS: list[str] = [
     "Breaking",
 ]
 
-DEFAULT_THRESHOLD: float = 0.5
+DEFAULT_THRESHOLD: float = 0.7
 
 LISTEN_SET = set(DEFAULT_LISTEN_LABELS)
 

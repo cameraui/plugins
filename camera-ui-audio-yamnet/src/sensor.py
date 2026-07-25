@@ -9,7 +9,6 @@ from camera_ui_sdk import (
     AudioFrameData,
     AudioModelSpec,
     AudioResult,
-    Detection,
     JsonSchema,
 )
 
@@ -20,9 +19,8 @@ from defaults import (
     YAMNET_FORMAT,
     YAMNET_SAMPLE_RATE,
     YAMNET_SAMPLES_PER_FRAME,
-    YAMNET_TO_LABEL,
 )
-from detector import AudioDetector
+from detector import AudioDetector, build_detections
 
 if TYPE_CHECKING:
     from camera_ui_sdk import LoggerService, PluginAPI
@@ -115,18 +113,7 @@ class YAMNetAudioSensor(AudioDetectorSensor[YAMNetStorageValues]):
 
         scores = await self._detector.detect(waveform)
 
-        detections: list[Detection] = []
-        for label, score in scores:
-            if label in self._listen_set and score >= self._threshold:
-                mapped_label = YAMNET_TO_LABEL.get(label, label)
-                detections.append(
-                    {
-                        "label": "audio",
-                        "confidence": score,
-                        "box": {"x": 0, "y": 0, "width": 1, "height": 1},
-                        "attribute": mapped_label,
-                    }
-                )
+        detections = build_detections(scores, self._listen_set, self._threshold)
 
         if detections:
             det_str = ", ".join(f"{d.get('attribute', d['label'])}={d['confidence']:.3f}" for d in detections)
