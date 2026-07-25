@@ -24,15 +24,15 @@
     "@homebridge/hap-nodejs": "file:../externals/hap",
     "chacha": "^2.1.0",
     "pick-port": "^2.2.1",
-    "werift": "^0.23.0"
+    "werift": "^0.24.1"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.68",
-    "@camera.ui/sdk": "^0.0.29",
+    "@camera.ui/cli": "^0.0.69",
+    "@camera.ui/sdk": "^0.0.31",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.1",
     "@typescript-eslint/parser": "^8.65.0",
-    "concurrently": "^10.0.3",
+    "concurrently": "^10.0.4",
     "cpy-cli": "^7.0.0",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",

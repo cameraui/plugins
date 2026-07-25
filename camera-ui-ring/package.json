@@ -24,13 +24,13 @@
     "ring-client-api": "file:../externals/ring"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.68",
-    "@camera.ui/sdk": "^0.0.29",
+    "@camera.ui/cli": "^0.0.69",
+    "@camera.ui/sdk": "^0.0.31",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.1",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/parser": "^8.65.0",
-    "concurrently": "^10.0.3",
+    "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
     "globals": "^17.7.0",
