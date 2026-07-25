@@ -92,6 +92,14 @@ func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 }
 
 func (c *reolinkCamera) release(b *bridge.Bridge) {
+	c.connMu.Lock()
+	if c.disconnectTimer != nil {
+		c.disconnectTimer.Stop()
+		c.disconnectTimer = nil
+	}
+	c.connReported = false
+	c.connMu.Unlock()
+
 	if err := b.RemoveCamera(c.dev.ID()); err != nil {
 		c.logger.Warn("Failed to remove bridge camera:", err)
 	}

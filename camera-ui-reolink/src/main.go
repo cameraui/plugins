@@ -497,14 +497,16 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 		name = "Reolink " + device.IP
 	}
 
+	keepConnected := !probe.caps.Battery
+
 	sources := make([]map[string]any, 0, len(probe.streams))
 	for _, profile := range probe.streams {
 		sources = append(sources, map[string]any{
 			"name":           profile,
 			"role":           roleForProfile(profile),
 			"useForSnapshot": false,
-			"hotMode":        profile == "main" && !probe.caps.Battery,
-			"preload":        profile == "main" && !probe.caps.Battery,
+			"hotMode":        keepConnected && (profile == "main" || profile == "sub"),
+			"preload":        true,
 		})
 	}
 
