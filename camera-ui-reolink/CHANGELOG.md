@@ -1,3 +1,7 @@
+## [1.1.3]
+
+- Bugfixes and improvements
+
 ## [1.1.2]
 
 - Fix NVR/Hub recognition when adopting: on cameras that negotiate AES encryption the login reply was decoded wrong, so an NVR was treated like a single camera instead of listing its channels
