@@ -18,9 +18,10 @@ const (
 	discoveryPrefix    = "reolink:"
 	defaultRTSPPort    = 8556
 	defaultWebhookPort = 8557
-	discoveryTimeout   = 5 * time.Second
+	discoveryTimeout   = 10 * time.Second
 	adoptProbeTimeout  = 20 * time.Second
 	storageKeyNVRs     = "nvrs"
+	presenceGrace      = 5 * time.Minute
 )
 
 type ReolinkPlugin struct {
@@ -31,6 +32,7 @@ type ReolinkPlugin struct {
 	cameras         map[string]*reolinkCamera    // camera ID → controller
 	existing        map[string]*sdk.CameraDevice // camera ID → device
 	discovered      map[string]discoveredEntry   // discovery ID → device (+ NVR channel)
+	lastSeen        map[string]time.Time         // discovery ID → last discovery reply
 	nvrs            map[string]storedNVR         // base discovery ID → connected NVR
 	pendingSettings map[string]cameraSettings
 }
@@ -84,6 +86,7 @@ func NewPlugin(logger *sdk.Logger, api *sdk.PluginAPI, storage *sdk.DeviceStorag
 		cameras:         make(map[string]*reolinkCamera),
 		existing:        make(map[string]*sdk.CameraDevice),
 		discovered:      make(map[string]discoveredEntry),
+		lastSeen:        make(map[string]time.Time),
 		nvrs:            make(map[string]storedNVR),
 		pendingSettings: make(map[string]cameraSettings),
 	}
@@ -356,12 +359,12 @@ func (p *ReolinkPlugin) OnDiscoverCameras() ([]sdk.DiscoveredCamera, error) {
 		p.Logger.Warn("Reolink LAN discovery failed:", err)
 	}
 
-	seen := make(map[string]struct{}, len(devices))
+	now := time.Now()
 
 	p.mu.Lock()
 	for _, device := range devices {
 		id := discoveryID(device)
-		seen[id] = struct{}{}
+		p.lastSeen[id] = now
 		if existing, ok := p.discovered[id]; ok {
 			p.discovered[id] = discoveredEntry{device: device, channel: existing.channel, manual: existing.manual}
 			continue
@@ -385,7 +388,7 @@ func (p *ReolinkPlugin) OnDiscoverCameras() ([]sdk.DiscoveredCamera, error) {
 			if entry.channel >= 0 {
 				presenceID = baseDiscoveryID(id)
 			}
-			if _, ok := seen[presenceID]; !ok {
+			if seenAt, ok := p.lastSeen[presenceID]; !ok || now.Sub(seenAt) > presenceGrace {
 				continue
 			}
 		}
