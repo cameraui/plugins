@@ -1,3 +1,11 @@
+## [1.1.4]
+
+- New cameras now get "Preload" turned on for every stream and "Hot mode" for the main and sub stream, so the live view opens without the long wait
+- Streams are only started when someone actually watches; the connection to the camera stays open for events and snapshots
+- Bugfixes and improvements
+
+**Please check your existing cameras.** Cameras added before this update keep their old settings. Open the camera, go to Sources and turn on "Hot mode" and "Preload" for the main and sub stream. On battery cameras leave "Hot mode" off, it would keep the camera awake and drain the battery
+
 ## [1.1.3]
 
 - Bugfixes and improvements
