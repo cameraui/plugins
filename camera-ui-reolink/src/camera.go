@@ -67,13 +67,14 @@ func (p *ReolinkPlugin) initializeCamera(dev *sdk.CameraDevice) {
 func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 	bridgeCam, err := b.AddCamera(bridge.CameraConfig{
 		Name:           c.dev.ID(),
+		Logger:         bridgeLogger{c.logger},
 		Host:           c.settings.Host,
 		UID:            c.settings.UID,
 		Username:       c.settings.Username,
 		Password:       c.settings.Password,
 		Channel:        c.settings.Channel,
 		Streams:        c.settings.Streams,
-		IdleDisconnect: c.settings.BatteryCamera,
+		IdleDisconnect: true,
 		BatteryCamera:  c.settings.BatteryCamera,
 	})
 	if err != nil {
