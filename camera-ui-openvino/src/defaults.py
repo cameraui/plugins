@@ -74,3 +74,12 @@ OBJECT_LABELS: dict[int, DetectionLabel] = {0: "person", 1: "vehicle", 2: "anima
 
 OPENVINO_DEVICES = ["Default", "AUTO", "CPU", "GPU", "NPU"]
 DEFAULT_OPENVINO_DEVICE = "Default"
+
+# some IRs ship with dynamic dims, but the runtime always feeds exactly these
+# shapes (batch 1, fixed size); pinning them makes the models NPU-compilable
+STATIC_INPUT_SHAPES: dict[str, list[list[int]]] = {
+    **{name: [[1, 3, size, size]] for name, size in FACE_EMBEDDER_MODELS.items()},
+    **{name: [[1, OCR_INPUT_HEIGHT, OCR_INPUT_WIDTH, 3]] for name in OCR_MODELS},
+    **{name: [[1, 3, size, size]] for name, size in CLIP_VISION_MODELS.items()},
+    **{name: [[1, tokens], [1, tokens]] for name, tokens in CLIP_TEXT_MODELS.items()},
+}

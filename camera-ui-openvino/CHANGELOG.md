@@ -1,3 +1,8 @@
+## [1.1.6]
+
+- Fixed a crash loop on machines with an Intel NPU: loading the CLIP model killed the plugin right after startup, over and over.
+- Face recognition, license plate OCR and CLIP no longer fall back to the CPU. These models are now loaded with fixed input shapes, so the NPU and GPU can run them like the object detection models.
+
 ## [1.1.5]
 
 - Exclude downloaded models from backups
