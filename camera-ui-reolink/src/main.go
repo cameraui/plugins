@@ -18,10 +18,11 @@ const (
 	discoveryPrefix    = "reolink:"
 	defaultRTSPPort    = 8556
 	defaultWebhookPort = 8557
-	discoveryTimeout   = 10 * time.Second
 	adoptProbeTimeout  = 20 * time.Second
 	storageKeyNVRs     = "nvrs"
 	presenceGrace      = 5 * time.Minute
+	discoverySettle    = 2 * time.Second
+	discoveryRetryWait = 30 * time.Second
 )
 
 type ReolinkPlugin struct {
@@ -29,6 +30,8 @@ type ReolinkPlugin struct {
 
 	mu              sync.Mutex
 	bridge          *bridge.Bridge
+	watcher         *baichuan.Watcher
+	watchCancel     context.CancelFunc
 	cameras         map[string]*reolinkCamera    // camera ID → controller
 	existing        map[string]*sdk.CameraDevice // camera ID → device
 	discovered      map[string]discoveredEntry   // discovery ID → device (+ NVR channel)
@@ -38,17 +41,11 @@ type ReolinkPlugin struct {
 }
 
 type discoveredEntry struct {
-	device baichuan.DiscoveredDevice
-	// channel is -1 for standalone devices and the NVR entry itself;
-	// >= 0 for the per-channel entries an adopted NVR expands into.
+	device  baichuan.DiscoveredDevice
 	channel int
-	// manual entries are user-asserted (different subnet, UID-only) and stay
-	// listed without a presence check.
-	manual bool
+	manual  bool
 }
 
-// storedNVR is a connected NVR persisted in the plugin storage, so channel
-// entries and their shared credentials survive plugin restarts.
 type storedNVR struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -280,18 +277,62 @@ func (p *ReolinkPlugin) start() {
 	for _, dev := range devices {
 		p.initializeCamera(dev)
 	}
+
+	p.startDiscoveryWatch()
 }
 
 func (p *ReolinkPlugin) stop() {
 	p.mu.Lock()
 	b := p.bridge
+	cancel := p.watchCancel
 	p.bridge = nil
+	p.watcher = nil
+	p.watchCancel = nil
 	p.cameras = make(map[string]*reolinkCamera)
 	p.mu.Unlock()
 
+	if cancel != nil {
+		cancel()
+	}
 	if b != nil {
 		b.Close()
 	}
+}
+
+func (p *ReolinkPlugin) startDiscoveryWatch() {
+	ctx, cancel := context.WithCancel(context.Background())
+	watcher := baichuan.NewWatcher(p.recordDiscovered)
+
+	p.mu.Lock()
+	p.watcher = watcher
+	p.watchCancel = cancel
+	p.mu.Unlock()
+
+	go func() {
+		for ctx.Err() == nil {
+			if err := watcher.Run(ctx); err != nil && ctx.Err() == nil {
+				p.Logger.Warn("Reolink discovery watcher stopped:", err)
+				select {
+				case <-ctx.Done():
+				case <-time.After(discoveryRetryWait):
+				}
+			}
+		}
+	}()
+}
+
+func (p *ReolinkPlugin) recordDiscovered(device baichuan.DiscoveredDevice) {
+	id := discoveryID(device)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.lastSeen[id] = time.Now()
+	if existing, ok := p.discovered[id]; ok {
+		p.discovered[id] = discoveredEntry{device: device, channel: existing.channel, manual: existing.manual}
+		return
+	}
+	p.discovered[id] = discoveredEntry{device: device, channel: -1}
 }
 
 func (p *ReolinkPlugin) ConfigureCameras(cameras []*sdk.CameraDevice) error {
@@ -351,26 +392,18 @@ func (p *ReolinkPlugin) OnCameraReleased(cameraID string) error {
 }
 
 func (p *ReolinkPlugin) OnDiscoverCameras() ([]sdk.DiscoveredCamera, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), discoveryTimeout+time.Second)
-	defer cancel()
+	p.mu.Lock()
+	watcher := p.watcher
+	p.mu.Unlock()
 
-	devices, err := baichuan.Discover(ctx, discoveryTimeout)
-	if err != nil {
-		p.Logger.Warn("Reolink LAN discovery failed:", err)
+	if watcher != nil {
+		watcher.Ping()
+		time.Sleep(discoverySettle)
 	}
 
 	now := time.Now()
 
 	p.mu.Lock()
-	for _, device := range devices {
-		id := discoveryID(device)
-		p.lastSeen[id] = now
-		if existing, ok := p.discovered[id]; ok {
-			p.discovered[id] = discoveredEntry{device: device, channel: existing.channel, manual: existing.manual}
-			continue
-		}
-		p.discovered[id] = discoveredEntry{device: device, channel: -1}
-	}
 	adopted := make(map[string]struct{}, len(p.existing))
 	for _, dev := range p.existing {
 		if nativeID := dev.NativeID(); nativeID != "" {

@@ -1,3 +1,8 @@
+## [1.1.5]
+
+- WiFi cameras no longer go missing when you search for cameras. Some models ignore the search for the first ten seconds, so they showed up only every other try. The plugin now keeps looking in the background, and a search finishes in two seconds instead of ten
+- Sound and picture now share one clock. The camera sends its audio without any timing information, and the plugin was starting the audio clock from scratch instead of from the picture, which is why audio and video could not be lined up in recordings
+
 ## [1.1.4]
 
 - New cameras now get "Preload" turned on for every stream and "Hot mode" for the main and sub stream, so the live view opens without the long wait
