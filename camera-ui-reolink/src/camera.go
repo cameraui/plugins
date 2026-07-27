@@ -23,9 +23,13 @@ type reolinkCamera struct {
 	motionSensor  *sdk.MotionSensor
 	objectSensor  *sdk.ObjectSensor
 	batterySensor *sdk.BatteryInfo
+	spotlight     *reolinkSpotlight
 
 	doorbellOnce   sync.Once
 	doorbellSensor *sdk.DoorbellTrigger
+
+	audioOnce   sync.Once
+	audioSensor *sdk.AudioSensor
 
 	connMu          sync.Mutex
 	connReported    bool
@@ -141,7 +145,8 @@ func (c *reolinkCamera) setupSensors() error {
 		}
 	}
 	if c.settings.HasSpotlight {
-		if err := c.dev.AddSensor(newReolinkSpotlight(c)); err != nil {
+		c.spotlight = newReolinkSpotlight(c)
+		if err := c.dev.AddSensor(c.spotlight); err != nil {
 			return err
 		}
 	}
@@ -157,6 +162,7 @@ func (c *reolinkCamera) subscribeEvents() {
 	c.bridgeCam.OnMotion(func(event bridge.MotionEvent) {
 		c.motionSensor.ReportDetections(event.Active, nil)
 		c.reportObjects(event)
+		c.reportSounds(event)
 	})
 
 	c.bridgeCam.OnDoorbell(func() {
@@ -189,6 +195,17 @@ func (c *reolinkCamera) subscribeEvents() {
 			c.batterySensor.SetCharging(sdk.ChargingStateNotCharging)
 		}
 		c.batterySensor.SetLow(state.LowPower)
+	})
+
+	c.bridgeCam.OnFloodlight(func(on bool) {
+		if c.spotlight == nil {
+			return
+		}
+		if on {
+			c.spotlight.LightControl.SetOn()
+		} else {
+			c.spotlight.LightControl.SetOff()
+		}
 	})
 
 	c.bridgeCam.OnSleep(func(sleeping bool) {
@@ -243,33 +260,78 @@ func (c *reolinkCamera) reportObjects(event bridge.MotionEvent) {
 	if c.objectSensor == nil {
 		return
 	}
-	if len(event.AITypes) == 0 {
+
+	detections := make([]sdk.Detection, 0, len(event.AITypes))
+	for _, aiType := range event.AITypes {
+		if label, ok := objectLabel(aiType); ok {
+			detections = append(detections, sdk.Detection{Label: label, Confidence: 1})
+		}
+	}
+	if len(detections) == 0 {
 		c.objectSensor.ReportDetections(false, nil)
 		return
 	}
 
-	detections := make([]sdk.TrackedDetection, 0, len(event.AITypes))
-	for _, aiType := range event.AITypes {
-		detections = append(detections, sdk.TrackedDetection{
-			Detection: sdk.Detection{
-				Label:      objectLabel(aiType),
-				Confidence: 1,
-			},
-		})
+	tracked := make([]sdk.TrackedDetection, 0, len(detections))
+	for _, detection := range detections {
+		tracked = append(tracked, sdk.TrackedDetection{Detection: detection})
 	}
-	c.objectSensor.ReportDetections(true, detections)
+	c.objectSensor.ReportDetections(true, tracked)
 }
 
-func objectLabel(aiType string) string {
+// reportSounds forwards the AI types that describe a sound. The sensor is
+// created on the first one, because no capability bit tells us upfront whether
+// a camera can hear anything.
+func (c *reolinkCamera) reportSounds(event bridge.MotionEvent) {
+	detections := make([]sdk.Detection, 0, len(event.AITypes))
+	for _, aiType := range event.AITypes {
+		if label, ok := audioLabel(aiType); ok {
+			detections = append(detections, sdk.Detection{Label: label, Confidence: 1})
+		}
+	}
+
+	if len(detections) == 0 {
+		if c.audioSensor != nil {
+			c.audioSensor.ReportDetections(false, nil)
+		}
+		return
+	}
+
+	c.audioOnce.Do(func() {
+		sensor := sdk.NewAudioSensor("Reolink Audio Detection")
+		if err := c.dev.AddSensor(sensor); err != nil {
+			c.logger.Error("Failed to add audio sensor:", err)
+			return
+		}
+		c.audioSensor = sensor
+	})
+	if c.audioSensor != nil {
+		c.audioSensor.ReportDetections(true, detections)
+	}
+}
+
+// audioLabel maps a Reolink AI type to an audio detection label.
+func audioLabel(aiType string) (string, bool) {
+	if aiType == "cry" {
+		return "cry", true
+	}
+	return "", false
+}
+
+// objectLabel maps a Reolink AI type to a detection label, skipping the ones
+// that describe a sound rather than something visible in the frame.
+func objectLabel(aiType string) (string, bool) {
 	switch aiType {
 	case "people":
-		return "person"
+		return "person", true
 	case "vehicle":
-		return "vehicle"
+		return "vehicle", true
 	case "dog_cat":
-		return "animal"
+		return "animal", true
+	case "cry":
+		return "", false
 	default:
-		return aiType
+		return aiType, true
 	}
 }
 

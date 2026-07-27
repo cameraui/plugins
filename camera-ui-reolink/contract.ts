@@ -5,7 +5,7 @@ import type { PluginContract } from '@camera.ui/sdk';
 export const contract: PluginContract = {
   name: 'Reolink',
   role: PluginRole.CameraController,
-  provides: [SensorType.Motion, SensorType.Object, SensorType.Battery, SensorType.Doorbell, SensorType.Siren, SensorType.Light, SensorType.PTZ],
+  provides: [SensorType.Motion, SensorType.Object, SensorType.Audio, SensorType.Battery, SensorType.Doorbell, SensorType.Siren, SensorType.Light, SensorType.PTZ],
   consumes: [],
   interfaces: [PluginInterface.DiscoveryProvider],
 };

@@ -3,6 +3,8 @@
 - WiFi cameras no longer go missing when you search for cameras. Some models ignore the search for the first ten seconds, so they showed up only every other try. The plugin now keeps looking in the background, and a search finishes in two seconds instead of ten
 - Sound and picture now share one clock. The camera sends its audio without any timing information, and the plugin was starting the audio clock from scratch instead of from the picture, which is why audio and video could not be lined up in recordings
 - Two-way audio works again. The camera stayed silent because your voice arrived on a second connection that the plugin threw away; both connections now reach the camera
+- The spotlight switch now follows the camera. When the camera turns its own light on, or you switch it in the Reolink app, camera.ui shows it instead of staying on the last state it set itself
+- Cameras that listen for a baby crying now get their own audio detection sensor, instead of the sound showing up as if it had been seen in the picture. The sensor appears the first time the camera actually reports one
 
 ## [1.1.4]
 
