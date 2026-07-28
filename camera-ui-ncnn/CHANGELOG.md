@@ -1,3 +1,7 @@
+## [1.1.7]
+
+- Pick which Vulkan GPU runs inference. A new Vulkan Device option lists the detected GPUs, so multi-GPU systems can pin detection to a specific card. Auto keeps the previous behavior.
+
 ## [1.1.6]
 
 - No more "dlopen failed libvulkan.so.1" spam on systems without Vulkan. The GPU probe is skipped when the Vulkan library is not installed, inference runs on CPU as before.

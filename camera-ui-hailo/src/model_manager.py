@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from camera_ui_ml import BaseModelManager, InferenceBackend
 from camera_ui_sdk import LoggerService
@@ -40,10 +40,13 @@ def _detect_arch() -> str | None:
 
 
 class HailoModelManager(BaseModelManager):
-    def __init__(self, storage_path: str, logger: LoggerService) -> None:
+    def __init__(
+        self, storage_path: str, logger: LoggerService, get_device_id: Callable[[], str | None]
+    ) -> None:
         super().__init__(storage_path, logger, model_version)
         self._arch: str | None = None
         self._arch_task: asyncio.Task[None] | None = None
+        self._get_device_id = get_device_id
 
     async def ensure_backend(self, model_name: str) -> InferenceBackend:
         await self._ensure_arch()
@@ -56,8 +59,9 @@ class HailoModelManager(BaseModelManager):
 
     async def build_backend(self, model_name: str, paths: Mapping[str, str]) -> InferenceBackend:
         arch = self._arch or _DEFAULT_ARCH
-        device = _ARCH_DISPLAY.get(arch, arch)
-        backend = await asyncio.to_thread(HailoBackend, paths["hef"], device)
+        device_id = self._get_device_id()
+        device = _ARCH_DISPLAY.get(arch, arch) + (f" ({device_id})" if device_id else "")
+        backend = await asyncio.to_thread(HailoBackend, paths["hef"], device, device_id)
         self.logger.success(f"Loaded model: {model_name} ({device})")
         return backend
 

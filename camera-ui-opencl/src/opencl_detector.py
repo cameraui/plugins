@@ -8,19 +8,29 @@ from camera_ui_sdk import LoggerService
 from opencl_utils import get_contour_detections
 
 
-def create_program() -> tuple[Any, Any, Any]:
+def create_program(device_selector: str | None = None) -> tuple[Any, Any, Any]:
     platforms = cast(Any, cl.get_platforms())
 
     if len(platforms) == 0:
         raise RuntimeError("Failed to find any OpenCL platforms.")
 
-    devices = platforms[0].get_devices(cl.device_type.GPU)
-    if len(devices) == 0:
-        devices = platforms[0].get_devices(cl.device_type.CPU)
-        if len(devices) == 0:
-            raise RuntimeError("Could not find OpenCL GPU or CPU device.")
+    device = None
+    if device_selector and device_selector != "auto":
+        # "platform:device" index pair; anything unusable falls back to auto
+        try:
+            platform_index, device_index = (int(part) for part in device_selector.split(":", 1))
+            device = platforms[platform_index].get_devices()[device_index]
+        except Exception:
+            device = None
 
-    device = devices[0]
+    if device is None:
+        devices = platforms[0].get_devices(cl.device_type.GPU)
+        if len(devices) == 0:
+            devices = platforms[0].get_devices(cl.device_type.CPU)
+            if len(devices) == 0:
+                raise RuntimeError("Could not find OpenCL GPU or CPU device.")
+        device = devices[0]
+
     context = cast(Any, cl.Context([device]))
 
     current_dir = os.path.dirname(os.path.abspath(__file__))

@@ -32,7 +32,9 @@ class OpenCLStorageValues(TypedDict):
 
 
 class OpenCLMotionSensor(MotionDetectorSensor[OpenCLStorageValues]):
-    def __init__(self, camera_device: CameraDevice, name: str = "OpenCL Motion") -> None:
+    def __init__(
+        self, camera_device: CameraDevice, name: str = "OpenCL Motion", device_selector: str | None = None
+    ) -> None:
         super().__init__(name)
 
         self._camera_device = camera_device
@@ -42,8 +44,13 @@ class OpenCLMotionSensor(MotionDetectorSensor[OpenCLStorageValues]):
         self._is_available = False
 
         with suppress(Exception):
-            self._opencl_ctx = create_program()
+            self._opencl_ctx = create_program(device_selector)
             self._is_available = True
+
+    def apply_device(self, device_selector: str | None) -> None:
+        with suppress(Exception):
+            self._opencl_ctx = create_program(device_selector)
+            self.resetState()
 
     @property
     def storage_schema(self) -> list[JsonSchema]:

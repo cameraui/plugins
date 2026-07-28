@@ -1,3 +1,7 @@
+## [1.1.6]
+
+- Pick which Edge TPU runs inference when several are attached. A new device option accepts usb, pci or an index like :0. Empty keeps the previous behavior (first available).
+
 ## [1.1.5]
 
 - Exclude downloaded models from backups

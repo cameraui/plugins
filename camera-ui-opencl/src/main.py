@@ -40,12 +40,31 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage) -> None:
         super().__init__(logger, api, storage)
         self._log_available_devices()
+        self._device_options, self._device_summary = self._enumerate_devices()
 
         self.sensors: dict[str, OpenCLMotionSensor] = {}
         self.motion_detection_running = False
 
         # self.api.on(API_EVENT.FINISH_LAUNCHING, self.on_finish_launching)
         self.api.on(API_EVENT.SHUTDOWN, self.on_shutdown)
+
+    @property
+    def storage_schema(self) -> list[JsonSchema]:
+        return [
+            {
+                "type": "string",
+                "key": "device",
+                "title": "OpenCL Device",
+                "description": (
+                    "Which OpenCL device runs motion detection (platform:device). "
+                    + (self._device_summary or "No OpenCL device detected.")
+                ),
+                "enum": self._device_options,
+                "store": True,
+                "defaultValue": "auto",
+                "onSet": self._on_device_change,
+            },
+        ]
 
     async def on_shutdown(self) -> None:
         for sensor in self.sensors.values():
@@ -67,7 +86,7 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
             del self.sensors[cameraId]
 
     async def add_sensor_to_camera(self, camera: CameraDevice) -> None:
-        sensor = OpenCLMotionSensor(camera)
+        sensor = OpenCLMotionSensor(camera, device_selector=self._device_selector)
 
         if not sensor.isAvailable:
             self.logger.error("OpenCL is not available on this system")
@@ -139,7 +158,7 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
 
         self.motion_detection_running = True
 
-        ctx = create_program()
+        ctx = create_program(self._device_selector)
 
         input_buffer = io.BytesIO(video_data)
 
@@ -253,7 +272,7 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
 
         width, height = frames[0]["width"], frames[0]["height"]
 
-        ctx = create_program()
+        ctx = create_program(self._device_selector)
         opencl_detector = OpenCLMotionDetector(ctx, width, height, blur, self.logger)
         executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="OpenCL")
 
@@ -293,6 +312,27 @@ class OpenCL(BasePlugin, MotionDetectionInterface):
             del opencl_detector
 
         return {"detected": len(all_detections) > 0, "detections": all_detections}
+
+    @property
+    def _device_selector(self) -> str:
+        return str(self.storage.values.get("device", "auto"))
+
+    def _enumerate_devices(self) -> tuple[list[str], str]:
+        options = ["auto"]
+        described: list[str] = []
+        try:
+            for platform_index, platform in enumerate(cl.get_platforms()):
+                for device_index, device in enumerate(platform.get_devices()):
+                    options.append(f"{platform_index}:{device_index}")
+                    described.append(f"{platform_index}:{device_index} = {device.name}")
+        except Exception:
+            pass
+        return options, "; ".join(described)
+
+    async def _on_device_change(self, new_value: object, old_value: object) -> None:
+        selector = str(new_value) if new_value else "auto"
+        for sensor in self.sensors.values():
+            sensor.apply_device(selector)
 
     def _log_available_devices(self) -> None:
         try:

@@ -31,10 +31,20 @@ from model_manager import HailoModelManager
 from sensors.object_sensor import HailoObjectSensor
 
 
+def _scan_device_ids() -> list[str]:
+    try:
+        from hailo_platform import Device
+
+        return [str(device_id) for device_id in Device.scan()]
+    except Exception:
+        return []
+
+
 class HailoPlugin(BasePlugin, ObjectDetectionInterface):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
-        self.model_manager = HailoModelManager(api.storagePath, logger)
+        self.model_manager = HailoModelManager(api.storagePath, logger, self._resolve_device_id)
+        self._device_ids = _scan_device_ids()
 
         self.object_detectors: dict[str, HailoDetector] = {}
         self._sensors: dict[str, dict[str, Any]] = {}
@@ -44,6 +54,23 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
     @property
     def storage_schema(self) -> list[JsonSchema]:
         return [
+            {
+                "type": "string",
+                "key": "device_id",
+                "title": "Hailo Device",
+                "description": (
+                    "Which Hailo device runs inference when several are installed. "
+                    + (
+                        f"Detected: {', '.join(self._device_ids)}."
+                        if self._device_ids
+                        else "No Hailo device detected."
+                    )
+                ),
+                "enum": ["auto", *self._device_ids],
+                "store": True,
+                "defaultValue": "auto",
+                "onSet": self._on_device_change,
+            },
             {
                 "type": "string",
                 "key": "active_hardware",
@@ -159,6 +186,16 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
         if not backends:
             return "No models loaded yet"
         return ", ".join(dict.fromkeys(backends))
+
+    def _resolve_device_id(self) -> str | None:
+        raw = str(self.storage.values.get("device_id", "auto"))
+        return raw if raw and raw != "auto" else None
+
+    async def _on_device_change(self, new_value: object, old_value: object) -> None:
+        if new_value == old_value:
+            return
+        self.logger.log(f"Hailo device changed ({old_value} -> {new_value}); reloading models")
+        await self._reload_models()
 
     async def _reload_models(self) -> None:
         obj = list(self.object_detectors)

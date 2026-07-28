@@ -1,3 +1,7 @@
+## [1.1.6]
+
+- Pick which Hailo device runs inference when several are installed. A new device dropdown lists the detected devices. Auto keeps the previous behavior.
+
 ## [1.1.5]
 
 - Exclude downloaded models from backups

@@ -13,11 +13,13 @@ from camera_ui_ml import InferenceBackend, Outputs
 
 
 class HailoBackend(InferenceBackend):
-    def __init__(self, hef_path: str, device: str = "unknown") -> None:
+    def __init__(self, hef_path: str, device: str = "unknown", device_id: str | None = None) -> None:
         from hailo_platform import HEF, FormatType, HailoSchedulingAlgorithm, VDevice
 
         params = VDevice.create_params()
         params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
+        if device_id:
+            params.device_ids = [device_id]
         self._vdevice = VDevice(params)
         self._hef = HEF(hef_path)
 

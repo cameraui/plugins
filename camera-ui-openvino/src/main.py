@@ -81,6 +81,13 @@ class OpenVinoPlugin(
         super().__init__(logger, api, storage)
         self._core = ov.Core()
         self.logger.log(f"Available devices: {', '.join(self._core.available_devices)}")
+
+        # enumerated once: indexed devices (GPU.0, GPU.1, NPU variants) join the
+        # static options so multi-GPU boxes can pin a specific card
+        self._device_options = [
+            *OPENVINO_DEVICES,
+            *[d for d in self._core.available_devices if d not in OPENVINO_DEVICES and d != "CPU"],
+        ]
         self.model_manager = OpenVinoModelManager(api.storagePath, logger, self._resolve_device)
 
         self.object_detectors: dict[str, BoxDetector] = {}
@@ -105,9 +112,10 @@ class OpenVinoPlugin(
                 "description": (
                     "OpenVINO inference device. 'Default' auto-detects (NPU/GPU/CPU); "
                     "AUTO lets OpenVINO choose; CPU/GPU/NPU force a specific device. "
+                    "Indexed entries (e.g. GPU.0, GPU.1) pin one card on multi-GPU systems. "
                     f"Available on this system: {', '.join(self._core.available_devices)}."
                 ),
-                "enum": OPENVINO_DEVICES,
+                "enum": self._device_options,
                 "store": True,
                 "defaultValue": DEFAULT_OPENVINO_DEVICE,
                 "required": True,

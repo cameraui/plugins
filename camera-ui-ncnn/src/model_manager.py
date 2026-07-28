@@ -29,9 +29,11 @@ class NcnnModelManager(BaseModelManager):
         storage_path: str,
         logger: LoggerService,
         get_use_vulkan: Callable[[], bool],
+        get_vulkan_device: Callable[[], int | None],
     ) -> None:
         super().__init__(storage_path, logger, model_version)
         self._get_use_vulkan = get_use_vulkan
+        self._get_vulkan_device = get_vulkan_device
 
     def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
         param_rel = f"{model_name}/{model_name}.ncnn.param"
@@ -43,16 +45,25 @@ class NcnnModelManager(BaseModelManager):
 
     async def build_backend(self, model_name: str, paths: Mapping[str, str]) -> InferenceBackend:
         use_vulkan = self._get_use_vulkan() and gpu_count() > 0
-        net = await asyncio.to_thread(self._build, paths["param"], paths["bin"], use_vulkan)
+        vulkan_device = self._get_vulkan_device() if use_vulkan else None
+        net = await asyncio.to_thread(self._build, paths["param"], paths["bin"], use_vulkan, vulkan_device)
         size = _box_input_size(model_name)
-        device = "Vulkan (GPU)" if use_vulkan else "CPU"
+        device = (
+            f"Vulkan (GPU {vulkan_device})"
+            if use_vulkan and vulkan_device is not None
+            else "Vulkan (GPU)"
+            if use_vulkan
+            else "CPU"
+        )
         self.logger.success(f"Loaded model: {model_name} ({device})")
         return NcnnBackend(net, size, device)
 
     @staticmethod
-    def _build(param_path: str, bin_path: str, use_vulkan: bool) -> Any:
+    def _build(param_path: str, bin_path: str, use_vulkan: bool, vulkan_device: int | None) -> Any:
         net = ncnn.Net()
         net.opt.use_vulkan_compute = use_vulkan
+        if use_vulkan and vulkan_device is not None:
+            net.set_vulkan_device(vulkan_device)
         net.load_param(param_path)
         net.load_model(bin_path)
         return net

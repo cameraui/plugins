@@ -1,3 +1,7 @@
+## [1.1.7]
+
+- Pick the exact inference device on multi-GPU systems. The device dropdown now lists every detected device individually (for example GPU.0 and GPU.1), so detection can run on a specific card instead of whatever OpenVINO picks.
+
 ## [1.1.6]
 
 - Fixed a crash loop on machines with an Intel NPU: loading the CLIP model killed the plugin right after startup, over and over.

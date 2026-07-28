@@ -58,7 +58,7 @@ from model_manager import NcnnModelManager
 from sensors.face_sensor import NCNNFaceSensor
 from sensors.lpd_sensor import NCNNLPDSensor
 from sensors.object_sensor import NCNNObjectSensor
-from vulkan import gpu_count
+from vulkan import gpu_count, gpu_devices
 
 
 class NCNNPlugin(
@@ -71,7 +71,9 @@ class NCNNPlugin(
         super().__init__(logger, api, storage)
         gpus = gpu_count()
         self.logger.log(f"Available devices: CPU{f', Vulkan GPU x{gpus}' if gpus > 0 else ''}")
-        self.model_manager = NcnnModelManager(api.storagePath, logger, self._resolve_use_vulkan)
+        self.model_manager = NcnnModelManager(
+            api.storagePath, logger, self._resolve_use_vulkan, self._resolve_vulkan_device
+        )
 
         self.object_detectors: dict[str, BoxDetector] = {}
         self.face_detectors: dict[str, BoxDetector] = {}
@@ -96,6 +98,19 @@ class NCNNPlugin(
                 ),
                 "store": True,
                 "defaultValue": DEFAULT_USE_VULKAN,
+                "onSet": self._on_vulkan_change,
+            },
+            {
+                "type": "string",
+                "key": "vulkan_device",
+                "title": "Vulkan Device",
+                "description": (
+                    "Which Vulkan GPU runs inference on multi-GPU systems. "
+                    + ("; ".join(f"{i}: {name}" for i, name in gpu_devices()) or "No Vulkan GPU detected.")
+                ),
+                "enum": ["auto", *[str(i) for i, _ in gpu_devices()]],
+                "store": True,
+                "defaultValue": "auto",
                 "onSet": self._on_vulkan_change,
             },
             {
@@ -483,6 +498,16 @@ class NCNNPlugin(
 
     def _resolve_use_vulkan(self) -> bool:
         return bool(self.storage.values.get("use_vulkan", DEFAULT_USE_VULKAN))
+
+    def _resolve_vulkan_device(self) -> int | None:
+        raw = str(self.storage.values.get("vulkan_device", "auto"))
+        if raw == "auto":
+            return None
+        try:
+            index = int(raw)
+        except ValueError:
+            return None
+        return index if any(i == index for i, _ in gpu_devices()) else None
 
     async def _on_vulkan_change(self, new_value: object, old_value: object) -> None:
         if new_value == old_value:

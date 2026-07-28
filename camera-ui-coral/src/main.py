@@ -49,7 +49,9 @@ class CoralPlugin(BasePlugin, ObjectDetectionInterface):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
         self.logger.log(f"Available devices: CPU ({_edgetpu_status()})")
-        self.model_manager = CoralModelManager(api.storagePath, logger, self._resolve_use_edgetpu)
+        self.model_manager = CoralModelManager(
+            api.storagePath, logger, self._resolve_use_edgetpu, self._resolve_device
+        )
 
         self.object_detectors: dict[str, BoxDetector] = {}
         self._sensors: dict[str, dict[str, Any]] = {}
@@ -69,6 +71,18 @@ class CoralPlugin(BasePlugin, ObjectDetectionInterface):
                 ),
                 "store": True,
                 "defaultValue": DEFAULT_USE_EDGETPU,
+                "onSet": self._on_edgetpu_change,
+            },
+            {
+                "type": "string",
+                "key": "device",
+                "title": "Edge TPU Device",
+                "description": (
+                    'Which Edge TPU to use when several are attached: "usb", "pci", ":0", ":1" or "usb:0". '
+                    "Empty uses the first available."
+                ),
+                "store": True,
+                "defaultValue": "",
                 "onSet": self._on_edgetpu_change,
             },
             {
@@ -190,6 +204,10 @@ class CoralPlugin(BasePlugin, ObjectDetectionInterface):
 
     def _resolve_use_edgetpu(self) -> bool:
         return bool(self.storage.values.get("use_edgetpu", DEFAULT_USE_EDGETPU))
+
+    def _resolve_device(self) -> str | None:
+        device = str(self.storage.values.get("device", "")).strip()
+        return device or None
 
     async def _on_edgetpu_change(self, new_value: object, old_value: object) -> None:
         if new_value == old_value:
