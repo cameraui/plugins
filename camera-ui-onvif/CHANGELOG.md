@@ -1,3 +1,7 @@
+## [1.1.11]
+
+- Motion events from thingino cameras arrive reliably now. Their firmware (before 02/2026) sends a broken reply when asked which event types it supports, and the plugin gave up on events entirely instead of listening anyway
+
 ## [1.1.10]
 
 - Already adopted cameras no longer reappear under Discovered after a while, sometimes twice with the same address. Some cameras report a new identity after a reboot; discovery now recognizes them by their address instead of listing them again

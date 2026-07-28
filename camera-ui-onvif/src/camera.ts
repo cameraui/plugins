@@ -326,8 +326,12 @@ export class OnvifCamera {
       try {
         eventProperties = await this.device.events.getEventProperties();
         advertisedTypes = getSupportedDetectionTypes(eventProperties);
-      } catch {
-        // ignore
+      } catch (error) {
+        // thingino (onvif_simple_server before 02/2026) truncates this response
+        // via a wrong Content-Length while the subscription itself works fine:
+        // assume motion instead of silently dropping all events
+        advertisedTypes = ['motion'];
+        this.camera.logger.warn('Could not read ONVIF event properties, assuming motion support:', error instanceof Error ? error.message : error);
       }
     }
 
