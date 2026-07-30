@@ -299,7 +299,7 @@ class OpenCVMotionSensor(MotionDetectorSensor[OpenCVStorageValues]):
             self._executor.shutdown(wait=False)
             self._executor = None
 
-    def on_deassigned(self) -> None:
+    def on_stop(self) -> None:
         self.resetState()
 
     async def _on_var_threshold_changed(self, new_value: object, old_value: object) -> None:

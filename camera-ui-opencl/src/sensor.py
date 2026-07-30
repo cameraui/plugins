@@ -177,7 +177,7 @@ class OpenCLMotionSensor(MotionDetectorSensor[OpenCLStorageValues]):
             self._executor.shutdown(wait=False)
             self._executor = None
 
-    def on_deassigned(self) -> None:
+    def on_stop(self) -> None:
         self.resetState()
 
     async def _reset_to_defaults(self) -> None:

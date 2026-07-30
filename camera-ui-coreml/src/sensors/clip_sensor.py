@@ -69,7 +69,7 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
     async def destroy(self) -> None:
         pass
 
-    async def on_assigned(self) -> None:
+    async def on_start(self) -> None:
         model_name = self.storage.values.get("vision_model", DEFAULT_CLIP_VISION)
         await self._plugin.get_clip_encoder(model_name)
 

@@ -73,7 +73,7 @@ class CoreMLObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
     async def destroy(self) -> None:
         pass
 
-    async def on_assigned(self) -> None:
+    async def on_start(self) -> None:
         model_name = self.storage.values["model"]
         await self._plugin.get_object_detector(model_name)
 

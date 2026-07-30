@@ -18,11 +18,11 @@ class WyzeMotionSensor(MotionSensor):
         self._last_event_ts: int = 0
         self._loop: asyncio.AbstractEventLoop | None = None
 
-    async def on_assigned(self) -> None:
+    async def on_start(self) -> None:
         self._loop = asyncio.get_running_loop()
         await self._camera_service.register_for_updates(self._wyze_camera, self._on_camera_update)
 
-    async def on_deassigned(self) -> None:
+    async def on_stop(self) -> None:
         await self._camera_service.deregister_for_updates(self._wyze_camera)
         self._loop = None
 

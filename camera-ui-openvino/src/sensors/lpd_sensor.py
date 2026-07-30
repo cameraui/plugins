@@ -104,7 +104,7 @@ class OpenVinoLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     async def destroy(self) -> None:
         pass
 
-    async def on_assigned(self) -> None:
+    async def on_start(self) -> None:
         detector_name = self.storage.values.get("detector_model", DEFAULT_LPD_DETECTOR)
         ocr_name = self.storage.values.get("ocr_model", DEFAULT_OCR)
         await asyncio.gather(

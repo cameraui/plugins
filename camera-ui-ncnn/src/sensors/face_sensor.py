@@ -106,7 +106,7 @@ class NCNNFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
     async def destroy(self) -> None:
         pass
 
-    async def on_assigned(self) -> None:
+    async def on_start(self) -> None:
         detector_name = self.storage.values.get("detector_model", DEFAULT_FACE_DETECTOR)
         embedder_name = self.storage.values.get("embedder_model", DEFAULT_FACE_EMBEDDER)
         await asyncio.gather(

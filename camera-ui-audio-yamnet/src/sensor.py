@@ -130,7 +130,7 @@ class YAMNetAudioSensor(AudioDetectorSensor[YAMNetStorageValues]):
             await self._detector.close()
             self._detector = None
 
-    async def on_assigned(self) -> None:
+    async def on_start(self) -> None:
         listen_labels = self.storage.values.get("listen_labels", DEFAULT_LISTEN_LABELS)
         self._listen_set = set(listen_labels)
         self._threshold = self.storage.values.get("threshold", DEFAULT_THRESHOLD)
@@ -145,7 +145,7 @@ class YAMNetAudioSensor(AudioDetectorSensor[YAMNetStorageValues]):
         except Exception as e:
             self._logger.error(f"Failed to initialize audio detector: {e}")
 
-    async def on_deassigned(self) -> None:
+    async def on_stop(self) -> None:
         if self._detector:
             await self._detector.close()
             self._detector = None
