@@ -21,9 +21,9 @@
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.70",
-    "@camera.ui/sdk": "^0.0.33",
+    "@camera.ui/sdk": "^1.2.0",
     "cross-env": "^10.1.0",
-    "updates": "^17.19.2"
+    "updates": "^17.20.1"
   },
   "os": [],
   "cpu": [],
