@@ -71,15 +71,15 @@ export class OnvifPTZSensor extends PTZControl {
     ];
   }
 
-  protected override onAssigned(): void {
+  protected override onStart(): void {
     if (this.pollingTimer) return;
-    this.cameraDevice.logger.debug('PTZ sensor assigned — starting motion-state polling');
+    this.cameraDevice.logger.debug('PTZ sensor started, starting motion-state polling');
     this.pollingTimer = setInterval(() => {
       this.pollStatus();
     }, POLL_INTERVAL_MS);
   }
 
-  protected override onDeassigned(): void {
+  protected override onStop(): void {
     if (this.pollingTimer) {
       clearInterval(this.pollingTimer);
       this.pollingTimer = undefined;
@@ -90,7 +90,7 @@ export class OnvifPTZSensor extends PTZControl {
     this.fastPathUntilTs = 0;
     this.pollErrorStreak = 0;
     this.pollBackoffUntilTs = 0;
-    this.cameraDevice.logger.debug('PTZ sensor deassigned — stopped motion-state polling');
+    this.cameraDevice.logger.debug('PTZ sensor stopped, motion-state polling stopped');
   }
 
   getDevice(): Onvif | undefined {
