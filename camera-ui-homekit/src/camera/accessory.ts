@@ -27,7 +27,7 @@ import { RecordingDelegate } from './recordingDelegate.js';
 import { CameraServices } from './services.js';
 import { StreamingDelegate } from './streamingDelegate.js';
 
-import type { CameraDevice, DeviceStorage, LoggerService, PluginAPI } from '@camera.ui/sdk';
+import type { CameraDevice, DeviceStorage, LoggerService, PluginAPI, SensorLike } from '@camera.ui/sdk';
 import type { CameraControllerOptions, MacAddress, MDNSAdvertiser, PublishInfo } from '../hap.js';
 import type HomeKit from '../index.js';
 import type { CameraStorageValues } from '../types.js';
@@ -50,6 +50,8 @@ export class CameraAccessory extends Subscribed {
   private published = false;
   private publishing?: Promise<void>;
   private cameraSeenOnline = false;
+
+  private attachedSensors = new Map<string, SensorLike>();
 
   private publishedExternalAccessories: Map<MacAddress, Accessory>;
   private accessoryPort: number | undefined;
@@ -87,6 +89,17 @@ export class CameraAccessory extends Subscribed {
     this.publishAccessory();
   }
 
+  public attachSensor(sensor: SensorLike): void {
+    this.attachedSensors.set(sensor.id, sensor);
+    this.cameraServices?.addSensor(sensor);
+  }
+
+  public detachSensor(sensorId: string): void {
+    if (this.attachedSensors.delete(sensorId)) {
+      this.cameraServices?.removeSensor(sensorId);
+    }
+  }
+
   public async teardown(destroy?: boolean): Promise<void> {
     const wasPublished = this.published;
     this.published = false;
@@ -103,9 +116,9 @@ export class CameraAccessory extends Subscribed {
         }
       } finally {
         await this.resetAccessory(destroy);
-        const advertiseAddress = await this.cameraStorage.getValue<string>('advertiseAddress')!;
-        if (this.publishedExternalAccessories.get(advertiseAddress) === accessory) {
-          this.publishedExternalAccessories.delete(advertiseAddress);
+        const advertiseAddress = await this.cameraStorage.getValue<string>('advertiseAddress');
+        if (this.publishedExternalAccessories.get(advertiseAddress!) === accessory) {
+          this.publishedExternalAccessories.delete(advertiseAddress!);
         }
       }
     }
@@ -121,11 +134,11 @@ export class CameraAccessory extends Subscribed {
   private async runPublishAccessory(republish?: boolean): Promise<void> {
     if (!this.published) {
       try {
-        const accessoryPin = await this.cameraStorage.getValue<string>('accessoryPin')!;
-        const advertiseAddress = await this.cameraStorage.getValue<string>('advertiseAddress')!;
+        const accessoryPin = await this.cameraStorage.getValue<string>('accessoryPin');
+        const advertiseAddress = await this.cameraStorage.getValue<string>('advertiseAddress');
         const accessoryPortOverride = this.cameraStorage.values.accessoryPortOverride;
 
-        if (this.publishedExternalAccessories.has(advertiseAddress)) {
+        if (this.publishedExternalAccessories.has(advertiseAddress!)) {
           throw new Error(`Accessory ${this.cameraDevice.name} experienced an address collision.`);
         }
 
@@ -154,8 +167,8 @@ export class CameraAccessory extends Subscribed {
         const port = accessoryPortOverride === 0 && this.accessoryPort === undefined ? undefined : accessoryPortOverride || this.accessoryPort;
 
         const publishInfo: PublishInfo = {
-          username: advertiseAddress,
-          pincode: accessoryPin,
+          username: advertiseAddress!,
+          pincode: accessoryPin!,
           category: this.accessory!.category,
           port,
           bind,
@@ -165,7 +178,7 @@ export class CameraAccessory extends Subscribed {
 
         await this.accessory!.publish(publishInfo);
 
-        this.publishedExternalAccessories.set(advertiseAddress, this.accessory!);
+        this.publishedExternalAccessories.set(advertiseAddress!, this.accessory!);
 
         this.published = true;
       } catch (error) {
@@ -253,7 +266,7 @@ export class CameraAccessory extends Subscribed {
       }),
     );
 
-    this.cameraServices = new CameraServices(this.accessory, this.cameraDevice);
+    this.cameraServices = new CameraServices(this.accessory, this.cameraDevice, this.attachedSensors.values());
     this.controller = new CameraController(this.createControllerOptions(this.accessory));
 
     this.accessory.configureController(this.controller);

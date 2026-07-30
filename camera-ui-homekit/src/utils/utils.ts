@@ -5,14 +5,11 @@ import { HDSProtocolSpecificErrorReason } from '../hap.js';
 import type {
   AudioStreamInfo,
   BatteryInfoLike,
-  ContactSensorLike,
   Disposable,
   DoorbellTriggerLike,
   LightControlLike,
   MotionSensorLike,
-  SecuritySystemLike,
   SirenControlLike,
-  SwitchControlLike,
   VideoStreamInfo,
 } from '@camera.ui/sdk';
 import type { H264Level, H264Profile } from '../hap.js';
@@ -122,10 +119,6 @@ export function isBatteryInfo(obj: any): obj is BatteryInfoLike {
   return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.Battery;
 }
 
-export function isContactSensor(obj: any): obj is ContactSensorLike {
-  return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.Contact;
-}
-
 export function isDoorbellTrigger(obj: any): obj is DoorbellTriggerLike {
   return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.Doorbell;
 }
@@ -138,16 +131,8 @@ export function isMotionSensor(obj: any): obj is MotionSensorLike {
   return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.Motion;
 }
 
-export function isSecuritySystem(obj: any): obj is SecuritySystemLike {
-  return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.SecuritySystem;
-}
-
 export function isSirenControl(obj: any): obj is SirenControlLike {
   return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.Siren;
-}
-
-export function isSwitchControl(obj: any): obj is SwitchControlLike {
-  return obj && typeof obj === 'object' && 'type' in obj && obj.type === SensorType.Switch;
 }
 
 export async function PromiseTimeout<T>(promise: Promise<T> | (() => Promise<T>), ms: number, cleanup?: () => void, errorMessage?: string): Promise<T> {

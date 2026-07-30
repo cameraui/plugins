@@ -1,3 +1,3 @@
 # HomeKit
 
-Exposes camera.ui cameras and sensors to Apple HomeKit. Bridges motion, doorbell, battery, contact, light, switch, siren, security system and audio events into the Home app.
+Exposes camera.ui cameras and sensors to Apple HomeKit. Cameras stream and record via HomeKit Secure Video, sensors appear as accessories in the Home app.

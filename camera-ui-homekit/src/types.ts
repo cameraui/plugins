@@ -1,3 +1,11 @@
+export interface PluginStorageValues {
+  bridgePin: string;
+  bridgePortOverride: number;
+  bridgeAdvertiseAddress?: string;
+  bridgeRepublishId: string;
+  bridgeAdvertiser: string;
+}
+
 export interface CameraStorageValues {
   accessoryPin: string;
   accessoryPortOverride: number;

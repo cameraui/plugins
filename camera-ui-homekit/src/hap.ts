@@ -2,6 +2,8 @@ export * from '@homebridge/hap-nodejs/dist/lib/definitions/index.js'; // must be
 
 export * from '@homebridge/hap-nodejs/dist/lib/Accessory.js';
 
+export * from '@homebridge/hap-nodejs/dist/lib/Bridge.js';
+
 export * as uuid from '@homebridge/hap-nodejs/dist/lib/util/uuid.js';
 
 export * from '@homebridge/hap-nodejs/dist/lib/Characteristic.js';
