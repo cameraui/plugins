@@ -29,9 +29,7 @@ from wyze_types import WyzeConfig
 
 
 class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
-    def __init__(
-        self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[WyzeConfig]
-    ) -> None:
+    def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[WyzeConfig]) -> None:
         super().__init__(logger, api, storage)
 
         self._wyze_client: Wyzeapy | None = None
@@ -110,9 +108,7 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
     async def onDiscoverCameras(self) -> list[DiscoveredCamera]:
         return self._get_discovered_cameras()
 
-    async def onGetCameraSettings(
-        self, camera: DiscoveredCamera
-    ) -> list[JsonSchemaWithoutCallbacks]:
+    async def onGetCameraSettings(self, camera: DiscoveredCamera) -> list[JsonSchemaWithoutCallbacks]:
         return []
 
     async def onAdoptCamera(
@@ -182,14 +178,10 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
 
             wyze_camera = self._wyze_cameras.get(camera_device.nativeId)
             if wyze_camera:
-                await self.api.deviceManager.pushDiscoveredCameras(
-                    [self._to_discovered_camera(wyze_camera)]
-                )
+                await self.api.deviceManager.pushDiscoveredCameras([self._to_discovered_camera(wyze_camera)])
 
     async def _start(self) -> None:
-        if self.storage.values.get("accessToken") and self.storage.values.get(
-            "refreshToken"
-        ):
+        if self.storage.values.get("accessToken") and self.storage.values.get("refreshToken"):
             try:
                 await self._connect()
             except Exception as e:
@@ -244,16 +236,12 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
         if mac in self._camera_controllers:
             return
 
-        camera_device = next(
-            (c for c in self._existing_cameras.values() if c.nativeId == mac), None
-        )
+        camera_device = next((c for c in self._existing_cameras.values() if c.nativeId == mac), None)
 
         if camera_device and self._camera_service:
             await self._initialize_camera(wyze_camera, camera_device)
 
-    async def _initialize_camera(
-        self, wyze_camera: WyzeCamera, camera_device: CameraDevice
-    ) -> None:
+    async def _initialize_camera(self, wyze_camera: WyzeCamera, camera_device: CameraDevice) -> None:
         if wyze_camera.mac in self._camera_controllers:
             return
 
@@ -301,9 +289,7 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
         ip = camera.device_params.get("ip", "")
         return f"wyze://{ip}?{urlencode(params)}"
 
-    async def _on_form_submit(
-        self, action_id: str, values: WyzeConfig
-    ) -> FormSubmitResponse | None:
+    async def _on_form_submit(self, action_id: str, values: WyzeConfig) -> FormSubmitResponse | None:
         if action_id != "onLogin":
             return None
 
