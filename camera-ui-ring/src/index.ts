@@ -86,8 +86,7 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
         type: 'boolean',
         key: 'polling',
         title: 'Polling',
-        description:
-          'Regularly refresh device status (battery, light, siren, online state) from Ring. Motion and doorbell events arrive via push either way.',
+        description: 'Regularly refresh device status (battery, light, siren, online state) from Ring. Motion and doorbell events arrive via push either way.',
         required: false,
         defaultValue: true,
         store: true,

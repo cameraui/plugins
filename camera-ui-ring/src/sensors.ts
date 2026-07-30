@@ -15,7 +15,7 @@ export class RingMotionSensor extends MotionSensor {
     this.ringCamera = ringCamera;
   }
 
-  protected override onAssigned(): void {
+  protected override onStart(): void {
     this.subscriptions.push(
       this.ringCamera.onMotionDetected.subscribe((motionDetected) => {
         this.reportDetections(motionDetected);
@@ -23,7 +23,7 @@ export class RingMotionSensor extends MotionSensor {
     );
   }
 
-  protected override onDeassigned(): void {
+  protected override onStop(): void {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
     this.subscriptions = [];
   }
@@ -39,7 +39,7 @@ export class RingBatteryInfo extends BatteryInfo {
     this.capabilities = [BatteryCapability.Charging, BatteryCapability.LowBattery];
   }
 
-  protected override onAssigned(): void {
+  protected override onStart(): void {
     this.updateFromRingCamera();
 
     this.subscriptions.push(
@@ -49,7 +49,7 @@ export class RingBatteryInfo extends BatteryInfo {
     );
   }
 
-  protected override onDeassigned(): void {
+  protected override onStop(): void {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
     this.subscriptions = [];
   }
@@ -78,7 +78,7 @@ export class RingLightControl extends LightControl {
     this.ringCamera = ringCamera;
   }
 
-  protected override onAssigned(): void {
+  protected override onStart(): void {
     if (this.ringCamera.data.led_status) {
       if (this.ringCamera.data.led_status === 'on') {
         super.setOn();
@@ -100,7 +100,7 @@ export class RingLightControl extends LightControl {
     );
   }
 
-  protected override onDeassigned(): void {
+  protected override onStop(): void {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
     this.subscriptions = [];
   }
@@ -133,7 +133,7 @@ export class RingSirenControl extends SirenControl {
     this.ringCamera = ringCamera;
   }
 
-  protected override onAssigned(): void {
+  protected override onStart(): void {
     if (this.ringCamera.data.siren_status) {
       if (this.ringCamera.data.siren_status.seconds_remaining > 0) {
         super.setActive();
@@ -155,7 +155,7 @@ export class RingSirenControl extends SirenControl {
     );
   }
 
-  protected override onDeassigned(): void {
+  protected override onStop(): void {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
     this.subscriptions = [];
   }
@@ -188,7 +188,7 @@ export class RingDoorbellTrigger extends DoorbellTrigger {
     this.ringCamera = ringCamera;
   }
 
-  protected override onAssigned(): void {
+  protected override onStart(): void {
     // SDK auto-resets the doorbell trigger after a short delay
     this.subscriptions.push(
       this.ringCamera.onDoorbellPressed.subscribe(() => {
@@ -197,7 +197,7 @@ export class RingDoorbellTrigger extends DoorbellTrigger {
     );
   }
 
-  protected override onDeassigned(): void {
+  protected override onStop(): void {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
     this.subscriptions = [];
   }
