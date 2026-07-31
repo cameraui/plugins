@@ -18,6 +18,7 @@ interface CatalogEntry {
   tagline: string;
   logo?: string;
   screenshots: string[];
+  protocolLevel?: number;
 }
 
 const CATEGORY_OVERRIDES: Record<string, Category> = {
@@ -101,10 +102,18 @@ function collectScreenshots(folder: string, dir: string): string[] {
     .map((file) => `${RAW_BASE}/${folder}/screenshots/${file}`);
 }
 
+function readProtocolLevel(dir: string): number | undefined {
+  const bundlePkgPath = resolve(dir, 'bundle', 'package.json');
+  if (!existsSync(bundlePkgPath)) return undefined;
+  const level = JSON.parse(readFileSync(bundlePkgPath, 'utf-8')).cameraui?.protocolLevel;
+  return typeof level === 'number' ? level : undefined;
+}
+
 function buildEntry(folder: string): { name: string; entry: CatalogEntry } {
   const dir = resolve(ROOT, folder);
   const pkg = JSON.parse(readFileSync(resolve(dir, 'package.json'), 'utf-8'));
   const name: string = pkg.name;
+  const protocolLevel = readProtocolLevel(dir);
 
   const entry: CatalogEntry = {
     ...(pkg.displayName ? { displayName: pkg.displayName as string } : {}),
@@ -113,6 +122,7 @@ function buildEntry(folder: string): { name: string; entry: CatalogEntry } {
     tagline: firstSentence(pkg.description),
     ...(existsSync(resolve(dir, 'logo.png')) ? { logo: `${RAW_BASE}/${folder}/logo.png` } : {}),
     screenshots: collectScreenshots(folder, dir),
+    ...(protocolLevel !== undefined ? { protocolLevel } : {}),
   };
 
   return { name, entry };
