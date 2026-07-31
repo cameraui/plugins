@@ -487,10 +487,7 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 		return nil, fmt.Errorf("username and password are required")
 	}
 
-	channel := entry.channel
-	if channel < 0 {
-		channel = 0
-	}
+	channel := max(entry.channel, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), adoptProbeTimeout)
 	defer cancel()
