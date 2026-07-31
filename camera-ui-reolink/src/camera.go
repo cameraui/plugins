@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ type reolinkCamera struct {
 	audioOnce   sync.Once
 	audioSensor *sdk.AudioSensor
 
+	hintMu          sync.Mutex
 	connMu          sync.Mutex
 	connReported    bool
 	connEverSet     bool
@@ -80,6 +82,7 @@ func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 		Streams:        c.settings.Streams,
 		IdleDisconnect: true,
 		BatteryCamera:  c.settings.BatteryCamera,
+		AudioHints:     c.loadAudioHints(),
 	})
 	if err != nil {
 		return err
@@ -215,7 +218,47 @@ func (c *reolinkCamera) subscribeEvents() {
 		c.logger.Log("Camera sleep state:", sleeping)
 	})
 
+	c.bridgeCam.OnAudioHint(c.storeAudioHint)
+
 	c.bridgeCam.OnConnection(c.handleConnection)
+}
+
+// loadAudioHints returns what earlier runs observed per stream profile, so a
+// known audio track is declared right away instead of being waited for.
+func (c *reolinkCamera) loadAudioHints() map[string]bridge.AudioHint {
+	raw, _ := c.dev.Storage().GetValue(storageKeyAudioHints).(string)
+	if raw == "" {
+		return nil
+	}
+
+	var hints map[string]bridge.AudioHint
+	if err := json.Unmarshal([]byte(raw), &hints); err != nil {
+		c.logger.Warn("Failed to parse stored audio hints:", err)
+		return nil
+	}
+	return hints
+}
+
+func (c *reolinkCamera) storeAudioHint(profile string, hint bridge.AudioHint) {
+	c.hintMu.Lock()
+	defer c.hintMu.Unlock()
+
+	hints := c.loadAudioHints()
+	if hints == nil {
+		hints = make(map[string]bridge.AudioHint)
+	}
+	if existing, ok := hints[profile]; ok && existing == hint {
+		return
+	}
+	hints[profile] = hint
+
+	raw, err := json.Marshal(hints)
+	if err != nil {
+		return
+	}
+	if err := c.dev.Storage().SetValue(storageKeyAudioHints, string(raw)); err != nil {
+		c.logger.Warn("Failed to persist audio hints:", err)
+	}
 }
 
 func (c *reolinkCamera) handleConnection(connected bool) {
@@ -372,6 +415,7 @@ const (
 	storageKeyHasDoorbell   = "hasDoorbell"
 	storageKeyHasAI         = "hasAI"
 	storageKeyChannel       = "channel"
+	storageKeyAudioHints    = "audioHints"
 )
 
 func ensureStorageSchemas(storage *sdk.DeviceStorage) {
