@@ -1,3 +1,7 @@
+## [1.2.0]
+
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
+
 ## [1.1.5]
 
 - Pick which OpenCL device runs motion detection. A new device option lists every detected platform and device, so multi-GPU systems can put motion on the integrated GPU. Auto keeps the previous behavior (first GPU).

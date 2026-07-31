@@ -1,3 +1,10 @@
+## [1.2.0]
+
+- New camera.ui Bridge accessory for standalone sensors. Contact, occupancy, smoke, leak, temperature, humidity, lock, garage door, switch and security system sensors, plus standalone lights and sirens, come across behind a single bridge. Pair it once and every sensor you expose later joins automatically. QR code, PIN, port and a reset button live in the plugin settings.
+- Camera accessories now carry their camera's hardware: spotlight, siren and battery show up on the camera itself, alongside motion and doorbell.
+- The "Expose sensor" toggle on the Sensors page decides what reaches HomeKit. Un-exposing a sensor removes it, exposing brings it back.
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
+
 ## [1.1.7]
 
 - Added new camera settings flag to disable hardware acceleration

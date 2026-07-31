@@ -1,8 +1,9 @@
-## [1.1.8]
+## [1.2.0]
 
 - Models now compile once instead of on every start. Compiled models are cached on disk, so a plugin restart skips the heavy GPU/NPU compilation that could stall weaker systems. The first start after an update or model change still compiles.
 - The Active Hardware field shows the device inference actually runs on. With AUTO it used to freeze on the temporary CPU stage shown while the real device was still compiling in the background.
 - Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
 
 ## [1.1.7]
 

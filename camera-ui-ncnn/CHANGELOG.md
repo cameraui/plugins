@@ -1,6 +1,7 @@
-## [1.1.8]
+## [1.2.0]
 
 - Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
 
 ## [1.1.7]
 

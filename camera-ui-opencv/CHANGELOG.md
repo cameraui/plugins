@@ -1,3 +1,7 @@
+## [1.2.0]
+
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
+
 ## [1.1.4]
 
 - **The Threshold slider for the Background Substraction detector now works.** It never had any effect before, apart from the maximum position, which silently switched motion detection off completely. If you had it at maximum, detection starts working again. The slider resets to a value that matches the previous detection behaviour.

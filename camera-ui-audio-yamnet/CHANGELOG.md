@@ -1,3 +1,7 @@
+## [1.2.0]
+
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
+
 ## [1.1.6]
 
 - Raise the default confidence threshold to 0.7, the old default let through almost every noise

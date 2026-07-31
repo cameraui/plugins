@@ -1,3 +1,7 @@
+## [1.2.0]
+
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
+
 ## [1.1.11]
 
 - Motion events from thingino cameras arrive reliably now. Their firmware (before 02/2026) sends a broken reply when asked which event types it supports, and the plugin gave up on events entirely instead of listening anyway

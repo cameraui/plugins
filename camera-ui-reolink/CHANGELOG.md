@@ -1,3 +1,7 @@
+## [1.2.0]
+
+- Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
+
 ## [1.1.5]
 
 - WiFi cameras no longer go missing when you search for cameras. Some models ignore the search for the first ten seconds, so they showed up only every other try. The plugin now keeps looking in the background, and a search finishes in two seconds instead of ten
