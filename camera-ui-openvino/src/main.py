@@ -650,7 +650,7 @@ class OpenVinoPlugin(
             return_exceptions=True,
         )
 
-    async def _redownload_models(self) -> None:
+    async def _redownload_models(self, _new: object = None, _old: object = None) -> None:
         self.logger.log("Re-downloading models (clearing cache)...")
         shutil.rmtree(self.model_manager.model_path, ignore_errors=True)
         await self._reload_models()
