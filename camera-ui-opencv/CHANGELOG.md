@@ -1,5 +1,6 @@
 ## [1.2.0]
 
+- Blur in the test form only steps through odd values now, matching what the detector accepts
 - Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
 
 ## [1.1.4]

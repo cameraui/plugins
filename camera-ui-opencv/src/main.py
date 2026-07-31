@@ -126,7 +126,7 @@ class OpenCV(BasePlugin, MotionDetectionInterface):
                 "defaultValue": DEFAULT_BLUR,
                 "minimum": 1,
                 "maximum": 21,
-                "step": 1,
+                "step": 2,
                 "required": True,
                 "group": "Default",
             },

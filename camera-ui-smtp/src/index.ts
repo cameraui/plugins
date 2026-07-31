@@ -35,6 +35,9 @@ export default class SMTPPlugin extends BasePlugin<StorageValues> {
         title: 'Port',
         description: 'Port the SMTP server listens on.',
         defaultValue: 25,
+        minimum: 1,
+        maximum: 65535,
+        step: 1,
         required: true,
         store: true,
         onSet: async () => {

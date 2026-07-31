@@ -112,6 +112,7 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         defaultValue: 86400,
         minimum: 10,
         maximum: 86400,
+        step: 10,
         store: true,
       },
       {

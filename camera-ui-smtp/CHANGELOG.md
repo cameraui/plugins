@@ -1,5 +1,6 @@
 ## [1.2.0]
 
+- The port field now enforces the valid range (1-65535)
 - Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
 
 ## [1.1.3]
