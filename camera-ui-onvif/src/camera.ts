@@ -225,6 +225,10 @@ export class OnvifCamera {
       this.camera.logger.debug('ONVIF subscription renew failed:', error.message ?? error);
     });
 
+    this.device.events.on('pulltimeoutfallback', (timeout: string) => {
+      this.camera.logger.debug(`ONVIF pull timeout reduced to ${timeout} (camera closes long polls early)`);
+    });
+
     this.device.events.startEventLoop({ messageLimit: 10 });
     this.eventLoopRunning = true;
     this.camera.logger.log('Started ONVIF event listening (detection sensors assigned)');
