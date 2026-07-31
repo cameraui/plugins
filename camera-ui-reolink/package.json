@@ -21,7 +21,7 @@
     "update": "updates --update ./"
   },
   "devDependencies": {
-    "@camera.ui/cli": "~0.0.73",
+    "@camera.ui/cli": "~0.0.74",
     "@camera.ui/sdk": "~1.2.3",
     "@types/node": "^26.1.2",
     "cross-env": "^10.1.0",
@@ -50,13 +50,13 @@
   "os": [],
   "cpu": [],
   "optionalDependencies": {
-    "@camera.ui/camera-ui-reolink-darwin-arm64": "1.1.5",
-    "@camera.ui/camera-ui-reolink-darwin-amd64": "1.1.5",
-    "@camera.ui/camera-ui-reolink-linux-amd64": "1.1.5",
-    "@camera.ui/camera-ui-reolink-linux-arm64": "1.1.5",
-    "@camera.ui/camera-ui-reolink-windows-amd64": "1.1.5",
-    "@camera.ui/camera-ui-reolink-windows-arm64": "1.1.5",
-    "@camera.ui/camera-ui-reolink-linux-amd64-musl": "1.1.5",
-    "@camera.ui/camera-ui-reolink-linux-arm64-musl": "1.1.5"
+    "@camera.ui/camera-ui-reolink-darwin-arm64": "1.2.0",
+    "@camera.ui/camera-ui-reolink-darwin-amd64": "1.2.0",
+    "@camera.ui/camera-ui-reolink-linux-amd64": "1.2.0",
+    "@camera.ui/camera-ui-reolink-linux-arm64": "1.2.0",
+    "@camera.ui/camera-ui-reolink-windows-amd64": "1.2.0",
+    "@camera.ui/camera-ui-reolink-windows-arm64": "1.2.0",
+    "@camera.ui/camera-ui-reolink-linux-amd64-musl": "1.2.0",
+    "@camera.ui/camera-ui-reolink-linux-arm64-musl": "1.2.0"
   }
 }
