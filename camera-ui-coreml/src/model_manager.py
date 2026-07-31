@@ -62,18 +62,22 @@ class CoreMlModelManager(BaseModelManager):
         pkg_path = os.path.join(self.model_path, f"{model_name}.mlpackage")
         mode = self._get_compute_units()
         units = _COMPUTE_UNITS.get(mode, ct.ComputeUnit.ALL)
-        model = await asyncio.to_thread(self._load_model, model_name, pkg_path, units)
+        model, spec = await asyncio.to_thread(self._load_model, model_name, pkg_path, units)
         self.logger.success(f"Loaded model: {model_name} ({mode})")
-        return CoreMlBackend(model, _DEVICE_LABELS.get(mode, mode))
+        return CoreMlBackend(model, spec, _DEVICE_LABELS.get(mode, mode))
 
-    def _load_model(self, model_name: str, pkg_path: str, compute_units: Any) -> Any:
+    def _load_model(self, model_name: str, pkg_path: str, compute_units: Any) -> tuple[Any, Any]:
+        # spec always comes from the source package: a cached CompiledMLModel
+        # has no get_spec
+        spec = ct.utils.load_spec(pkg_path)
+
         compiled_path = os.path.join(
             self.compile_cache_dir(f"coremltools-{ct.__version__}"),
             f"{model_name}.mlmodelc",
         )
         if os.path.isdir(compiled_path):
             try:
-                return ct.models.CompiledMLModel(compiled_path, compute_units=compute_units)
+                return ct.models.CompiledMLModel(compiled_path, compute_units=compute_units), spec
             except Exception:
                 shutil.rmtree(compiled_path, ignore_errors=True)
 
@@ -85,4 +89,4 @@ class CoreMlModelManager(BaseModelManager):
             os.rename(tmp_path, compiled_path)
         except Exception as error:
             self.logger.log(f"Could not persist compiled model ({error})")
-        return model
+        return model, spec

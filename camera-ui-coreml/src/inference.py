@@ -25,10 +25,9 @@ _ARRAY_DTYPES: dict[int, Any] = {
 
 
 class CoreMlBackend(InferenceBackend):
-    def __init__(self, model: Any, device: str = "unknown", workers: int = 2) -> None:
+    def __init__(self, model: Any, spec: Any, device: str = "unknown", workers: int = 2) -> None:
         self._model = model
         self._device = device
-        spec = model.get_spec()
         inputs = spec.description.input
 
         self._input_names = [str(i.name) for i in inputs]
