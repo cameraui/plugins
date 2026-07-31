@@ -23,3 +23,4 @@ class Camera:
 
     async def initialize(self) -> None:
         await self._camera_device.addSensor(self._motion_sensor)
+        await self._camera_device.connect()

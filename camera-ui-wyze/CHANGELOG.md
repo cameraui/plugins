@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- Wyze cameras record again. The plugin never reported its cameras as online, so the NVR kept deferring the recording ("Camera not connected") and the frame worker stayed down
+
 ## [1.2.0]
 
 - Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
