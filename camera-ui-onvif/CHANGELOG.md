@@ -1,5 +1,7 @@
 ## [1.2.0]
 
+- Short motion pulses from thingino cameras no longer slip through. These cameras only report the latest motion state per poll, and the plugin used to spend a request between polls in exactly the moment a one-second motion could start and end, so most triggers collapsed into nothing. Polling now runs back to back during activity
+- Tapo cameras no longer flood the log with "other side closed" and drop their event subscription every two minutes. These cameras cut idle connections after about 20 seconds; event polls now return before that cutoff
 - Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
 
 ## [1.1.11]
