@@ -68,7 +68,8 @@
     "featured": true,
     "tagline": "Manage and store video recordings from your cameras.",
     "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/external-logos/camera-ui-nvr.png",
-    "screenshots": []
+    "screenshots": [],
+    "protocolLevel": 1
   },
   "@camera.ui/camera-ui-onnx": {
     "displayName": "ONNX",
