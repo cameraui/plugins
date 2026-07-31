@@ -24,7 +24,7 @@
     "@seydx/onvif": "file:../externals/onvif"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.70",
+    "@camera.ui/cli": "^0.0.71",
     "@camera.ui/sdk": "^1.2.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.2",
@@ -36,7 +36,7 @@
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.65.0",
-    "updates": "^17.20.1"
+    "updates": "^17.20.2"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
