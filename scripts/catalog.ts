@@ -47,7 +47,8 @@ const CATEGORY_OVERRIDES: Record<string, Category> = {
 const FEATURED = new Set<string>(['camera-ui-homekit', 'camera-ui-rust-motion', 'camera-ui-coreml', 'camera-ui-openvino', 'camera-ui-onnx']);
 
 // Official plugins published to npm but sourced from a separate repo, so unavailable
-// when this script runs. Their metadata is maintained here by hand.
+// when this script runs. Their metadata is maintained here by hand; protocolLevel is
+// only the fallback until the registry serves a stamped release.
 const EXTERNAL_PLUGINS: Record<string, CatalogEntry> = {
   '@camera.ui/camera-ui-nvr': {
     displayName: 'NVR',
@@ -56,6 +57,7 @@ const EXTERNAL_PLUGINS: Record<string, CatalogEntry> = {
     tagline: 'Manage and store video recordings from your cameras.',
     logo: `${RAW_BASE}/external-logos/camera-ui-nvr.png`,
     screenshots: [],
+    protocolLevel: 1,
   },
 };
 
@@ -109,6 +111,18 @@ function readProtocolLevel(dir: string): number | undefined {
   return typeof level === 'number' ? level : undefined;
 }
 
+async function fetchExternalProtocolLevel(name: string): Promise<number | undefined> {
+  try {
+    const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}/latest`);
+    if (!response.ok) return undefined;
+    const pkg = (await response.json()) as { cameraui?: { protocolLevel?: unknown } };
+    const level = pkg.cameraui?.protocolLevel;
+    return typeof level === 'number' ? level : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildEntry(folder: string): { name: string; entry: CatalogEntry } {
   const dir = resolve(ROOT, folder);
   const pkg = JSON.parse(readFileSync(resolve(dir, 'package.json'), 'utf-8'));
@@ -128,7 +142,7 @@ function buildEntry(folder: string): { name: string; entry: CatalogEntry } {
   return { name, entry };
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const folders = discoverPlugins();
   if (!folders.length) {
     console.error('\r\n', chalk.bgRed.bold(' ERROR '), chalk.red('No camera-ui-* plugins found.'));
@@ -142,7 +156,8 @@ function main(): void {
   }
 
   for (const [name, entry] of Object.entries(EXTERNAL_PLUGINS)) {
-    catalog[name] = entry;
+    const registryLevel = await fetchExternalProtocolLevel(name);
+    catalog[name] = registryLevel !== undefined ? { ...entry, protocolLevel: registryLevel } : entry;
   }
 
   const sorted: Record<string, CatalogEntry> = {};
@@ -161,4 +176,4 @@ function main(): void {
   console.log('\r\n', chalk.bgGreen(' SUCCESS '), chalk.green(`catalog.json written to ${outPath}`));
 }
 
-main();
+await main();
