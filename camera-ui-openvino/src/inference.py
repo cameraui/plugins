@@ -32,7 +32,14 @@ class OpenVinoBackend(InferenceBackend):
 
     @property
     def device(self) -> str:
-        return self._device
+        try:
+            resolved = ",".join(self._compiled.get_property("EXECUTION_DEVICES"))
+        except Exception:
+            return self._device
+        requested = self._device.split(" -> ")[0]
+        if not resolved or resolved == requested:
+            return self._device
+        return f"{requested} -> {resolved}"
 
     async def infer(self, inputs: Sequence[Any]) -> Outputs:
         future: asyncio.Future[Outputs] = self._loop.create_future()

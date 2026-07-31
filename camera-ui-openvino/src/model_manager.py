@@ -24,6 +24,11 @@ class OpenVinoModelManager(BaseModelManager):
         super().__init__(storage_path, logger, model_version)
         self._get_device = get_device
         self._core = ov.Core()
+        try:
+            cache_dir = self.compile_cache_dir(f"openvino-{ov.__version__.split('-')[0]}")
+            self._core.set_property({"CACHE_DIR": cache_dir})
+        except Exception as error:
+            logger.log(f"Model compile cache unavailable ({error})")
 
     def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
         xml_rel, bin_rel = self._rel_files(model_name)
@@ -34,7 +39,10 @@ class OpenVinoModelManager(BaseModelManager):
 
     def clip_processor_files(self) -> Mapping[str, tuple[str, str]]:
         return {
-            name: (f"{MODEL_BASE_URL}/clip-vit-base-patch32/{name}", f"clip-vit-base-patch32/{name}")
+            name: (
+                f"{MODEL_BASE_URL}/clip-vit-base-patch32/{name}",
+                f"clip-vit-base-patch32/{name}",
+            )
             for name in self.CLIP_PROCESSOR_FILENAMES
         }
 

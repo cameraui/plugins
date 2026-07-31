@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -50,7 +51,10 @@ class CoreMlModelManager(BaseModelManager):
 
     def clip_processor_files(self) -> Mapping[str, tuple[str, str]]:
         return {
-            name: (f"{MODEL_BASE_URL}/clip-vit-base-patch32/{name}", f"clip-vit-base-patch32/{name}")
+            name: (
+                f"{MODEL_BASE_URL}/clip-vit-base-patch32/{name}",
+                f"clip-vit-base-patch32/{name}",
+            )
             for name in self.CLIP_PROCESSOR_FILENAMES
         }
 
@@ -58,10 +62,27 @@ class CoreMlModelManager(BaseModelManager):
         pkg_path = os.path.join(self.model_path, f"{model_name}.mlpackage")
         mode = self._get_compute_units()
         units = _COMPUTE_UNITS.get(mode, ct.ComputeUnit.ALL)
-        model = await asyncio.to_thread(self._load_model, pkg_path, units)
+        model = await asyncio.to_thread(self._load_model, model_name, pkg_path, units)
         self.logger.success(f"Loaded model: {model_name} ({mode})")
         return CoreMlBackend(model, _DEVICE_LABELS.get(mode, mode))
 
-    @staticmethod
-    def _load_model(pkg_path: str, compute_units: Any) -> Any:
-        return ct.models.MLModel(pkg_path, compute_units=compute_units)
+    def _load_model(self, model_name: str, pkg_path: str, compute_units: Any) -> Any:
+        compiled_path = os.path.join(
+            self.compile_cache_dir(f"coremltools-{ct.__version__}"),
+            f"{model_name}.mlmodelc",
+        )
+        if os.path.isdir(compiled_path):
+            try:
+                return ct.models.CompiledMLModel(compiled_path, compute_units=compute_units)
+            except Exception:
+                shutil.rmtree(compiled_path, ignore_errors=True)
+
+        model = ct.models.MLModel(pkg_path, compute_units=compute_units)
+        try:
+            tmp_path = compiled_path + ".tmp"
+            shutil.rmtree(tmp_path, ignore_errors=True)
+            shutil.copytree(model.get_compiled_model_path(), tmp_path)
+            os.rename(tmp_path, compiled_path)
+        except Exception as error:
+            self.logger.log(f"Could not persist compiled model ({error})")
+        return model

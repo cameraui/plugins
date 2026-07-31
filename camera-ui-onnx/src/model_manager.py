@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
@@ -67,15 +68,30 @@ class OnnxModelManager(BaseModelManager):
 
     def _create_session(self, path: str, providers: list[Any]) -> Any:
         try:
+            if providers == ["CPUExecutionProvider"]:
+                return self._create_cpu_session(path)
             session = ort.InferenceSession(path, providers=providers)
-            if providers != ["CPUExecutionProvider"]:
-                self._warmup(session)
+            self._warmup(session)
             return session
         except Exception as error:
             if providers == ["CPUExecutionProvider"]:
                 raise
             self.logger.warn(f"Accelerated provider unavailable ({error}); falling back to CPU")
-            return ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+            return self._create_cpu_session(path)
+
+    def _create_cpu_session(self, path: str) -> Any:
+        cache_dir = self.compile_cache_dir(f"onnxruntime-{ort.__version__}")
+        optimized = os.path.join(cache_dir, os.path.basename(path))
+        if os.path.isfile(optimized):
+            try:
+                options = ort.SessionOptions()
+                options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+                return ort.InferenceSession(optimized, options, providers=["CPUExecutionProvider"])
+            except Exception:
+                os.remove(optimized)
+        options = ort.SessionOptions()
+        options.optimized_model_filepath = optimized
+        return ort.InferenceSession(path, options, providers=["CPUExecutionProvider"])
 
     @staticmethod
     def _warmup(session: Any) -> None:

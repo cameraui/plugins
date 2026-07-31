@@ -52,6 +52,15 @@ class BaseModelManager(ABC):
     def reset(self) -> None:
         self._load_tasks.clear()
 
+    def compile_cache_dir(self, runtime_tag: str) -> str:
+        """Directory for runtime compile artifacts (compiled blobs, optimized graphs).
+        Lives inside the versioned model dir, so a model re-download clears it and the
+        ``.backupignore`` marker keeps it out of backups. ``runtime_tag`` must include
+        the runtime version — compiled artifacts rarely survive a runtime upgrade."""
+        path = os.path.join(self.model_path, ".compile-cache", runtime_tag)
+        os.makedirs(path, exist_ok=True)
+        return path
+
     def clip_processor_files(self) -> Mapping[str, tuple[str, str]]:
         """CLIP processor (tokenizer + image preprocessor) files: key → (url, path relative to
         ``model_path``). Empty (default) = plugin has no CLIP; CLIP plugins must override this."""
