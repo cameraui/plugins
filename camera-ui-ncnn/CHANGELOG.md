@@ -1,3 +1,7 @@
+## [1.1.8]
+
+- Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+
 ## [1.1.7]
 
 - Pick which Vulkan GPU runs inference. A new Vulkan Device option lists the detected GPUs, so multi-GPU systems can pin detection to a specific card. Auto keeps the previous behavior.

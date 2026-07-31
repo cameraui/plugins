@@ -1,3 +1,9 @@
+## [1.1.8]
+
+- Models now compile once instead of on every start. Compiled models are cached on disk, so a plugin restart skips the heavy GPU/NPU compilation that could stall weaker systems. The first start after an update or model change still compiles.
+- The Active Hardware field shows the device inference actually runs on. With AUTO it used to freeze on the temporary CPU stage shown while the real device was still compiling in the background.
+- Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+
 ## [1.1.7]
 
 - Pick the exact inference device on multi-GPU systems. The device dropdown now lists every detected device individually (for example GPU.0 and GPU.1), so detection can run on a specific card instead of whatever OpenVINO picks.

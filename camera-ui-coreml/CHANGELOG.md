@@ -1,3 +1,8 @@
+## [1.1.6]
+
+- Models load much faster after the first start. The compiled model is kept on disk and reused instead of being recompiled on every plugin start.
+- Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+
 ## [1.1.5]
 
 - Exclude downloaded models from backups

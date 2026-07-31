@@ -1,3 +1,7 @@
+## [1.1.7]
+
+- Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+
 ## [1.1.6]
 
 - Pick which Edge TPU runs inference when several are attached. A new device option accepts usb, pci or an index like :0. Empty keeps the previous behavior (first available).

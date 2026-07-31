@@ -1,3 +1,7 @@
+## [1.1.7]
+
+- Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+
 ## [1.1.6]
 
 - Pick which Hailo device runs inference when several are installed. A new device dropdown lists the detected devices. Auto keeps the previous behavior.
