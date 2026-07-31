@@ -1,5 +1,7 @@
+# gpu 1.27+ builds against CUDA 13 (docker image ships 12) and drops pre-Turing
+# cards; 1.26 still carries sm_52-61 and runs Blackwell via 90-virtual PTX
 onnxruntime-gpu==1.26.0; sys_platform != "darwin" and platform_machine != "aarch64"
-onnxruntime==1.28.0
+onnxruntime==1.28.0; sys_platform == "darwin" or platform_machine == "aarch64"
 camera-ui-sdk==1.2.0
 camera-ui-ml==1.2.7
 numpy==2.4.6

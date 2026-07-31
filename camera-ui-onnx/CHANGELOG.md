@@ -2,6 +2,7 @@
 
 - CPU models load faster after the first start. The optimized model graph is kept on disk and reused instead of being rebuilt on every plugin start.
 - Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.
+- CUDA works again. The plugin installed both the GPU and the CPU runtime on Linux and whichever landed last won, so detection often stayed on the CPU no matter what the Execution Provider setting said. Linux x86 now gets exactly the GPU-enabled runtime, CPU inference included
 - Bump camera.ui SDK, requires camera.ui 2.0.23 or newer
 
 ## [1.1.5]
