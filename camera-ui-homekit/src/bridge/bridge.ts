@@ -208,7 +208,9 @@ export class SensorBridge {
 
   private setupBridge(): void {
     const republishId = this.storage.values.bridgeRepublishId;
-    const bridge = new Bridge('camera.ui Bridge', uuid.generate(`${republishId}-cameraui-bridge`));
+    // no dot in the name: it becomes the mDNS instance name, and ciao splits it
+    // into DNS labels there, which makes the bridge undiscoverable
+    const bridge = new Bridge('camera ui Bridge', uuid.generate(`${republishId}-cameraui-bridge`));
 
     const accessoryInformation = bridge.getService(Service.AccessoryInformation);
     accessoryInformation?.setCharacteristic(Characteristic.Manufacturer, 'camera.ui');

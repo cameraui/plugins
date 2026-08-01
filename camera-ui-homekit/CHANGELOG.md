@@ -1,5 +1,6 @@
 ## [1.2.1]
 
+- The bridge is found by the Home app again. It announced itself under a name the network stack couldn't handle, so Home never saw it and pairing by QR code ran into a timeout. The bridge is now called "camera ui Bridge".
 - The bridge now starts even when no sensor is exposed yet. QR code, PIN and port are there from the first start, so you can pair the bridge up front and sensors you expose later show up in the Home app right away.
 
 ## [1.2.0]
