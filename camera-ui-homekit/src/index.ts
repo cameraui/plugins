@@ -31,6 +31,7 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
 
     HAPStorage.setCustomStoragePath(resolve(this.api.storagePath, 'accessories'));
 
+    this.api.on(API_EVENT.FINISH_LAUNCHING, this.start.bind(this));
     this.api.on(API_EVENT.SHUTDOWN, this.stop.bind(this));
   }
 
@@ -172,6 +173,10 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
     this.assignmentSubscriptions.delete(sensorId);
     this.consumedSensors.delete(sensorId);
     await this.unrouteSensor(sensorId);
+  }
+
+  private async start(): Promise<void> {
+    await this.sensorBridge.start();
   }
 
   private async stop(): Promise<void> {

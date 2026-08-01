@@ -16,6 +16,7 @@ export class SensorBridge {
 
   private bridge?: Bridge;
   private bridgePort?: number;
+  private started = false;
   private published = false;
   private publishing?: Promise<void>;
 
@@ -38,7 +39,12 @@ export class SensorBridge {
   }
 
   public setupURI(): string {
-    return this.bridge?.setupURI() ?? '';
+    return this.published ? (this.bridge?.setupURI() ?? '') : '';
+  }
+
+  public async start(): Promise<void> {
+    this.started = true;
+    await this.publishBridge();
   }
 
   public async addSensor(sensor: SensorLike): Promise<void> {
@@ -47,7 +53,10 @@ export class SensorBridge {
     }
 
     this.sensors.set(sensor.id, sensor);
-    await this.syncSensor(sensor.id);
+
+    if (this.started) {
+      await this.syncSensor(sensor.id);
+    }
   }
 
   public async removeSensor(sensorId: string): Promise<void> {
@@ -69,7 +78,7 @@ export class SensorBridge {
   public async republish(reset?: boolean): Promise<void> {
     await this.teardown(reset);
 
-    if (this.sensors.size) {
+    if (this.started) {
       await this.publishBridge(!reset);
     }
   }
@@ -149,7 +158,7 @@ export class SensorBridge {
   }
 
   private async runPublishBridge(republish?: boolean): Promise<void> {
-    if (this.published || !this.sensors.size) {
+    if (this.published) {
       return;
     }
 

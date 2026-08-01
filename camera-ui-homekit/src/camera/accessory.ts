@@ -283,7 +283,7 @@ export class CameraAccessory extends Subscribed {
         group: 'Pairing',
         readonly: true,
         onGet: async () => {
-          return this.accessory?.setupURI() ?? '';
+          return this.published ? (this.accessory?.setupURI() ?? '') : '';
         },
       },
       {

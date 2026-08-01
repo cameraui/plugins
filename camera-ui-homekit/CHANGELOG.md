@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- The bridge now starts even when no sensor is exposed yet. QR code, PIN and port are there from the first start, so you can pair the bridge up front and sensors you expose later show up in the Home app right away.
+
 ## [1.2.0]
 
 - New camera.ui Bridge accessory for standalone sensors. Contact, occupancy, smoke, leak, temperature, humidity, lock, garage door, switch and security system sensors, plus standalone lights and sirens, come across behind a single bridge. Pair it once and every sensor you expose later joins automatically. QR code, PIN, port and a reset button live in the plugin settings.
