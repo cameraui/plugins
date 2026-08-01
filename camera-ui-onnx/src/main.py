@@ -91,6 +91,7 @@ class ONNXPlugin(
         self.clip_encoders: dict[str, ClipEncoder] = {}
 
         self._sensors: dict[str, dict[str, Any]] = {}
+        self._warned_provider: str | None = None
 
         self.api.on(API_EVENT.FINISH_LAUNCHING, self._on_start)
         self.api.on(API_EVENT.SHUTDOWN, self._on_shutdown)
@@ -639,12 +640,34 @@ class ONNXPlugin(
                 ]
                 for device_id in self._device_ids()
             ]
+
+        wanted = (
+            "TensorrtExecutionProvider"
+            if pref == "tensorrt"
+            else "CUDAExecutionProvider"
+            if use_cuda
+            else None
+        )
+        if wanted and wanted not in available:
+            self._warn_missing_provider(wanted)
+
         return [["CPUExecutionProvider"]]
+
+    def _warn_missing_provider(self, provider: str) -> None:
+        if self._warned_provider == provider:
+            return
+
+        self._warned_provider = provider
+        self.logger.warn(
+            f"{provider} is not in this onnxruntime build, inference runs on the CPU. "
+            f"Available: {', '.join(ort.get_available_providers())}"
+        )
 
     async def _on_provider_change(self, new_value: object, old_value: object) -> None:
         if new_value == old_value:
             return
         self.logger.log(f"Execution provider setting changed ({old_value} -> {new_value}); reloading models")
+        self._warned_provider = None
         await self._reload_models()
 
     async def _reload_models(self) -> None:

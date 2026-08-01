@@ -1,3 +1,8 @@
+## [1.2.1]
+
+- CUDA works again on Linux and Windows. The fix from 1.2.0 was undone shortly before the release, so the CPU runtime was installed next to the GPU one again and overwrote it. Detection then stayed on the CPU no matter what the Execution Provider setting said.
+- The log says it now when the selected provider is missing from the installed runtime, instead of quietly running on the CPU.
+
 ## [1.2.0]
 
 - CPU models load faster after the first start. The optimized model graph is kept on disk and reused instead of being rebuilt on every plugin start.
