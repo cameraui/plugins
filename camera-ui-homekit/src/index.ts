@@ -43,7 +43,6 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
         title: 'QR Code',
         description: 'Scan in the Home app to pair the bridge. Standalone sensors appear as accessories behind it.',
         format: 'qrCode',
-        group: 'Bridge',
         readonly: true,
         onGet: async () => {
           return this.sensorBridge.setupURI();
@@ -54,7 +53,6 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
         key: 'bridgePin',
         title: 'PIN',
         description: 'Manual pairing code for the Home app.',
-        group: 'Bridge',
         store: true,
         readonly: true,
         onGet: async () => {
@@ -70,7 +68,6 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
         key: 'bridgePort',
         title: 'Port',
         description: 'Network port the bridge currently uses.',
-        group: 'Bridge',
         readonly: true,
         onGet: async () => {
           return this.sensorBridge.currentPort;
@@ -81,7 +78,6 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
         key: 'bridgePortOverride',
         title: 'Override Port',
         description: 'Force a fixed port (0 = automatic).',
-        group: 'Bridge',
         store: true,
         required: false,
         defaultValue: 0,
@@ -96,7 +92,6 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
         key: 'bridgeAdvertiser',
         title: 'mDNS advertiser',
         description: 'Backend used to announce the bridge on the network.',
-        group: 'Bridge',
         store: true,
         defaultValue: baseAdvertiser[0],
         enum: baseAdvertiser,
@@ -130,7 +125,6 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
         type: 'button',
         title: 'Reset Bridge Pairing',
         key: 'bridgeReset',
-        group: 'Bridge',
         description: 'Unpair the bridge and generate a new pairing code.',
         color: 'danger',
         onSet: async () => {
