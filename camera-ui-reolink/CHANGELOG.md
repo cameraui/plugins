@@ -1,3 +1,7 @@
+## [1.2.2]
+
+- Doorbells report a lingering visitor again. Some models describe the zone without saying what they saw, and those events were dropped instead of counting as motion
+
 ## [1.2.1]
 
 - Bump camera.ui SDK
