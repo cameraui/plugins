@@ -116,6 +116,15 @@
     "screenshots": [],
     "protocolLevel": 1
   },
+  "@camera.ui/camera-ui-openvino-legacy": {
+    "displayName": "OpenVino Legacy",
+    "category": "ai-model",
+    "featured": false,
+    "tagline": "OpenVINO backend with the older 2024.6 runtime, for Intel GPUs up to 10th gen Core on Windows.",
+    "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/camera-ui-openvino-legacy/logo.png",
+    "screenshots": [],
+    "protocolLevel": 1
+  },
   "@camera.ui/camera-ui-pamdiff": {
     "displayName": "Pam Diff",
     "category": "detection",

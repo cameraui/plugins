@@ -1,0 +1,64 @@
+{
+  "displayName": "OpenVino Legacy",
+  "name": "@camera.ui/camera-ui-openvino-legacy",
+  "version": "1.2.3",
+  "description": "OpenVINO detection backend for camera.ui with the older 2024.6 runtime. For Intel GPUs up to 10th gen Core on Windows, whose drivers cannot build the GPU code of newer OpenVINO releases. On Linux the camera.ui Docker image covers these GPUs with legacy compute libs; use the regular OpenVino plugin everywhere else.",
+  "author": "seydx (https://github.com/cameraui/plugins)",
+  "main": "./bundle/dist/main.py",
+  "type": "module",
+  "scripts": {
+    "build": "npm run sync && mypy src",
+    "bundle": "npm run format && npm run lint && npm run build && cui bundle",
+    "bundle:dev": "npm run sync && npm run format && npm run lint && npm run build && cross-env MODE=development cui bundle",
+    "format": "ruff format",
+    "install-updates": "npm i --save --force",
+    "lint": "npm run sync && ruff check --fix",
+    "prepublishOnly": "node -e \"if(!process.env.SAFE_PUBLISH){console.error('Error: Please use @camera.ui/cli to publish the plugin:\\n  npm run publish:alpha\\n  npm run publish:beta\\n  npm run publish:latest\\n');process.exit(1)}\"",
+    "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
+    "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
+    "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
+    "sync": "node scripts/sync.mjs"
+  },
+  "devDependencies": {
+    "@camera.ui/cli": "^0.0.77",
+    "@camera.ui/sdk": "^1.2.4",
+    "cross-env": "^10.1.0"
+  },
+  "bugs": {
+    "url": "https://github.com/cameraui/plugins/issues"
+  },
+  "engines": {
+    "camera.ui": ">=2.0.23",
+    "node": ">=22.0.0"
+  },
+  "os": [
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-openvino-legacy#readme",
+  "keywords": [
+    "camera-ui-plugin",
+    "object",
+    "clip-detection",
+    "clip",
+    "face-detection",
+    "face",
+    "license-plate",
+    "lpd",
+    "ocr",
+    "alpr",
+    "openvino",
+    "legacy",
+    "detection"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cameraui/plugins.git",
+    "directory": "camera-ui-openvino-legacy"
+  }
+}

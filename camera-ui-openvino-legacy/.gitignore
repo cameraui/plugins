@@ -1,0 +1,11 @@
+# synced from ../camera-ui-openvino by scripts/sync.mjs
+src/
+contract.ts
+cameraui.config.ts
+ruff.toml
+mypy.ini
+LICENSE.md
+
+bundle/
+node_modules/
+package-lock.json
