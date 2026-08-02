@@ -1,3 +1,7 @@
+## [1.2.2]
+
+- Minor bugfixes and improvements
+
 ## [1.2.1]
 
 - The bridge is found by the Home app again. It announced itself under a name the network stack couldn't handle, so Home never saw it and pairing by QR code ran into a timeout. The bridge is now called "camera ui Bridge".
