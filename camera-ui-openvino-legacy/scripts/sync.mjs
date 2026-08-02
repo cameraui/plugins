@@ -26,6 +26,14 @@ for (const entry of COPY) {
   });
 }
 
+const defaultsPath = resolve(legacyDir, 'src', 'defaults.py');
+const defaults = readFileSync(defaultsPath, 'utf8');
+if (!defaults.includes('LEGACY_RUNTIME = False')) {
+  console.error('Base defaults.py has no LEGACY_RUNTIME flag, update sync.mjs');
+  process.exit(1);
+}
+writeFileSync(defaultsPath, defaults.replace('LEGACY_RUNTIME = False', 'LEGACY_RUNTIME = True'));
+
 const ruff = readFileSync(resolve(legacyDir, 'ruff.toml'), 'utf8');
 writeFileSync(resolve(legacyDir, 'ruff.toml'), `respect-gitignore = false\nextend-exclude = ["bundle"]\n${ruff}`);
 

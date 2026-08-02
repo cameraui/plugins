@@ -12,6 +12,7 @@ from camera_ui_sdk import LoggerService
 from defaults import (
     DEFAULT_CLIP_TEXT,
     DEFAULT_CLIP_VISION,
+    LEGACY_RUNTIME,
     MODEL_BASE_URL,
     MODEL_LFS_URL,
     STATIC_INPUT_SHAPES,
@@ -122,7 +123,7 @@ class OpenVinoModelManager(BaseModelManager):
         self.logger.warn(f"{device} cannot compile {model_name}, using the next device instead: {reason}")
         # on Linux old Intel GPUs are covered by the legacy compute libs (the docker
         # image ships them), only Windows drivers can't be helped from outside
-        if "GPU" in device and sys.platform == "win32":
+        if "GPU" in device and sys.platform == "win32" and not LEGACY_RUNTIME:
             self.logger.warn("Intel GPUs up to 10th gen Core work with the OpenVino Legacy plugin instead")
         self.logger.debug(detail)
 

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from camera_ui_sdk import DetectionLabel
 
+# flipped to True by the legacy sibling plugin's sync script
+LEGACY_RUNTIME = False
+
 model_version = "v1"
 
 _MODELS_HOST = "https://models.cameraui.com"
