@@ -20,7 +20,10 @@ for (const entry of COPY) {
     process.exit(1);
   }
   rmSync(target, { recursive: true, force: true });
-  cpSync(source, target, { recursive: true });
+  cpSync(source, target, {
+    recursive: true,
+    filter: (src) => !/(^|\/)(__pycache__|\.mypy_cache|\.ruff_cache|\.DS_Store)(\/|$)/.test(src),
+  });
 }
 
 const ruff = readFileSync(resolve(legacyDir, 'ruff.toml'), 'utf8');
