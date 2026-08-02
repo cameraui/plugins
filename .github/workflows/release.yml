@@ -21,6 +21,7 @@ jobs:
       runtime: ${{ steps.resolve.outputs.runtime }}
       externals: ${{ steps.resolve.outputs.externals }}
       dist_tag: ${{ steps.resolve.outputs.dist_tag }}
+      python_version: ${{ steps.resolve.outputs.python_version }}
     steps:
       - uses: actions/checkout@v7
       - id: resolve
@@ -39,6 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Sync sources from base plugin
+        run: |
+          if [ -f "$PLUGIN/scripts/sync.mjs" ]; then
+            node "$PLUGIN/scripts/sync.mjs"
+          fi
+
       - name: Init submodule
         if: needs.resolve.outputs.externals != ''
         run: git submodule update --init --depth 1 ${{ needs.resolve.outputs.externals }}
@@ -52,7 +59,7 @@ jobs:
         if: needs.resolve.outputs.runtime == 'python'
         uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: ${{ needs.resolve.outputs.python_version }}
 
       - name: Install Python deps (mypy for build + plugin requirements)
         if: needs.resolve.outputs.runtime == 'python'

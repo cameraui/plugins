@@ -65,6 +65,7 @@ jobs:
             camera-ui-opencl: ['camera-ui-opencl/**']
             camera-ui-opencv: ['camera-ui-opencv/**']
             camera-ui-openvino: ['camera-ui-openvino/**']
+            camera-ui-openvino-legacy: ['camera-ui-openvino-legacy/**', 'camera-ui-openvino/src/**', 'camera-ui-openvino/contract.ts']
             camera-ui-wyze: ['camera-ui-wyze/**']
             camera-ui-reolink: ['camera-ui-reolink/**', 'externals/reolinkproxy', 'externals/reolinkproxy/**']
       - id: select
@@ -148,13 +149,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        plugin: ${{ fromJSON(needs.changes.outputs.python) }}
+        include: ${{ fromJSON(needs.changes.outputs.python) }}
     steps:
       - uses: actions/checkout@v7
 
+      - name: Sync sources from base plugin
+        run: |
+          if [ -f "${{ matrix.plugin }}/scripts/sync.mjs" ]; then
+            node "${{ matrix.plugin }}/scripts/sync.mjs"
+          fi
+
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python }}
 
       - name: Install deps (lint/type tools + plugin requirements)
         run: pip install ruff mypy -r ${{ matrix.plugin }}/requirements.txt

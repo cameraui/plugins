@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs';
 
-import { GO, NODE, PYTHON } from './plugins.mjs';
+import { GO, NODE, PYTHON, PYTHON_VERSIONS } from './plugins.mjs';
 
 const tag = process.env.GITHUB_REF_NAME || process.argv[2] || '';
 
@@ -46,6 +46,8 @@ if (prerelease === '') {
   process.exit(1);
 }
 
-const out = `plugin=${plugin}\nversion=${version}\nruntime=${runtime}\nexternals=${externals}\ndist_tag=${distTag}\n`;
+const pythonVersion = isPython ? (PYTHON_VERSIONS[plugin] ?? '3.13') : '';
+
+const out = `plugin=${plugin}\nversion=${version}\nruntime=${runtime}\nexternals=${externals}\ndist_tag=${distTag}\npython_version=${pythonVersion}\n`;
 console.log(out);
 if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, out);
