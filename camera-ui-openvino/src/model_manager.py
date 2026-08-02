@@ -24,6 +24,7 @@ class OpenVinoModelManager(BaseModelManager):
         super().__init__(storage_path, logger, model_version)
         self._get_device = get_device
         self._core = ov.Core()
+        self._failed_devices: set[str] = set()
         try:
             cache_dir = self.compile_cache_dir(f"openvino-{ov.__version__.split('-')[0]}")
             self._core.set_property({"CACHE_DIR": cache_dir})
@@ -72,12 +73,45 @@ class OpenVinoModelManager(BaseModelManager):
             if dev in tried:
                 continue
             tried.append(dev)
-            try:
-                compiled = self._core.compile_model(model, dev, config)
-                return compiled, self._describe_device(compiled, dev)
-            except Exception as error:
-                self.logger.log(f"compile_model on {dev} failed ({error}); trying fallback")
+            result = self._compile_on(model, model_name, dev, config)
+            if result is not None:
+                return result
         raise RuntimeError(f"Could not compile model on any device (tried {tried})")
+
+    def _compile_on(
+        self, model: ov.Model, model_name: str, device: str, config: dict[str, str]
+    ) -> tuple[Any, str] | None:
+        failure: Exception | None = None
+        precisions = (None, "f32") if "GPU" in device else (None,)
+
+        for precision in precisions:
+            attempt = config if precision is None else {**config, "INFERENCE_PRECISION_HINT": precision}
+            try:
+                compiled = self._core.compile_model(model, device, attempt)
+                used = self._describe_device(compiled, device)
+                if precision is not None:
+                    self.logger.log(f"{device} needed {precision} for {model_name}")
+                return compiled, used
+            except Exception as error:
+                failure = error
+
+        self._report_compile_failure(model_name, device, failure)
+        return None
+
+    def _report_compile_failure(self, model_name: str, device: str, error: Exception | None) -> None:
+        detail = str(error).strip() if error else ""
+        reason = next(
+            (line.strip() for line in reversed(detail.splitlines()) if line.strip()),
+            "no reason given",
+        )
+
+        if device in self._failed_devices:
+            self.logger.debug(f"{device} still cannot compile {model_name}: {reason}")
+            return
+
+        self._failed_devices.add(device)
+        self.logger.warn(f"{device} cannot compile {model_name}, using the next device instead: {reason}")
+        self.logger.debug(detail)
 
     def _make_static(self, model_name: str, model: ov.Model) -> None:
         shapes = STATIC_INPUT_SHAPES.get(model_name)

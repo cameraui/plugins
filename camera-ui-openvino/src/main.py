@@ -80,7 +80,7 @@ class OpenVinoPlugin(
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
         super().__init__(logger, api, storage)
         self._core = ov.Core()
-        self.logger.log(f"Available devices: {', '.join(self._core.available_devices)}")
+        self.logger.log(f"Available devices: {', '.join(self._describe_devices())}")
 
         # enumerated once: indexed devices (GPU.0, GPU.1, NPU variants) join the
         # static options so multi-GPU boxes can pin a specific card
@@ -569,6 +569,16 @@ class OpenVinoPlugin(
         sensors["clip"] = clip
 
         self._sensors[camera.id] = sensors
+
+    def _describe_devices(self) -> list[str]:
+        described = []
+        for device in self._core.available_devices:
+            try:
+                driver = self._core.get_property(device, "GPU_DRIVER_VERSION")
+            except Exception:
+                driver = ""
+            described.append(f"{device} (driver {driver})" if driver else device)
+        return described
 
     def _active_hardware(self) -> str:
         backends = [

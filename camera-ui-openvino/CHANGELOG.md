@@ -1,3 +1,9 @@
+## [1.2.1]
+
+- A device that can't run a model no longer floods the log. If your GPU driver refuses a model, the log now says so in one line and names the reason, instead of dumping a multi-line driver trace for every model. Detection keeps running on the next device, as before.
+- The device list in the log now includes the graphics driver version. On older Intel chips the driver decides whether the GPU can be used at all, and this is the first thing to check when models end up on the CPU.
+- Older Intel GPUs get a second chance before a model drops to the CPU. If the graphics driver refuses a model, it is now retried at full precision on the same device.
+
 ## [1.2.0]
 
 - Models now compile once instead of on every start. Compiled models are cached on disk, so a plugin restart skips the heavy GPU/NPU compilation that could stall weaker systems. The first start after an update or model change still compiles.
