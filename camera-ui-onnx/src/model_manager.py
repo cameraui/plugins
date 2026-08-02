@@ -13,6 +13,7 @@ from camera_ui_sdk import LoggerService
 from defaults import (
     DEFAULT_CLIP_TEXT,
     DEFAULT_CLIP_VISION,
+    LEGACY_RUNTIME,
     MODEL_BASE_URL,
     MODEL_LFS_URL,
     model_version,
@@ -42,6 +43,7 @@ class OnnxModelManager(BaseModelManager):
     ) -> None:
         super().__init__(storage_path, logger, model_version)
         self._get_provider_lists = get_provider_lists
+        self._hinted_legacy = False
 
     def model_files(self, model_name: str) -> Mapping[str, tuple[str, str]]:
         rel = self._rel_path(model_name)
@@ -77,7 +79,20 @@ class OnnxModelManager(BaseModelManager):
             if providers == ["CPUExecutionProvider"]:
                 raise
             self.logger.warn(f"Accelerated provider unavailable ({error}); falling back to CPU")
+            self._hint_legacy(providers)
             return self._create_cpu_session(path)
+
+    def _hint_legacy(self, providers: list[Any]) -> None:
+        if LEGACY_RUNTIME or self._hinted_legacy:
+            return
+        names = {p[0] if isinstance(p, tuple) else p for p in providers}
+        if not names & {"CUDAExecutionProvider", "TensorrtExecutionProvider"}:
+            return
+        self._hinted_legacy = True
+        self.logger.warn(
+            "NVIDIA GPUs before GTX 1650 (Maxwell, Pascal, Volta) and CUDA 12 setups "
+            "work with the ONNX Legacy plugin instead"
+        )
 
     def _create_cpu_session(self, path: str) -> Any:
         cache_dir = self.compile_cache_dir(f"onnxruntime-{ort.__version__}")

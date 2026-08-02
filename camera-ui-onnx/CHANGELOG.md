@@ -1,3 +1,8 @@
+## [1.2.3]
+
+- The plugin moved to the CUDA 13 runtime (onnxruntime-gpu 1.28). The RTX 50 series now runs with native kernels instead of relying on a JIT fallback. Your system needs CUDA 13, cuDNN 9 for CUDA 13 and NVIDIA driver 580 or newer.
+- NVIDIA GPUs before the GTX 1650 (Maxwell, Pascal, Volta) lost GPU support in CUDA 13. Use the new sibling plugin "ONNX Legacy" on those cards, it stays on the CUDA 12 runtime and keeps them on the GPU. Also the right choice if you want to keep an installed CUDA 12 toolkit. The log points to it when GPU inference fails.
+
 ## [1.2.2]
 
 - Fixed license plate detection failing whenever exactly one plate was in the frame. The log showed "License plate detection error: invalid index to scalar variable" and the plate was not read. Two or more plates worked fine.

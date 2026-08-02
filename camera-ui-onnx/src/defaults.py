@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# flipped to True by the legacy sibling plugin's sync script
+LEGACY_RUNTIME = False
+
 model_version = "v1"
 
 _MODELS_HOST = "https://models.cameraui.com"
