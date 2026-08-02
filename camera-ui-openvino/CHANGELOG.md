@@ -1,3 +1,7 @@
+## [1.2.3]
+
+- Fixed license plate detection failing whenever exactly one plate was in the frame. The log showed "License plate detection error: invalid index to scalar variable" and the plate was not read. Two or more plates worked fine.
+
 ## [1.2.2]
 
 - Detection is roughly 50 times faster. The plugin set up your hardware for throughput, which pays off when hundreds of images are queued at once, but detection sends one frame and waits for the answer. On an Intel GPU that single frame took about a second instead of eleven milliseconds, so only one frame per second was analyzed and anyone walking past was easily missed. The setup is now tuned for a fast single answer.
