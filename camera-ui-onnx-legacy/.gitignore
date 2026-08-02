@@ -1,0 +1,10 @@
+# synced from ../camera-ui-onnx by scripts/sync.mjs
+src/
+contract.ts
+cameraui.config.ts
+ruff.toml
+mypy.ini
+LICENSE.md
+
+bundle/
+node_modules/

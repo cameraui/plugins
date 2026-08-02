@@ -61,6 +61,7 @@ jobs:
             camera-ui-hailo: ['camera-ui-hailo/**']
             camera-ui-ncnn: ['camera-ui-ncnn/**']
             camera-ui-onnx: ['camera-ui-onnx/**']
+            camera-ui-onnx-legacy: ['camera-ui-onnx-legacy/**', 'camera-ui-onnx/src/**', 'camera-ui-onnx/contract.ts']
             camera-ui-eufy: ['camera-ui-eufy/**']
             camera-ui-opencl: ['camera-ui-opencl/**']
             camera-ui-opencv: ['camera-ui-opencv/**']

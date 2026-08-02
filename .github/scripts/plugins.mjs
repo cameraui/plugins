@@ -27,6 +27,7 @@ export const PYTHON = [
   'camera-ui-hailo',
   'camera-ui-ncnn',
   'camera-ui-onnx',
+  'camera-ui-onnx-legacy',
   'camera-ui-opencl',
   'camera-ui-opencv',
   'camera-ui-openvino',

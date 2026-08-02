@@ -80,6 +80,15 @@
     "screenshots": [],
     "protocolLevel": 1
   },
+  "@camera.ui/camera-ui-onnx-legacy": {
+    "displayName": "ONNX Legacy",
+    "category": "ai-model",
+    "featured": false,
+    "tagline": "ONNX backend on the CUDA 12 runtime, for NVIDIA GPUs before the GTX 1650.",
+    "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/camera-ui-onnx-legacy/logo.png",
+    "screenshots": [],
+    "protocolLevel": 1
+  },
   "@camera.ui/camera-ui-onvif": {
     "displayName": "Onvif",
     "category": "camera-source",
