@@ -1,3 +1,7 @@
+## [1.2.2]
+
+- Fixed license plate detection failing whenever exactly one plate was in the frame. The log showed "License plate detection error: invalid index to scalar variable" and the plate was not read. Two or more plates worked fine.
+
 ## [1.2.1]
 
 - CUDA works again on Linux and Windows. The fix from 1.2.0 was undone shortly before the release, so the CPU runtime was installed next to the GPU one again and overwrote it. Detection then stayed on the CPU no matter what the Execution Provider setting said.
