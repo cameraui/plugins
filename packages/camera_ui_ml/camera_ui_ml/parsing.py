@@ -31,6 +31,7 @@ def parse_yolov9(results: NDArray, threshold: float) -> list[RawDetection]:
 
 
 def parse_end2end(rows: NDArray, threshold: float) -> list[RawDetection]:
+    rows = np.atleast_2d(rows)
     detections: list[RawDetection] = []
     for row in rows:
         score = float(row[6])
