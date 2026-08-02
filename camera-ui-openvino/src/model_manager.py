@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -119,6 +120,10 @@ class OpenVinoModelManager(BaseModelManager):
 
         self._failed_devices.add(device)
         self.logger.warn(f"{device} cannot compile {model_name}, using the next device instead: {reason}")
+        # on Linux old Intel GPUs are covered by the legacy compute libs (the docker
+        # image ships them), only Windows drivers can't be helped from outside
+        if "GPU" in device and sys.platform == "win32":
+            self.logger.warn("Intel GPUs up to 10th gen Core work with the OpenVino Legacy plugin instead")
         self.logger.debug(detail)
 
     def _make_static(self, model_name: str, model: ov.Model) -> None:

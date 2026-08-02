@@ -1,3 +1,7 @@
+## [1.2.4]
+
+- When an Intel GPU on Windows refuses to compile a model, the log now points to the new OpenVino Legacy plugin. Its older runtime still loads all models on GPUs up to 10th gen Core, where the regular plugin silently fell back to the CPU.
+
 ## [1.2.3]
 
 - Fixed license plate detection failing whenever exactly one plate was in the frame. The log showed "License plate detection error: invalid index to scalar variable" and the plate was not read. Two or more plates worked fine.
