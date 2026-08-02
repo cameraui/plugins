@@ -1,3 +1,7 @@
+## [1.2.5]
+
+- Maintenance release. The readme now points old Intel GPUs on Windows to the OpenVino Legacy plugin, no functional changes.
+
 ## [1.2.4]
 
 - When an Intel GPU on Windows refuses to compile a model, the log now points to the new OpenVino Legacy plugin. Its older runtime still loads all models on GPUs up to 10th gen Core, where the regular plugin silently fell back to the CPU.
