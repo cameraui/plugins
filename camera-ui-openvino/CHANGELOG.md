@@ -1,3 +1,8 @@
+## [1.2.2]
+
+- Detection is roughly 50 times faster. The plugin set up your hardware for throughput, which pays off when hundreds of images are queued at once, but detection sends one frame and waits for the answer. On an Intel GPU that single frame took about a second instead of eleven milliseconds, so only one frame per second was analyzed and anyone walking past was easily missed. The setup is now tuned for a fast single answer.
+- A GPU serves more cameras at once. It now works on two frames in parallel, which keeps it busy while picture data is being moved around.
+
 ## [1.2.1]
 
 - A device that can't run a model no longer floods the log. If your GPU driver refuses a model, the log now says so in one line and names the reason, instead of dumping a multi-line driver trace for every model. Detection keeps running on the next device, as before.

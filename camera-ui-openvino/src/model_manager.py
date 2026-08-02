@@ -54,7 +54,9 @@ class OpenVinoModelManager(BaseModelManager):
 
     def _compile(self, model_name: str, xml_path: str, device: str) -> tuple[Any, str]:
         model = self._core.read_model(xml_path)
-        config = {"PERFORMANCE_HINT": "THROUGHPUT"}
+        # detection asks for one frame and waits for the answer: THROUGHPUT lets the GPU
+        # queue up to 128 requests and delays a single one by ~1s (11ms with LATENCY)
+        config = {"PERFORMANCE_HINT": "LATENCY"}
         if _dynamic_inputs(model):
             self._make_static(model_name, model)
         candidates = [device, "AUTO", "CPU"]
@@ -83,6 +85,12 @@ class OpenVinoModelManager(BaseModelManager):
     ) -> tuple[Any, str] | None:
         failure: Exception | None = None
         precisions = (None, "f32") if "GPU" in device else (None,)
+
+        # a single GPU stream idles during the host transfers, a second one costs no
+        # latency and serves roughly 50% more cameras; on CPU streams split the cores
+        # and cost latency, so only a named GPU gets them (never AUTO, it may land elsewhere)
+        if device.startswith("GPU"):
+            config = {**config, "NUM_STREAMS": "2"}
 
         for precision in precisions:
             attempt = config if precision is None else {**config, "INFERENCE_PRECISION_HINT": precision}
