@@ -1,3 +1,7 @@
+## [1.2.4]
+
+- The event listener stays up as long as the connection does. It used to be torn down and rebuilt every five minutes, and a detection that landed in that moment was lost
+
 ## [1.2.3]
 
 - Cameras on an NVR or Home Hub get their events again. The subscription was sent to the wrong channel, so the camera accepted it and then never reported motion or AI detections
