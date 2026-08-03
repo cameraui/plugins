@@ -1,3 +1,8 @@
+## [1.2.3]
+
+- Cameras on an NVR or Home Hub get their events again. The subscription was sent to the wrong channel, so the camera accepted it and then never reported motion or AI detections
+- A camera that stays silent after subscribing now gets asked again every 30 seconds instead of every 5 minutes, and says so in the log if it never answers
+
 ## [1.2.2]
 
 - Doorbells report a lingering visitor again. Some models describe the zone without saying what they saw, and those events were dropped instead of counting as motion
