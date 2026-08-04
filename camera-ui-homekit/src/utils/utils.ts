@@ -1,4 +1,5 @@
 import { SensorType } from '@camera.ui/sdk';
+import { networkInterfaces } from 'node:os';
 
 import { HDSProtocolSpecificErrorReason } from '../hap.js';
 
@@ -8,6 +9,7 @@ import type {
   Disposable,
   DoorbellTriggerLike,
   LightControlLike,
+  LoggerService,
   MotionSensorLike,
   SirenControlLike,
   VideoStreamInfo,
@@ -58,6 +60,22 @@ export class Subscribed {
   protected unsubscribeAdditional(): void {
     this.additionalSubscriptions.forEach((subscription) => subscription.dispose());
   }
+}
+
+export function filterBindAddresses(addresses: string[], logger: LoggerService): string[] {
+  const local = new Set<string>();
+  for (const infos of Object.values(networkInterfaces())) {
+    for (const info of infos ?? []) {
+      local.add(info.address);
+    }
+  }
+
+  const usable = addresses.filter((address) => local.has(address));
+  const dropped = addresses.filter((address) => !local.has(address));
+  if (dropped.length) {
+    logger.warn(`Ignoring configured server address(es) not present on this machine: ${dropped.join(', ')}`);
+  }
+  return usable;
 }
 
 export function generateValidAccessoryName(input = ''): string {

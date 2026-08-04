@@ -22,7 +22,7 @@ import {
 
 import { baseAdvertiser } from '../constants.js';
 import * as mac from '../utils/mac.js';
-import { generateValidAccessoryName, Subscribed } from '../utils/utils.js';
+import { filterBindAddresses, generateValidAccessoryName, Subscribed } from '../utils/utils.js';
 import { RecordingDelegate } from './recordingDelegate.js';
 import { CameraServices } from './services.js';
 import { StreamingDelegate } from './streamingDelegate.js';
@@ -156,7 +156,7 @@ export class CameraAccessory extends Subscribed {
           this.cameraLogger.log(`Please add the camera manually in Home app. Setup Code: ${accessoryPin}`);
         });
 
-        const addresses = await this.api.coreManager.getServerAddresses();
+        const addresses = filterBindAddresses(await this.api.coreManager.getServerAddresses(), this.cameraLogger);
         let bind = addresses.length ? addresses : undefined;
 
         if (!bind) {

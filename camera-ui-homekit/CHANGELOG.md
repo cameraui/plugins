@@ -1,3 +1,7 @@
+## [1.2.4]
+
+- A stale network address no longer kills the bridge. When camera.ui is bound to an address the machine does not have anymore (changed IP, old config), the bridge and camera accessories now skip that address with a warning and publish on the remaining ones, instead of failing to start.
+
 ## [1.2.3]
 
 - New sensor types reach HomeKit. Carbon monoxide, carbon dioxide (level plus alarm above 1500 ppm), illuminance and vibration sensors now appear in Apple Home; vibration shows up as a motion sensor since HomeKit has no vibration category. Gas, heat, cold, tamper, problem and power stay camera.ui-only, HomeKit has no matching accessory type.

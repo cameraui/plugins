@@ -1,5 +1,6 @@
 import { AccessoryEventTypes, Bridge, Categories, Characteristic, Service, uuid } from '../hap.js';
 import * as mac from '../utils/mac.js';
+import { filterBindAddresses } from '../utils/utils.js';
 import { buildSensorAccessory } from './sensorAccessory.js';
 
 import type { DeviceStorage, LoggerService, PluginAPI, SensorLike } from '@camera.ui/sdk';
@@ -181,7 +182,7 @@ export class SensorBridge {
         this.logger.log(`Please add the bridge manually in Home app. Setup Code: ${bridgePin}`);
       });
 
-      const addresses = await this.api.coreManager.getServerAddresses();
+      const addresses = filterBindAddresses(await this.api.coreManager.getServerAddresses(), this.logger);
       const bind = addresses.length ? addresses : ['0.0.0.0'];
 
       const port = portOverride === 0 && this.bridgePort === undefined ? undefined : portOverride || this.bridgePort;
