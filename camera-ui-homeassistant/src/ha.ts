@@ -41,6 +41,7 @@ export class HaClient {
   private reconnectDelay = RECONNECT_MIN_MS;
   private messageId = 1;
   private stopped = false;
+  private failureLogged = false;
 
   constructor(
     private readonly target: HaConnectionTarget,
@@ -119,6 +120,8 @@ export class HaClient {
       }
       if (message.type === 'auth_ok') {
         this.reconnectDelay = RECONNECT_MIN_MS;
+        this.failureLogged = false;
+        this.logger.log(`Connected to Home Assistant (${this.target.apiUrl.replace(/\/api$/, '')})`);
         ws.send(JSON.stringify({ id: this.messageId++, type: 'subscribe_events', event_type: 'state_changed' }));
         this.startPing(ws);
         this.onConnected();
@@ -137,7 +140,13 @@ export class HaClient {
     });
 
     ws.on('error', (error: Error) => {
-      this.logger.debug(`Home Assistant websocket error: ${error.message}`);
+      // one visible line per down-phase, the reconnect loop stays on debug
+      if (!this.failureLogged) {
+        this.failureLogged = true;
+        this.logger.warn(`Home Assistant not reachable at ${this.target.wsUrl}: ${error.message}`);
+      } else {
+        this.logger.debug(`Home Assistant websocket error: ${error.message}`);
+      }
     });
 
     ws.on('close', () => {
