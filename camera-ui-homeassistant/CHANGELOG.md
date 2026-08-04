@@ -1,3 +1,9 @@
+## [1.0.7]
+
+- **Fixed the connection inside the Home Assistant add-on.** The add-on was missing the Home Assistant API permission, so the automatic connection was always rejected with "rejected the access token". Update the camera.ui add-on to 0.1.7 and the connection works without any configuration again.
+- **A manually entered URL and token now win over the add-on connection.** Before, the automatic add-on path always took priority, so entering your own credentials had no effect.
+- Fix camera.ui engine
+
 ## [1.0.6]
 
 - **Notify entities work as delivery targets.** Entity-based notify services now show up under Settings > Notifications and are called through notify.send_message. The bare send_message service no longer appears as a target, sending to it always failed with a 400 error. These targets carry title and text only, Home Assistant does not accept a picture there.
