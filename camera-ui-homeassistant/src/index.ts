@@ -24,6 +24,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   private imported = new Map<string, ImportedSensor>();
   private skippedLogged = new Set<string>();
   private ownEntities = new Set<string>();
+  private guardLoaded = false;
+  private resyncTimer?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
   private notifier = new HaNotifier(this.storage, this.logger, () => this.client);
 
@@ -158,6 +160,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
       let importedCount = 0;
       for (const state of states) {
+        if (!this.guardLoaded && !this.imported.has(state.entity_id)) continue;
         if (this.applyOrImport(state, false)) importedCount++;
       }
       this.logger.log(`Home Assistant sync: ${importedCount} entities imported as sensors`);
@@ -170,14 +173,32 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     try {
       const rendered = await client.renderTemplate(OWN_ENTITIES_TEMPLATE);
       this.ownEntities = new Set(JSON.parse(rendered) as string[]);
+      this.guardLoaded = true;
     } catch (error) {
-      this.logger.debug('Could not resolve camera.ui-owned entities:', error);
+      this.guardLoaded = false;
+      this.logger.warn('Could not resolve camera.ui-owned entities, imports are paused:', error);
     }
   }
 
   private handleStateChanged(state: HaState | null): void {
     if (!state) return;
-    this.applyOrImport(state, true);
+    const existing = this.imported.get(state.entity_id);
+    if (existing) {
+      if (!this.ownEntities.has(state.entity_id) && !this.isExcluded(state.entity_id)) {
+        applyEntityState(existing, state, true);
+      }
+      return;
+    }
+
+    this.scheduleResync();
+  }
+
+  private scheduleResync(): void {
+    if (this.resyncTimer) return;
+    this.resyncTimer = setTimeout(() => {
+      this.resyncTimer = undefined;
+      void this.syncEntities();
+    }, 5000);
   }
 
   private applyOrImport(state: HaState, live: boolean): boolean {
