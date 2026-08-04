@@ -3,6 +3,7 @@ export const NODE = {
   'camera-ui-onvif': 'externals/onvif',
   'camera-ui-ring': 'externals/ring',
   'camera-ui-eufy': 'externals/eufy-security-client',
+  'camera-ui-homeassistant': '',
   'camera-ui-pamdiff': '',
   'camera-ui-rust-motion': '',
   'camera-ui-smtp': '',

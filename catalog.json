@@ -44,6 +44,15 @@
     "screenshots": [],
     "protocolLevel": 1
   },
+  "@camera.ui/camera-ui-homeassistant": {
+    "displayName": "Home Assistant",
+    "category": "automation",
+    "featured": true,
+    "tagline": "Imports Home Assistant devices into camera.ui: motion, contacts, doorbells and more become detection triggers, locks, lights and alarms become controls.",
+    "logo": "https://raw.githubusercontent.com/cameraui/plugins/main/camera-ui-homeassistant/logo.png",
+    "screenshots": [],
+    "protocolLevel": 1
+  },
   "@camera.ui/camera-ui-homekit": {
     "displayName": "HomeKit",
     "category": "automation",

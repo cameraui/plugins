@@ -10,6 +10,9 @@ coreml:
 eufy:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-eufy/**'
+homeassistant:
+  - changed-files:
+      - any-glob-to-any-file: 'camera-ui-homeassistant/**'
 hailo:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-hailo/**'
@@ -22,6 +25,9 @@ ncnn:
 onnx:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-onnx/**'
+onnx-legacy:
+  - changed-files:
+      - any-glob-to-any-file: 'camera-ui-onnx-legacy/**'
 onvif:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-onvif/**'
@@ -34,6 +40,9 @@ opencv:
 openvino:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-openvino/**'
+openvino-legacy:
+  - changed-files:
+      - any-glob-to-any-file: 'camera-ui-openvino-legacy/**'
 pamdiff:
   - changed-files:
       - any-glob-to-any-file: 'camera-ui-pamdiff/**'

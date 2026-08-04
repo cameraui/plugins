@@ -47,6 +47,7 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/scripts/select-plugins.mjs'
               - '.github/scripts/plugins.mjs'
+            camera-ui-homeassistant: ['camera-ui-homeassistant/**']
             camera-ui-homekit: ['camera-ui-homekit/**']
             camera-ui-onvif: ['camera-ui-onvif/**']
             camera-ui-ring: ['camera-ui-ring/**']
