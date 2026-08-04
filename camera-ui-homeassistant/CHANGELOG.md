@@ -1,5 +1,7 @@
 ## [1.0.4]
 
+**Requires camera.ui 2.1.3. If you use the camera.ui integration in Home Assistant, update it as well.**
+
 - **Imported sensors no longer flood Home Assistant with camera.ui devices.** Imports now start unexported and are marked with their origin, so the camera.ui integration and the MQTT bridge never send them back to Home Assistant, even if you export them for other bridges like HomeKit. Existing imports are marked on the next plugin start; reload the camera.ui integration in Home Assistant once to drop the stray devices.
 
 ## [1.0.3]
