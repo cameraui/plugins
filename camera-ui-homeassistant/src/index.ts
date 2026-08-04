@@ -23,6 +23,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
   private imported = new Map<string, ImportedSensor>();
   private skippedLogged = new Set<string>();
   private ownEntities = new Set<string>();
+  private reconnectTimer?: NodeJS.Timeout;
 
   constructor(logger: LoggerService, api: PluginAPI, storage: DeviceStorage<StorageValues>) {
     super(logger, api, storage);
@@ -49,6 +50,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
         description: 'For example http://homeassistant.local:8123. Leave empty when camera.ui runs as Home Assistant add-on.',
         required: false,
         store: true,
+        onSet: async () => this.reconnectSoon(),
       },
       {
         type: 'string',
@@ -58,6 +60,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
         format: 'password',
         required: false,
         store: true,
+        onSet: async () => this.reconnectSoon(),
       },
       {
         type: 'string',
@@ -66,6 +69,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
         description: 'Comma-separated entity ids that should not be imported.',
         required: false,
         store: true,
+        onSet: async () => this.reconnectSoon(),
       },
     ];
   }
@@ -87,7 +91,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
       target,
       this.logger,
       (_entityId, state) => this.handleStateChanged(state),
-      () => void this.syncEntities(),
+      () => this.syncEntities(),
     );
     this.client.connect();
   }
@@ -97,6 +101,15 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
     this.client = undefined;
   }
 
+  private reconnectSoon(): void {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.logger.log('Settings changed, reconnecting to Home Assistant');
+      this.stop().then(() => this.start());
+    }, 500);
+  }
+
   private async syncEntities(): Promise<void> {
     const client = this.client;
     if (!client) return;
@@ -104,6 +117,13 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
     try {
       await this.loadOwnEntities(client);
       const states = await client.fetchStates();
+
+      for (const [entityId, imported] of this.imported) {
+        if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) {
+          this.imported.delete(entityId);
+          this.api.sensorManager.removeSensor(imported.sensor);
+        }
+      }
 
       let importedCount = 0;
       for (const state of states) {
@@ -159,7 +179,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
     }
 
     this.imported.set(entityId, imported);
-    void this.registerImported(entityId, imported, state);
+    this.registerImported(entityId, imported, state);
     return true;
   }
 
