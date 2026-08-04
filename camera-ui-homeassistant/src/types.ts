@@ -1,3 +1,9 @@
+export const IMPORT_ORIGIN = 'homeassistant';
+
+export function importOptions(nativeId: string): { nativeId: string; origin: string; exposed: boolean } {
+  return { nativeId, origin: IMPORT_ORIGIN, exposed: false };
+}
+
 export interface StorageValues {
   debug?: boolean;
   mutedNotifyServices?: string[];

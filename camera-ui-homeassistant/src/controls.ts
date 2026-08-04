@@ -16,6 +16,8 @@ import {
   SwitchProperty,
 } from '@camera.ui/sdk';
 
+import { importOptions } from './types.js';
+
 import type { HaState } from './types.js';
 
 export type ControlKind = 'lock' | 'garage' | 'securitySystem' | 'switch' | 'light' | 'siren';
@@ -34,7 +36,7 @@ export class HaLockControl extends LockControl {
     nativeId: string,
     private readonly command: CommandFn,
   ) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
   }
 
   writeStates(partial: Record<string, unknown>): void {
@@ -53,7 +55,7 @@ export class HaGarageControl extends GarageControl {
     nativeId: string,
     private readonly command: CommandFn,
   ) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
   }
 
   writeStates(partial: Record<string, unknown>): void {
@@ -72,7 +74,7 @@ export class HaSecuritySystem extends SecuritySystem {
     nativeId: string,
     private readonly command: CommandFn,
   ) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
   }
 
   writeStates(partial: Record<string, unknown>): void {
@@ -91,7 +93,7 @@ export class HaSwitchControl extends SwitchControl {
     nativeId: string,
     private readonly command: CommandFn,
   ) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
   }
 
   writeStates(partial: Record<string, unknown>): void {
@@ -110,7 +112,7 @@ export class HaLightControl extends LightControl {
     nativeId: string,
     private readonly command: CommandFn,
   ) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
   }
 
   writeStates(partial: Record<string, unknown>): void {
@@ -129,7 +131,7 @@ export class HaSirenControl extends SirenControl {
     nativeId: string,
     private readonly command: CommandFn,
   ) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
   }
 
   writeStates(partial: Record<string, unknown>): void {

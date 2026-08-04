@@ -2,6 +2,7 @@ import { DoorbellTrigger, MotionSensor, Sensor } from '@camera.ui/sdk';
 
 import { applyControlState, controlKindForEntity, createControl } from './controls.js';
 import { entityDisplayName, mapEntity } from './mapping.js';
+import { importOptions } from './types.js';
 
 import type { SensorCategory, SensorMeta, SensorType } from '@camera.ui/sdk';
 import type { CommandFn, ControlKind, HaControl } from './controls.js';
@@ -14,7 +15,7 @@ export class ImportedStateSensor extends Sensor<Record<string, unknown>> {
   private readonly stateProperty: string;
 
   constructor(meta: SensorMeta, name: string, nativeId: string) {
-    super(name, { nativeId });
+    super(name, importOptions(nativeId));
     this.type = meta.type;
     this.category = meta.category;
     this.stateProperty = meta.semantics!.stateProperty;
@@ -49,10 +50,10 @@ export function createImportedSensor(state: HaState, commandFor: (kind: ControlK
   if (!mapping) return undefined;
 
   if (mapping.kind === 'motion') {
-    return { kind: 'motion', sensor: new MotionSensor(name, { nativeId }) };
+    return { kind: 'motion', sensor: new MotionSensor(name, importOptions(nativeId)) };
   }
   if (mapping.kind === 'doorbell') {
-    return { kind: 'doorbell', sensor: new DoorbellTrigger(name, { nativeId }) };
+    return { kind: 'doorbell', sensor: new DoorbellTrigger(name, importOptions(nativeId)) };
   }
   return { kind: mapping.kind, sensor: new ImportedStateSensor(mapping.meta, name, nativeId) };
 }
