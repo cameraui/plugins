@@ -20,17 +20,19 @@ export interface HaConnectionTarget {
 }
 
 export function resolveTarget(options: HaClientOptions): HaConnectionTarget | undefined {
+  if (options.host && options.token) {
+    let host = options.host.trim().replace(/\/+$/, '');
+    if (!/^https?:\/\//.test(host)) host = `http://${host}`;
+    const wsUrl = `${host.replace(/^http/, 'ws')}/api/websocket`;
+    return { apiUrl: `${host}/api`, wsUrl, token: options.token };
+  }
+
   const supervisorToken = process.env.SUPERVISOR_TOKEN;
   if (supervisorToken) {
     return { apiUrl: 'http://supervisor/core/api', wsUrl: 'ws://supervisor/core/websocket', token: supervisorToken };
   }
 
-  if (!options.host || !options.token) return undefined;
-
-  let host = options.host.trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//.test(host)) host = `http://${host}`;
-  const wsUrl = `${host.replace(/^http/, 'ws')}/api/websocket`;
-  return { apiUrl: `${host}/api`, wsUrl, token: options.token };
+  return undefined;
 }
 
 export class HaClient {
@@ -122,7 +124,11 @@ export class HaClient {
         return;
       }
       if (message.type === 'auth_invalid') {
-        this.logger.error('Home Assistant rejected the access token');
+        if (this.target.apiUrl.startsWith('http://supervisor')) {
+          this.logger.error('Home Assistant rejected the supervisor token. Update the camera.ui add-on, older versions lack the Home Assistant API permission.');
+        } else {
+          this.logger.error('Home Assistant rejected the access token');
+        }
         this.stop();
         return;
       }
