@@ -67,7 +67,9 @@ export class HaClient {
   public async fetchNotifyServices(): Promise<string[]> {
     const response = await this.request('/services');
     const domains = (await response.json()) as { domain: string; services: Record<string, unknown> }[];
-    return Object.keys(domains.find((entry) => entry.domain === 'notify')?.services ?? {}).sort();
+    return Object.keys(domains.find((entry) => entry.domain === 'notify')?.services ?? {})
+      .filter((service) => service !== 'send_message') // entity service, needs an entity_id to be callable
+      .sort();
   }
 
   public connect(): void {

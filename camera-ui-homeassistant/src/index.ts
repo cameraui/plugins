@@ -148,8 +148,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
     try {
       await this.loadOwnEntities(client);
-      await this.notifier.refreshServices();
       const states = await client.fetchStates();
+      await this.notifier.refreshTargets(states);
 
       for (const [entityId, imported] of this.imported) {
         if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) {
