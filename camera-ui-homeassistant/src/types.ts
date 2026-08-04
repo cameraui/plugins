@@ -1,8 +1,7 @@
-import type { StoredNotifierDevice } from './notifier.js';
-
 export interface StorageValues {
   debug?: boolean;
-  notifierDevices?: StoredNotifierDevice[];
+  mutedNotifyServices?: string[];
+  notifyServiceNames?: Record<string, string>;
   host?: string;
   token?: string;
   excludeEntities?: string;

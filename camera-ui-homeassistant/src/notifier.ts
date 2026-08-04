@@ -1,19 +1,12 @@
-import { randomUUID } from 'node:crypto';
-
 import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice } from '@camera.ui/sdk';
 import type { HaClient } from './ha.js';
 import type { StorageValues } from './types.js';
 
-export interface StoredNotifierDevice {
-  id: string;
-  ownerUserId: string;
-  name: string;
-  active: boolean;
-  service: string;
-}
+const DEVICE_PREFIX = 'notify:';
 
 export class HaNotifier {
   private services: string[] = [];
+  private lastOwnerUserId = '';
 
   constructor(
     private readonly storage: DeviceStorage<StorageValues>,
@@ -25,21 +18,25 @@ export class HaNotifier {
     const client = this.getClient();
     if (!client) return;
     try {
-      this.services = await client.fetchNotifyServices();
+      const services = await client.fetchNotifyServices();
+      if (services.length !== this.services.length) {
+        this.logger.log(`Home Assistant notify targets available: ${services.join(', ') || 'none'}`);
+      }
+      this.services = services;
     } catch (error) {
       this.logger.debug('Could not list Home Assistant notify services:', error);
     }
   }
 
   public async getDevices(ownerUserIds: string[]): Promise<NotifierDevice[]> {
-    return this.devices()
-      .filter((device) => ownerUserIds.includes(device.ownerUserId))
-      .map((device) => this.toDevice(device));
+    const owner = ownerUserIds[0] ?? this.lastOwnerUserId;
+    if (owner) this.lastOwnerUserId = owner;
+    return this.services.map((service) => this.toDevice(service, owner));
   }
 
   public async getDevice(deviceId: string): Promise<NotifierDevice | null> {
-    const device = this.devices().find((entry) => entry.id === deviceId);
-    return device ? this.toDevice(device) : null;
+    const service = this.serviceForId(deviceId);
+    return service ? this.toDevice(service, this.lastOwnerUserId) : null;
   }
 
   public async sendNotification(deviceIds: string[], n: Notification): Promise<void> {
@@ -50,84 +47,66 @@ export class HaNotifier {
     const data: Record<string, unknown> = {};
     if (n.imageUrl) data.image = n.imageUrl;
 
-    for (const device of this.devices()) {
-      if (!deviceIds.includes(device.id) || !device.active) continue;
+    for (const deviceId of deviceIds) {
+      const service = this.serviceForId(deviceId);
+      if (!service || this.isMuted(service)) continue;
       try {
-        await client.callService('notify', device.service, { title: n.title, message, data });
+        await client.callService('notify', service, { title: n.title, message, data });
       } catch (error) {
-        this.logger.error(`Notify via ${device.service} failed:`, error);
+        this.logger.error(`Notify via ${service} failed:`, error);
       }
     }
   }
 
-  public async registerDevice(ownerUserId: string, input: Record<string, unknown>): Promise<NotifierDevice> {
-    const service = typeof input.service === 'string' ? input.service : '';
-    if (!service) throw new Error('A Home Assistant notify service is required');
-
-    const name = typeof input.name === 'string' && input.name.length > 0 ? input.name : service;
-    const device: StoredNotifierDevice = {
-      id: randomUUID(),
-      ownerUserId,
-      name,
-      active: true,
-      service,
-    };
-    await this.saveDevices([...this.devices(), device]);
-    return this.toDevice(device);
+  public async registerDevice(): Promise<NotifierDevice> {
+    throw new Error('Home Assistant notify targets are added automatically');
   }
 
   public async revokeDevice(deviceId: string): Promise<void> {
-    await this.saveDevices(this.devices().filter((device) => device.id !== deviceId));
+    // the service exists as long as HA has it; revoking mutes it
+    await this.setMuted(this.serviceForId(deviceId), true);
   }
 
   public async updateDevice(deviceId: string, patch: Record<string, unknown>): Promise<NotifierDevice | null> {
-    const devices = this.devices();
-    const device = devices.find((entry) => entry.id === deviceId);
-    if (!device) return null;
+    const service = this.serviceForId(deviceId);
+    if (!service || !this.services.includes(service)) return null;
 
-    if (typeof patch.name === 'string') device.name = patch.name;
-    if (typeof patch.active === 'boolean') device.active = patch.active;
-    await this.saveDevices(devices);
-    return this.toDevice(device);
+    if (typeof patch.active === 'boolean') await this.setMuted(service, !patch.active);
+    if (typeof patch.name === 'string' && patch.name.length > 0) {
+      this.storage.values.notifyServiceNames = { ...this.storage.values.notifyServiceNames, [service]: patch.name };
+      await this.storage.save();
+    }
+    return this.toDevice(service, this.lastOwnerUserId);
   }
 
   public async notificationSettings(): Promise<JsonSchema[] | undefined> {
-    await this.refreshServices();
-    return [
-      {
-        type: 'string',
-        key: 'service',
-        title: 'Notify Service',
-        description: 'Home Assistant notify service this device delivers to.',
-        required: true,
-        enum: this.services,
-      },
-      {
-        type: 'string',
-        key: 'name',
-        title: 'Name',
-        description: 'Display name for this device.',
-        required: false,
-      },
-    ];
+    return undefined;
   }
 
-  private devices(): StoredNotifierDevice[] {
-    return this.storage.values.notifierDevices ?? [];
+  private serviceForId(deviceId: string): string | undefined {
+    return deviceId.startsWith(DEVICE_PREFIX) ? deviceId.slice(DEVICE_PREFIX.length) : undefined;
   }
 
-  private async saveDevices(devices: StoredNotifierDevice[]): Promise<void> {
-    this.storage.values.notifierDevices = devices;
+  private isMuted(service: string): boolean {
+    return (this.storage.values.mutedNotifyServices ?? []).includes(service);
+  }
+
+  private async setMuted(service: string | undefined, muted: boolean): Promise<void> {
+    if (!service) return;
+    const current = new Set(this.storage.values.mutedNotifyServices ?? []);
+    if (muted) current.add(service);
+    else current.delete(service);
+    this.storage.values.mutedNotifyServices = [...current];
     await this.storage.save();
   }
 
-  private toDevice(device: StoredNotifierDevice): NotifierDevice {
+  private toDevice(service: string, owner: string): NotifierDevice {
     return {
-      id: device.id,
-      ownerUserId: device.ownerUserId,
-      name: device.name,
-      active: device.active,
-      metadata: { service: device.service },
+      id: `${DEVICE_PREFIX}${service}`,
+      ownerUserId: owner,
+      name: this.storage.values.notifyServiceNames?.[service] ?? service,
+      active: !this.isMuted(service),
+      metadata: { service },
     };
   }
 }

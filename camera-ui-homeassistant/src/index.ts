@@ -88,8 +88,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     return this.notifier.sendNotification(deviceIds, n);
   }
 
-  async registerDevice(ownerUserId: string, input: Record<string, unknown>): Promise<NotifierDevice> {
-    return this.notifier.registerDevice(ownerUserId, input);
+  async registerDevice(): Promise<NotifierDevice> {
+    return this.notifier.registerDevice();
   }
 
   async revokeDevice(deviceId: string): Promise<void> {
@@ -146,6 +146,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
     try {
       await this.loadOwnEntities(client);
+      await this.notifier.refreshServices();
       const states = await client.fetchStates();
 
       for (const [entityId, imported] of this.imported) {
