@@ -1,4 +1,4 @@
-onnxruntime-gpu==1.26.0
+onnxruntime-gpu==1.28.0
 camera-ui-sdk==1.2.4
 camera-ui-ml==1.2.8
 numpy==2.4.6
