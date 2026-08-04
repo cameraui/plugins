@@ -25,21 +25,21 @@
     "eufy-security-client": "file:../externals/eufy-security-client"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.77",
-    "@camera.ui/sdk": "^1.2.4",
+    "@camera.ui/cli": "^0.0.79",
+    "@camera.ui/sdk": "^1.2.7",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.2",
-    "@typescript-eslint/parser": "^8.65.0",
+    "@typescript-eslint/parser": "^8.66.0",
     "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
-    "globals": "^17.8.0",
+    "globals": "^17.9.0",
     "prettier": "^3.9.6",
     "rimraf": "^6.1.3",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.5",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.65.0",
-    "updates": "^17.20.2"
+    "typescript-eslint": "^8.66.0",
+    "updates": "^17.20.4"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
