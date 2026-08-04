@@ -1,9 +1,12 @@
 import {
+  CarbonDioxideProperty,
+  CarbonMonoxideProperty,
   ContactProperty,
   DoorbellProperty,
   GarageProperty,
   GarageState,
   HumidityProperty,
+  IlluminanceProperty,
   LeakProperty,
   LightCapability,
   LightProperty,
@@ -18,6 +21,7 @@ import {
   SmokeProperty,
   SwitchProperty,
   TemperatureProperty,
+  VibrationProperty,
 } from '@camera.ui/sdk';
 
 import { Accessory, AccessoryEventTypes, Categories, Characteristic, Service, uuid } from '../hap.js';
@@ -225,6 +229,65 @@ const SENSOR_CONFIGS: Partial<Record<SensorType, SensorServiceConfig>> = {
       },
     ],
   },
+  [SensorType.CarbonMonoxide]: {
+    serviceType: Service.CarbonMonoxideSensor,
+    typeName: 'carbon monoxide sensor',
+    category: Categories.SENSOR,
+    bindings: [
+      {
+        property: CarbonMonoxideProperty.Detected,
+        characteristic: Characteristic.CarbonMonoxideDetected,
+        defaultValue: false,
+        toHAP: (v) => (v ? Characteristic.CarbonMonoxideDetected.CO_LEVELS_ABNORMAL : Characteristic.CarbonMonoxideDetected.CO_LEVELS_NORMAL),
+      },
+    ],
+  },
+  [SensorType.CarbonDioxide]: {
+    serviceType: Service.CarbonDioxideSensor,
+    typeName: 'carbon dioxide sensor',
+    category: Categories.SENSOR,
+    bindings: [
+      {
+        property: CarbonDioxideProperty.Current,
+        characteristic: Characteristic.CarbonDioxideLevel,
+        defaultValue: 0,
+        props: { minValue: 0, maxValue: 100000 },
+      },
+      {
+        property: CarbonDioxideProperty.Current,
+        characteristic: Characteristic.CarbonDioxideDetected,
+        defaultValue: Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL,
+        toHAP: (v) => (Number(v) >= 1500 ? Characteristic.CarbonDioxideDetected.CO2_LEVELS_ABNORMAL : Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL),
+      },
+    ],
+  },
+  [SensorType.Illuminance]: {
+    serviceType: Service.LightSensor,
+    typeName: 'light sensor',
+    category: Categories.SENSOR,
+    bindings: [
+      {
+        property: IlluminanceProperty.Current,
+        characteristic: Characteristic.CurrentAmbientLightLevel,
+        defaultValue: 0.0001,
+        // HAP range is 0.0001-100000 lux
+        toHAP: (v) => Math.min(100_000, Math.max(0.0001, Number(v) || 0.0001)),
+      },
+    ],
+  },
+  // HAP has no vibration service, a motion sensor is the convention
+  [SensorType.Vibration]: {
+    serviceType: Service.MotionSensor,
+    typeName: 'vibration sensor',
+    category: Categories.SENSOR,
+    bindings: [
+      {
+        property: VibrationProperty.Detected,
+        characteristic: Characteristic.MotionDetected,
+        defaultValue: false,
+      },
+    ],
+  },
   // GarageState matches the HAP door-state values 1:1, no mapping needed
   [SensorType.Garage]: {
     serviceType: Service.GarageDoorOpener,
@@ -331,7 +394,6 @@ function bindConfiguredService(accessory: Accessory, sensor: SensorLike, display
         if (property === binding.property) {
           const hapValue = binding.toHAP ? binding.toHAP(value) : value;
           service.getCharacteristic(binding.characteristic).updateValue(hapValue as CharacteristicValue);
-          break;
         }
       }
     }),

@@ -1,3 +1,7 @@
+## [1.2.3]
+
+- New sensor types reach HomeKit. Carbon monoxide, carbon dioxide (level plus alarm above 1500 ppm), illuminance and vibration sensors now appear in Apple Home; vibration shows up as a motion sensor since HomeKit has no vibration category. Gas, heat, cold, tamper, problem and power stay camera.ui-only, HomeKit has no matching accessory type.
+
 ## [1.2.2]
 
 - Minor bugfixes and improvements
