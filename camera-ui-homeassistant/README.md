@@ -1,6 +1,6 @@
 # Home Assistant
 
-Imports Home Assistant devices into camera.ui. Motion, occupancy, contact, doorbell, smoke, leak, gas, CO and other supported entities become camera.ui sensors that you can assign to cameras, use as detection triggers, or watch on the dashboard. Locks, garage doors, alarm panels, switches, lights and sirens come in as controls: switching them in camera.ui switches them in Home Assistant.
+Imports Home Assistant devices into camera.ui. Motion, occupancy, contact, doorbell, smoke, leak, gas, CO and other supported entities become camera.ui sensors that you can assign to cameras, use as detection triggers, or watch on the dashboard. Locks, garage doors, alarm panels, switches, lights and sirens come in as controls: switching them in camera.ui switches them in Home Assistant. Home Assistant notify services (companion app, TTS, Telegram, ...) can be added as notification targets under Settings > Notifications, so camera.ui alerts reach every channel Home Assistant knows.
 
 ## Setup
 

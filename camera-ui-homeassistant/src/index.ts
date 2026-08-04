@@ -2,9 +2,10 @@ import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 
 import { commandToService } from './controls.js';
 import { HaClient, resolveTarget } from './ha.js';
+import { HaNotifier } from './notifier.js';
 import { applyEntityState, createImportedSensor } from './sensors.js';
 
-import type { DeviceStorage, JsonSchema, LoggerService, PluginAPI } from '@camera.ui/sdk';
+import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice, NotifierInterface, PluginAPI } from '@camera.ui/sdk';
 import type { ImportedSensor } from './sensors.js';
 import type { HaState, StorageValues } from './types.js';
 
@@ -18,12 +19,13 @@ const OWN_ENTITIES_TEMPLATE = `
 {%- endfor -%}
 {{ ns.ids | tojson }}`;
 
-export default class HomeAssistant extends BasePlugin<StorageValues> {
+export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface {
   private client?: HaClient;
   private imported = new Map<string, ImportedSensor>();
   private skippedLogged = new Set<string>();
   private ownEntities = new Set<string>();
   private reconnectTimer?: NodeJS.Timeout;
+  private notifier = new HaNotifier(this.storage, this.logger, () => this.client);
 
   constructor(logger: LoggerService, api: PluginAPI, storage: DeviceStorage<StorageValues>) {
     super(logger, api, storage);
@@ -72,6 +74,34 @@ export default class HomeAssistant extends BasePlugin<StorageValues> {
         onSet: async () => this.reconnectSoon(),
       },
     ];
+  }
+
+  async getDevices(ownerUserIds: string[]): Promise<NotifierDevice[]> {
+    return this.notifier.getDevices(ownerUserIds);
+  }
+
+  async getDevice(deviceId: string): Promise<NotifierDevice | null> {
+    return this.notifier.getDevice(deviceId);
+  }
+
+  async sendNotification(deviceIds: string[], n: Notification): Promise<void> {
+    return this.notifier.sendNotification(deviceIds, n);
+  }
+
+  async registerDevice(ownerUserId: string, input: Record<string, unknown>): Promise<NotifierDevice> {
+    return this.notifier.registerDevice(ownerUserId, input);
+  }
+
+  async revokeDevice(deviceId: string): Promise<void> {
+    return this.notifier.revokeDevice(deviceId);
+  }
+
+  async updateDevice(deviceId: string, patch: Record<string, unknown>): Promise<NotifierDevice | null> {
+    return this.notifier.updateDevice(deviceId, patch);
+  }
+
+  async notificationSettings(): Promise<JsonSchema[] | undefined> {
+    return this.notifier.notificationSettings();
   }
 
   async configureCameras(): Promise<void> {}

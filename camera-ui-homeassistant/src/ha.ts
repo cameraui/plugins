@@ -64,6 +64,12 @@ export class HaClient {
     await this.request(`/services/${domain}/${service}`, data);
   }
 
+  public async fetchNotifyServices(): Promise<string[]> {
+    const response = await this.request('/services');
+    const domains = (await response.json()) as { domain: string; services: Record<string, unknown> }[];
+    return Object.keys(domains.find((entry) => entry.domain === 'notify')?.services ?? {}).sort();
+  }
+
   public connect(): void {
     this.stopped = false;
     this.openSocket();

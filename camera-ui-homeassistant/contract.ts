@@ -1,4 +1,4 @@
-import { PluginRole, SensorType } from '@camera.ui/sdk';
+import { PluginInterface, PluginRole, SensorType } from '@camera.ui/sdk';
 
 import type { PluginContract } from '@camera.ui/sdk';
 
@@ -32,7 +32,7 @@ export const contract: PluginContract = {
     SensorType.Siren,
   ],
   consumes: [],
-  interfaces: [],
+  interfaces: [PluginInterface.Notifier],
 };
 
 export default contract;
