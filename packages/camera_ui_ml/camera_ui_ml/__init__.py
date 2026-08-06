@@ -47,6 +47,7 @@ from .preprocess import (
     to_pil,
     to_tensor,
 )
+from .settings import reset_stored_settings
 
 __all__ = [
     "InferenceBackend",
@@ -90,5 +91,6 @@ __all__ = [
     "detect_objects",
     "detect_faces",
     "detect_plates",
+    "reset_stored_settings",
     "detect_clip",
 ]
