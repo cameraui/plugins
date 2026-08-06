@@ -18,6 +18,11 @@ OBJECT_MODELS: dict[str, int] = {
 
 FACE_DETECTOR_MODELS: dict[str, int] = {
     "yolo-v9-t-320-faces": 320,
+    "yolo-v9-s-320-faces": 320,
+    "yolo-v9-m-320-faces": 320,
+    "yolo-v9-t-640-faces": 640,
+    "yolo-v9-s-640-faces": 640,
+    "yolo-v9-m-640-faces": 640,
 }
 
 LPD_DETECTOR_MODELS: dict[str, int] = {
@@ -74,3 +79,9 @@ CLIP_EMBEDDING_DIM = 512
 # "tensorrt" -> NVIDIA TensorRT EP (CUDA + CPU fallback); builds/caches an engine on first run.
 EXECUTION_PROVIDERS = ["auto", "cpu", "cuda", "tensorrt"]
 DEFAULT_EXECUTION_PROVIDER = "auto"
+
+DEFAULT_OPTION = "default"
+
+
+def resolve_model(name: str | None, fallback: str) -> str:
+    return fallback if not name or name == DEFAULT_OPTION else name

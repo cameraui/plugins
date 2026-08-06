@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
-from camera_ui_ml import detect_objects
+from camera_ui_ml import detect_objects, reset_stored_settings
 from camera_ui_sdk import (
     JsonSchema,
     ObjectDetectorSensor,
@@ -11,7 +11,7 @@ from camera_ui_sdk import (
     VideoFrameData,
 )
 
-from defaults import DEFAULT_OBJECT_MODEL, OBJECT_MODELS
+from defaults import DEFAULT_OBJECT_MODEL, DEFAULT_OPTION, OBJECT_MODELS, resolve_model
 
 if TYPE_CHECKING:
     from camera_ui_sdk import LoggerService
@@ -39,9 +39,9 @@ class OpenVinoObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
                 "title": "Model",
                 "description": "YOLO model for object detection",
                 "group": "Object Detection",
-                "enum": list(OBJECT_MODELS.keys()),
+                "enum": [DEFAULT_OPTION, *OBJECT_MODELS],
                 "store": True,
-                "defaultValue": DEFAULT_OBJECT_MODEL,
+                "defaultValue": DEFAULT_OPTION,
                 "required": True,
                 "onSet": self._on_change_model,
             },
@@ -58,6 +58,15 @@ class OpenVinoObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
                 "step": 0.05,
                 "required": True,
             },
+            {
+                "type": "button",
+                "key": "reset_defaults",
+                "title": "Reset to Defaults",
+                "description": "Reset all settings to their default values",
+                "group": "Object Detection",
+                "color": "danger",
+                "onSet": self._reset_settings,
+            },
         ]
 
     @property
@@ -65,7 +74,9 @@ class OpenVinoObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
         return {"input": {"width": 320, "height": 320, "format": "rgb"}}
 
     async def detectObjects(self, frame: VideoFrameData) -> ObjectResult:
-        detector = self._plugin.object_detectors.get(self.storage.values["model"])
+        detector = self._plugin.object_detectors.get(
+            resolve_model(self.storage.values.get("model"), DEFAULT_OBJECT_MODEL)
+        )
         if detector is None or not detector.initialized:
             return {"detected": False, "detections": []}
         return await detect_objects(detector, frame, self.storage.values["confidence_threshold"])
@@ -74,10 +85,14 @@ class OpenVinoObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
         pass
 
     async def on_start(self) -> None:
-        model_name = self.storage.values["model"]
+        model_name = resolve_model(self.storage.values.get("model"), DEFAULT_OBJECT_MODEL)
         await self._plugin.get_object_detector(model_name)
 
     async def _on_change_model(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_object_detector(new_model)
+            await self._plugin.get_object_detector(resolve_model(new_model, DEFAULT_OBJECT_MODEL))
             self._logger.log(f"Object model changed to {new_model}")
+
+    async def _reset_settings(self) -> None:
+        await reset_stored_settings(self.storage)
+        self._logger.log("Settings reset to defaults")

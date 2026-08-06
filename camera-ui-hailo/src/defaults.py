@@ -39,3 +39,9 @@ COCO_TO_CLASS: dict[int, int] = {
     22: 2,
     23: 2,  # bird..giraffe
 }
+
+DEFAULT_OPTION = "default"
+
+
+def resolve_model(name: str | None, fallback: str) -> str:
+    return fallback if not name or name == DEFAULT_OPTION else name

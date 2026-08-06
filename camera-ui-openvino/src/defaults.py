@@ -20,6 +20,11 @@ OBJECT_MODELS: dict[str, int] = {
 
 FACE_DETECTOR_MODELS: dict[str, int] = {
     "yolo-v9-t-320-faces": 320,
+    "yolo-v9-s-320-faces": 320,
+    "yolo-v9-m-320-faces": 320,
+    "yolo-v9-t-640-faces": 640,
+    "yolo-v9-s-640-faces": 640,
+    "yolo-v9-m-640-faces": 640,
 }
 
 LPD_DETECTOR_MODELS: dict[str, int] = {
@@ -86,3 +91,9 @@ STATIC_INPUT_SHAPES: dict[str, list[list[int]]] = {
     **{name: [[1, 3, size, size]] for name, size in CLIP_VISION_MODELS.items()},
     **{name: [[1, tokens], [1, tokens]] for name, tokens in CLIP_TEXT_MODELS.items()},
 }
+
+DEFAULT_OPTION = "default"
+
+
+def resolve_model(name: str | None, fallback: str) -> str:
+    return fallback if not name or name == DEFAULT_OPTION else name

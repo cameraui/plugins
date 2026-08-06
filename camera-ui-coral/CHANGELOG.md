@@ -1,3 +1,8 @@
+## [1.2.1]
+
+- **A "Reset to Defaults" button in every settings section.** One click puts all values of that section back to the defaults, models included.
+- **A new "default" choice in the model dropdown.** It follows the recommended model, so plugin updates can improve the pick automatically. Choosing a concrete model still pins it. Existing setups keep their current selection.
+
 ## [1.2.0]
 
 - Fixed the "Re-download Models" button doing nothing. Pressing it failed with a handler error in the log.

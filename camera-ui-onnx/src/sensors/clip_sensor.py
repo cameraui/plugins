@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from camera_ui_ml import detect_clip
+from camera_ui_ml import detect_clip, reset_stored_settings
 from camera_ui_sdk import (
     ClipDetectorSensor,
     ClipResult,
@@ -12,7 +12,13 @@ from camera_ui_sdk import (
 )
 from typing_extensions import TypedDict
 
-from defaults import CLIP_VISION_MODELS, DEFAULT_CLIP_EMBEDDER, DEFAULT_CLIP_VISION
+from defaults import (
+    CLIP_VISION_MODELS,
+    DEFAULT_CLIP_EMBEDDER,
+    DEFAULT_CLIP_VISION,
+    DEFAULT_OPTION,
+    resolve_model,
+)
 
 if TYPE_CHECKING:
     from camera_ui_sdk import LoggerService
@@ -39,17 +45,26 @@ class ONNXClipSensor(ClipDetectorSensor["ClipStorageValues"]):
                 "title": "Vision Model",
                 "description": "CLIP vision model for embedding generation",
                 "group": "CLIP",
-                "enum": list(CLIP_VISION_MODELS.keys()),
+                "enum": [DEFAULT_OPTION, *CLIP_VISION_MODELS],
                 "store": True,
-                "defaultValue": DEFAULT_CLIP_VISION,
+                "defaultValue": DEFAULT_OPTION,
                 "required": True,
                 "onSet": self._on_change_model,
+            },
+            {
+                "type": "button",
+                "key": "reset_defaults",
+                "title": "Reset to Defaults",
+                "description": "Reset all settings to their default values",
+                "group": "CLIP",
+                "color": "danger",
+                "onSet": self._reset_settings,
             },
         ]
 
     @property
     def modelSpec(self) -> ModelSpec:
-        model_name = self.storage.values.get("vision_model", DEFAULT_CLIP_VISION)
+        model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
         input_size = CLIP_VISION_MODELS.get(model_name, 224)
         return {
             "input": {"width": input_size, "height": input_size, "format": "rgb"},
@@ -58,7 +73,7 @@ class ONNXClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         }
 
     async def detectEmbeddings(self, frames: list[VideoFrameData]) -> list[ClipResult]:
-        model_name = self.storage.values.get("vision_model", DEFAULT_CLIP_VISION)
+        model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
         encoder = self._plugin.clip_encoders.get(model_name)
 
         if encoder is None or not encoder.initialized:
@@ -70,9 +85,13 @@ class ONNXClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         pass
 
     async def on_start(self) -> None:
-        model_name = self.storage.values.get("vision_model", DEFAULT_CLIP_VISION)
+        model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
         await self._plugin.get_clip_encoder(model_name)
 
     async def _on_change_model(self, _old: str, new: str) -> None:
         self._logger.log(f"Switching CLIP vision model to {new}")
-        await self._plugin.get_clip_encoder(new)
+        await self._plugin.get_clip_encoder(resolve_model(new, DEFAULT_CLIP_VISION))
+
+    async def _reset_settings(self) -> None:
+        await reset_stored_settings(self.storage)
+        self._logger.log("Settings reset to defaults")

@@ -11,6 +11,7 @@ from camera_ui_ml import (
     crop_rgb,
     decode_image,
     normalize_box,
+    reset_stored_settings,
     scale_box,
 )
 from camera_ui_sdk import (
@@ -40,6 +41,7 @@ from defaults import (
     DEFAULT_LPD_DETECTOR,
     DEFAULT_OBJECT_MODEL,
     DEFAULT_OCR,
+    DEFAULT_OPTION,
     DEFAULT_USE_VULKAN,
     FACE_DETECTOR_MODELS,
     FACE_EMBEDDER_INPUT_SIZE,
@@ -53,6 +55,7 @@ from defaults import (
     OCR_MAX_SLOTS,
     OCR_MODELS,
     OCR_PAD_CHAR,
+    resolve_model,
 )
 from model_manager import NcnnModelManager
 from sensors.face_sensor import NCNNFaceSensor
@@ -121,6 +124,14 @@ class NCNNPlugin(
                 "readonly": True,
                 "store": False,
                 "onGet": self._active_hardware,
+            },
+            {
+                "type": "button",
+                "key": "reset_defaults",
+                "title": "Reset to Defaults",
+                "description": "Reset all plugin settings to their default values",
+                "color": "danger",
+                "onSet": self._reset_settings,
             },
             {
                 "type": "button",
@@ -230,8 +241,8 @@ class NCNNPlugin(
                 "title": "Model",
                 "description": "YOLO model for testing",
                 "required": True,
-                "defaultValue": DEFAULT_OBJECT_MODEL,
-                "enum": list(OBJECT_MODELS.keys()),
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *OBJECT_MODELS],
                 "store": False,
             },
         ]
@@ -239,7 +250,7 @@ class NCNNPlugin(
     async def testObjectDetection(
         self, image_data: bytes, metadata: ImageMetadata, config: dict[str, Any]
     ) -> ObjectDetectionPluginResponse | None:
-        model_name: str = config.get("model", DEFAULT_OBJECT_MODEL)
+        model_name: str = resolve_model(config.get("model"), DEFAULT_OBJECT_MODEL)
         detector = await self.get_object_detector(model_name)
         if not detector.initialized:
             return None
@@ -258,7 +269,7 @@ class NCNNPlugin(
     async def detectObjects(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
     ) -> ObjectDetectionPluginResponse | None:
-        model_name = (config or {}).get("model", DEFAULT_OBJECT_MODEL)
+        model_name = resolve_model((config or {}).get("model"), DEFAULT_OBJECT_MODEL)
         detector = await self.get_object_detector(model_name)
         if not detector.initialized:
             return None
@@ -283,8 +294,8 @@ class NCNNPlugin(
                 "title": "Detector Model",
                 "description": "Face detection model for testing",
                 "required": True,
-                "defaultValue": DEFAULT_FACE_DETECTOR,
-                "enum": list(FACE_DETECTOR_MODELS.keys()),
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *FACE_DETECTOR_MODELS],
                 "store": False,
             },
             {
@@ -293,8 +304,8 @@ class NCNNPlugin(
                 "title": "Embedding Model",
                 "description": "Face embedding model for testing",
                 "required": True,
-                "defaultValue": DEFAULT_FACE_EMBEDDER,
-                "enum": list(FACE_EMBEDDER_MODELS.keys()),
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *FACE_EMBEDDER_MODELS],
                 "store": False,
             },
         ]
@@ -302,8 +313,8 @@ class NCNNPlugin(
     async def testFaceDetection(
         self, image_data: bytes, metadata: ImageMetadata, config: dict[str, Any]
     ) -> FaceDetectionPluginResponse | None:
-        detector_name: str = config.get("detector_model", DEFAULT_FACE_DETECTOR)
-        embedder_name: str = config.get("embedder_model", DEFAULT_FACE_EMBEDDER)
+        detector_name: str = resolve_model(config.get("detector_model"), DEFAULT_FACE_DETECTOR)
+        embedder_name: str = resolve_model(config.get("embedder_model"), DEFAULT_FACE_EMBEDDER)
 
         detector = await self.get_face_detector(detector_name)
         embedder = await self.get_face_embedder(embedder_name)
@@ -339,8 +350,8 @@ class NCNNPlugin(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
     ) -> FaceDetectionPluginResponse | None:
         cfg = config or {}
-        detector_name = cfg.get("detector_model", DEFAULT_FACE_DETECTOR)
-        embedder_name = cfg.get("embedder_model", DEFAULT_FACE_EMBEDDER)
+        detector_name = resolve_model(cfg.get("detector_model"), DEFAULT_FACE_DETECTOR)
+        embedder_name = resolve_model(cfg.get("embedder_model"), DEFAULT_FACE_EMBEDDER)
 
         detector = await self.get_face_detector(detector_name)
         embedder = await self.get_face_embedder(embedder_name)
@@ -377,8 +388,8 @@ class NCNNPlugin(
                 "title": "Detector Model",
                 "description": "YOLOv9 model for plate detection testing",
                 "required": True,
-                "defaultValue": DEFAULT_LPD_DETECTOR,
-                "enum": list(LPD_DETECTOR_MODELS.keys()),
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *LPD_DETECTOR_MODELS],
                 "store": False,
             },
             {
@@ -387,8 +398,8 @@ class NCNNPlugin(
                 "title": "OCR Model",
                 "description": "CCT model for plate text recognition testing",
                 "required": True,
-                "defaultValue": DEFAULT_OCR,
-                "enum": OCR_MODELS,
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *OCR_MODELS],
                 "store": False,
             },
         ]
@@ -396,8 +407,8 @@ class NCNNPlugin(
     async def testLicensePlateDetection(
         self, image_data: bytes, metadata: ImageMetadata, config: dict[str, Any]
     ) -> LicensePlateDetectionPluginResponse | None:
-        detector_name: str = config.get("detector_model", DEFAULT_LPD_DETECTOR)
-        ocr_name: str = config.get("ocr_model", DEFAULT_OCR)
+        detector_name: str = resolve_model(config.get("detector_model"), DEFAULT_LPD_DETECTOR)
+        ocr_name: str = resolve_model(config.get("ocr_model"), DEFAULT_OCR)
 
         detector = await self.get_plate_detector(detector_name)
         ocr = await self.get_ocr(ocr_name)
@@ -432,8 +443,8 @@ class NCNNPlugin(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
     ) -> LicensePlateDetectionPluginResponse | None:
         cfg = config or {}
-        detector_name = cfg.get("detector_model", DEFAULT_LPD_DETECTOR)
-        ocr_name = cfg.get("ocr_model", DEFAULT_OCR)
+        detector_name = resolve_model(cfg.get("detector_model"), DEFAULT_LPD_DETECTOR)
+        ocr_name = resolve_model(cfg.get("ocr_model"), DEFAULT_OCR)
 
         detector = await self.get_plate_detector(detector_name)
         ocr = await self.get_ocr(ocr_name)
@@ -533,6 +544,10 @@ class NCNNPlugin(
             *(self.get_ocr(n) for n in ocr),
             return_exceptions=True,
         )
+
+    async def _reset_settings(self) -> None:
+        await reset_stored_settings(self.storage)
+        self.logger.log("Settings reset to defaults")
 
     async def _redownload_models(self, _new: object = None, _old: object = None) -> None:
         self.logger.log("Re-downloading models (clearing cache)...")

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, TypedDict
 
-from camera_ui_ml import detect_plates
+from camera_ui_ml import detect_plates, reset_stored_settings
 from camera_ui_sdk import (
     JsonSchema,
     LicensePlateDetectorSensor,
@@ -12,7 +12,14 @@ from camera_ui_sdk import (
     VideoFrameData,
 )
 
-from defaults import DEFAULT_LPD_DETECTOR, DEFAULT_OCR, LPD_DETECTOR_MODELS, OCR_MODELS
+from defaults import (
+    DEFAULT_LPD_DETECTOR,
+    DEFAULT_OCR,
+    DEFAULT_OPTION,
+    LPD_DETECTOR_MODELS,
+    OCR_MODELS,
+    resolve_model,
+)
 
 if TYPE_CHECKING:
     from camera_ui_sdk import LoggerService
@@ -46,9 +53,9 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
                 "title": "Detector Model",
                 "description": "YOLOv9 model for plate detection",
                 "group": "License Plate",
-                "enum": list(LPD_DETECTOR_MODELS.keys()),
+                "enum": [DEFAULT_OPTION, *LPD_DETECTOR_MODELS],
                 "store": True,
-                "defaultValue": DEFAULT_LPD_DETECTOR,
+                "defaultValue": DEFAULT_OPTION,
                 "required": True,
                 "onSet": self._on_change_detector,
             },
@@ -58,9 +65,9 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
                 "title": "OCR Model",
                 "description": "CCT model for plate text recognition",
                 "group": "License Plate",
-                "enum": OCR_MODELS,
+                "enum": [DEFAULT_OPTION, *OCR_MODELS],
                 "store": True,
-                "defaultValue": DEFAULT_OCR,
+                "defaultValue": DEFAULT_OPTION,
                 "required": True,
                 "onSet": self._on_change_ocr,
             },
@@ -77,11 +84,20 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
                 "step": 0.05,
                 "required": True,
             },
+            {
+                "type": "button",
+                "key": "reset_defaults",
+                "title": "Reset to Defaults",
+                "description": "Reset all settings to their default values",
+                "group": "License Plate",
+                "color": "danger",
+                "onSet": self._reset_settings,
+            },
         ]
 
     @property
     def modelSpec(self) -> ModelSpec:
-        detector_name = self.storage.values.get("detector_model", DEFAULT_LPD_DETECTOR)
+        detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
         size = LPD_DETECTOR_MODELS.get(detector_name, 384)
         return {
             "input": {"width": size, "height": size, "format": "rgb"},
@@ -89,8 +105,8 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
         }
 
     async def detectLicensePlates(self, frames: list[VideoFrameData]) -> list[LicensePlateResult]:
-        detector_name = self.storage.values.get("detector_model", DEFAULT_LPD_DETECTOR)
-        ocr_name = self.storage.values.get("ocr_model", DEFAULT_OCR)
+        detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
+        ocr_name = resolve_model(self.storage.values.get("ocr_model"), DEFAULT_OCR)
         threshold = self.storage.values.get("confidence_threshold", 0.3)
 
         detector = self._plugin.plate_detectors.get(detector_name)
@@ -105,8 +121,8 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
         pass
 
     async def on_start(self) -> None:
-        detector_name = self.storage.values.get("detector_model", DEFAULT_LPD_DETECTOR)
-        ocr_name = self.storage.values.get("ocr_model", DEFAULT_OCR)
+        detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
+        ocr_name = resolve_model(self.storage.values.get("ocr_model"), DEFAULT_OCR)
         await asyncio.gather(
             self._plugin.get_plate_detector(detector_name),
             self._plugin.get_ocr(ocr_name),
@@ -114,10 +130,14 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
 
     async def _on_change_detector(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_plate_detector(new_model)
+            await self._plugin.get_plate_detector(resolve_model(new_model, DEFAULT_LPD_DETECTOR))
             self._logger.log(f"Plate detector changed to {new_model}")
 
     async def _on_change_ocr(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_ocr(new_model)
+            await self._plugin.get_ocr(resolve_model(new_model, DEFAULT_OCR))
             self._logger.log(f"OCR model changed to {new_model}")
+
+    async def _reset_settings(self) -> None:
+        await reset_stored_settings(self.storage)
+        self._logger.log("Settings reset to defaults")

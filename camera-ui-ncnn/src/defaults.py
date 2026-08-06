@@ -17,6 +17,11 @@ OBJECT_MODELS: dict[str, int] = {
 
 FACE_DETECTOR_MODELS: dict[str, int] = {
     "yolo-v9-t-320-faces": 320,
+    "yolo-v9-s-320-faces": 320,
+    "yolo-v9-m-320-faces": 320,
+    "yolo-v9-t-640-faces": 640,
+    "yolo-v9-s-640-faces": 640,
+    "yolo-v9-m-640-faces": 640,
 }
 
 LPD_DETECTOR_MODELS: dict[str, int] = {
@@ -60,3 +65,9 @@ OBJECT_LABELS: dict[int, DetectionLabel] = {0: "person", 1: "vehicle", 2: "anima
 
 # NCNN runs on Vulkan when available (GPU) and falls back to CPU otherwise.
 DEFAULT_USE_VULKAN = True
+
+DEFAULT_OPTION = "default"
+
+
+def resolve_model(name: str | None, fallback: str) -> str:
+    return fallback if not name or name == DEFAULT_OPTION else name

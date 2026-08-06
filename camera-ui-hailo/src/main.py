@@ -4,7 +4,7 @@ import asyncio
 import shutil
 from typing import Any
 
-from camera_ui_ml import normalize_box
+from camera_ui_ml import normalize_box, reset_stored_settings
 from camera_ui_sdk import (
     API_EVENT,
     BasePlugin,
@@ -23,8 +23,10 @@ from camera_ui_sdk import (
 from defaults import (
     COCO_TO_CLASS,
     DEFAULT_OBJECT_MODEL,
+    DEFAULT_OPTION,
     OBJECT_LABELS,
     OBJECT_MODELS,
+    resolve_model,
 )
 from detector import HailoDetector
 from model_manager import HailoModelManager
@@ -82,6 +84,14 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
             },
             {
                 "type": "button",
+                "key": "reset_defaults",
+                "title": "Reset to Defaults",
+                "description": "Reset all plugin settings to their default values",
+                "color": "danger",
+                "onSet": self._reset_settings,
+            },
+            {
+                "type": "button",
                 "key": "redownload_models",
                 "title": "Re-download Models",
                 "description": "Clear the local model cache and download the latest models again.",
@@ -123,8 +133,8 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
                 "title": "Model",
                 "description": "YOLO model for testing",
                 "required": True,
-                "defaultValue": DEFAULT_OBJECT_MODEL,
-                "enum": list(OBJECT_MODELS.keys()),
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *OBJECT_MODELS],
                 "store": False,
             },
         ]
@@ -132,7 +142,7 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
     async def testObjectDetection(
         self, image_data: bytes, metadata: ImageMetadata, config: dict[str, Any]
     ) -> ObjectDetectionPluginResponse | None:
-        model_name: str = config.get("model", DEFAULT_OBJECT_MODEL)
+        model_name: str = resolve_model(config.get("model"), DEFAULT_OBJECT_MODEL)
         detector = await self.get_object_detector(model_name)
         if not detector.initialized:
             return None
@@ -151,7 +161,7 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
     async def detectObjects(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
     ) -> ObjectDetectionPluginResponse | None:
-        model_name = (config or {}).get("model", DEFAULT_OBJECT_MODEL)
+        model_name = resolve_model((config or {}).get("model"), DEFAULT_OBJECT_MODEL)
         detector = await self.get_object_detector(model_name)
         if not detector.initialized:
             return None
@@ -202,6 +212,10 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
         await self._close_all()
         self.model_manager.reset()
         await asyncio.gather(*(self.get_object_detector(n) for n in obj), return_exceptions=True)
+
+    async def _reset_settings(self) -> None:
+        await reset_stored_settings(self.storage)
+        self.logger.log("Settings reset to defaults")
 
     async def _redownload_models(self, _new: object = None, _old: object = None) -> None:
         self.logger.log("Re-downloading models (clearing cache)...")
