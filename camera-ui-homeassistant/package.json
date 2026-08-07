@@ -23,7 +23,7 @@
     "ws": "^8.21.2"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.78",
+    "@camera.ui/cli": "^0.0.79",
     "@camera.ui/sdk": "^1.2.6",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.1.2",
