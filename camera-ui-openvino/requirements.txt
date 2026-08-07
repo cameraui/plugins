@@ -1,4 +1,4 @@
-openvino==2026.2.1
+openvino==2026.3.0
 camera-ui-sdk==1.2.6
 camera-ui-ml==1.2.8
 numpy==2.4.6
