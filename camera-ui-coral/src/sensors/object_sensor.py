@@ -90,8 +90,9 @@ class CoralObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
 
     async def _on_change_model(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_object_detector(resolve_model(new_model, DEFAULT_OBJECT_MODEL))
-            self._logger.log(f"Object model changed to {new_model}")
+            resolved = resolve_model(new_model, DEFAULT_OBJECT_MODEL)
+            await self._plugin.get_object_detector(resolved)
+            self._logger.log(f"Object model changed to {resolved}")
 
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)

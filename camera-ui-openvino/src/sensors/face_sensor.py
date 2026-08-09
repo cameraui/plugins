@@ -127,13 +127,15 @@ class OpenVinoFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
 
     async def _on_change_detector(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_face_detector(resolve_model(new_model, DEFAULT_FACE_DETECTOR))
-            self._logger.log(f"Face detector changed to {new_model}")
+            resolved = resolve_model(new_model, DEFAULT_FACE_DETECTOR)
+            await self._plugin.get_face_detector(resolved)
+            self._logger.log(f"Face detector changed to {resolved}")
 
     async def _on_change_embedder(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_face_embedder(resolve_model(new_model, DEFAULT_FACE_EMBEDDER))
-            self._logger.log(f"Face embedder changed to {new_model}")
+            resolved = resolve_model(new_model, DEFAULT_FACE_EMBEDDER)
+            await self._plugin.get_face_embedder(resolved)
+            self._logger.log(f"Face embedder changed to {resolved}")
 
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)

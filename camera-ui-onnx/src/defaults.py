@@ -55,7 +55,7 @@ OCR_MODELS: list[str] = [
 
 DEFAULT_OBJECT_MODEL = "yolo-v9-s-320"
 
-DEFAULT_FACE_DETECTOR = "yolo-v9-t-320-faces"
+DEFAULT_FACE_DETECTOR = "yolo-v9-s-320-faces"
 DEFAULT_FACE_EMBEDDER = "facenet-inceptionresnetv1-512"
 
 DEFAULT_LPD_DETECTOR = "yolo-v9-t-384-license-plates"

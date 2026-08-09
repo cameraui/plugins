@@ -88,9 +88,11 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
         await self._plugin.get_clip_encoder(model_name)
 
-    async def _on_change_model(self, _old: str, new: str) -> None:
-        self._logger.log(f"Switching CLIP vision model to {new}")
-        await self._plugin.get_clip_encoder(resolve_model(new, DEFAULT_CLIP_VISION))
+    async def _on_change_model(self, new_model: str, _old_model: str) -> None:
+        if new_model != _old_model:
+            resolved = resolve_model(new_model, DEFAULT_CLIP_VISION)
+            await self._plugin.get_clip_encoder(resolved)
+            self._logger.log(f"CLIP vision model changed to {resolved}")
 
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)

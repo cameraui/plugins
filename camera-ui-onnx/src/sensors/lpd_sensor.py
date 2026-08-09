@@ -130,13 +130,15 @@ class ONNXLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
 
     async def _on_change_detector(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_plate_detector(resolve_model(new_model, DEFAULT_LPD_DETECTOR))
-            self._logger.log(f"Plate detector changed to {new_model}")
+            resolved = resolve_model(new_model, DEFAULT_LPD_DETECTOR)
+            await self._plugin.get_plate_detector(resolved)
+            self._logger.log(f"Plate detector changed to {resolved}")
 
     async def _on_change_ocr(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
-            await self._plugin.get_ocr(resolve_model(new_model, DEFAULT_OCR))
-            self._logger.log(f"OCR model changed to {new_model}")
+            resolved = resolve_model(new_model, DEFAULT_OCR)
+            await self._plugin.get_ocr(resolved)
+            self._logger.log(f"OCR model changed to {resolved}")
 
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
