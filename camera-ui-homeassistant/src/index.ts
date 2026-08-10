@@ -3,7 +3,7 @@ import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 import { commandToService } from './controls.js';
 import { HaClient, resolveTarget } from './ha.js';
 import { HaNotifier } from './notifier.js';
-import { applyEntityState, createImportedSensor } from './sensors.js';
+import { applyEntityState, createImportedSensor, isImportableEntity } from './sensors.js';
 
 import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice, NotifierInterface, PluginAPI } from '@camera.ui/sdk';
 import type { ImportedSensor } from './sensors.js';
@@ -25,7 +25,9 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   private skippedLogged = new Set<string>();
   private ownEntities = new Set<string>();
   private guardLoaded = false;
+  private syncLogged = false;
   private resyncTimer?: NodeJS.Timeout;
+  private resyncInterval?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
   private notifier = new HaNotifier(this.storage, this.logger, () => this.client);
 
@@ -126,9 +128,14 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       () => this.syncEntities(),
     );
     this.client.connect();
+    this.resyncInterval = setInterval(() => this.syncEntities(), 15 * 60_000);
   }
 
   private async stop(): Promise<void> {
+    if (this.resyncTimer) clearTimeout(this.resyncTimer);
+    this.resyncTimer = undefined;
+    if (this.resyncInterval) clearInterval(this.resyncInterval);
+    this.resyncInterval = undefined;
     this.client?.stop();
     this.client = undefined;
   }
@@ -151,6 +158,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       const states = await client.fetchStates();
       await this.notifier.refreshTargets(states);
 
+      const before = new Set(this.imported.keys());
+
       for (const [entityId, imported] of this.imported) {
         if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) {
           this.imported.delete(entityId);
@@ -158,12 +167,18 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
         }
       }
 
-      let importedCount = 0;
       for (const state of states) {
         if (!this.guardLoaded && !this.imported.has(state.entity_id)) continue;
-        if (this.applyOrImport(state, false)) importedCount++;
+        this.applyOrImport(state, false);
       }
-      this.logger.log(`Home Assistant sync: ${importedCount} entities imported as sensors`);
+
+      const added = [...this.imported.keys()].filter((entityId) => !before.has(entityId)).length;
+      const removed = [...before].filter((entityId) => !this.imported.has(entityId)).length;
+      if (!this.syncLogged || added > 0 || removed > 0) {
+        this.syncLogged = true;
+        const changes = [added > 0 ? `${added} added` : '', removed > 0 ? `${removed} removed` : ''].filter(Boolean).join(', ');
+        this.logger.log(`Home Assistant sync: ${this.imported.size} entities imported as sensors${changes ? ` (${changes})` : ''}`);
+      }
     } catch (error) {
       this.logger.error('Home Assistant sync failed:', error);
     }
@@ -190,6 +205,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       return;
     }
 
+    if (this.ownEntities.has(state.entity_id) || this.isExcluded(state.entity_id)) return;
+    if (this.guardLoaded && !isImportableEntity(state)) return;
     this.scheduleResync();
   }
 

@@ -37,6 +37,10 @@ export type ImportedSensor =
   | { kind: 'doorbell'; sensor: DoorbellTrigger; lastEventState?: string }
   | { kind: 'control'; controlKind: ControlKind; sensor: HaControl };
 
+export function isImportableEntity(state: HaState): boolean {
+  return controlKindForEntity(state) !== undefined || mapEntity(state) !== undefined;
+}
+
 export function createImportedSensor(state: HaState, commandFor: (kind: ControlKind) => CommandFn): ImportedSensor | undefined {
   const name = entityDisplayName(state);
   const nativeId = state.entity_id;
