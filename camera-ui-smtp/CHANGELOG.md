@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- Updated camera.ui engine
+
 ## [1.2.0]
 
 - The port field now enforces the valid range (1-65535)

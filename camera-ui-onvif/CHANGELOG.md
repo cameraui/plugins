@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- Updated camera.ui engine
+
 ## [1.2.0]
 
 - Short motion pulses from thingino cameras no longer slip through. These cameras only report the latest motion state per poll, and the plugin used to spend a request between polls in exactly the moment a one-second motion could start and end, so most triggers collapsed into nothing. Polling now runs back to back during activity

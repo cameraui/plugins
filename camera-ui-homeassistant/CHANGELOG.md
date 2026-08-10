@@ -1,3 +1,8 @@
+## [1.0.8]
+
+- The "entities imported" sync log only appears at startup and when entities were actually added or removed, instead of repeating every few minutes.
+- Updated camera.ui engine
+
 ## [1.0.7]
 
 - **Fixed the connection inside the Home Assistant add-on.** The add-on was missing the Home Assistant API permission, so the automatic connection was always rejected with "rejected the access token". Update the camera.ui add-on to 0.1.7 and the connection works without any configuration again.

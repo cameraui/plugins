@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- Updated camera.ui engine
+
 ## [1.2.0]
 
 - Blur and dilation in the test form only step through odd values now, matching what the detector accepts

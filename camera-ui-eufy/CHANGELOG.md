@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- Updated camera.ui engine
+
 ## [1.2.0]
 
 - The live stream duration field steps in 10s increments

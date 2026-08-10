@@ -1,7 +1,7 @@
 {
   "displayName": "YAMNet Audio Detection",
   "name": "@camera.ui/camera-ui-audio-yamnet",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Audio event detection for camera.ui. Classifies sounds from camera audio streams using the YAMNet model.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
@@ -31,7 +31,7 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.0.23",
+    "camera.ui": ">=2.1.4",
     "node": ">=22.0.0"
   },
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-audio-yamnet#readme",

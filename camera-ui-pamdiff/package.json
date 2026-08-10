@@ -1,7 +1,7 @@
 {
   "displayName": "Pam Diff",
   "name": "@camera.ui/camera-ui-pamdiff",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Pixel-based motion detection for camera.ui using the pam-diff algorithm on ffmpeg PAM frames.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
@@ -43,7 +43,7 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.0.23",
+    "camera.ui": ">=2.1.4",
     "node": ">=22.0.0"
   },
   "os": [],

@@ -1,3 +1,7 @@
+## [1.2.1]
+
+- Updated camera.ui engine
+
 ## [1.2.0]
 
 - Bump camera.ui SDK, requires camera.ui 2.0.23 or newer

@@ -1,3 +1,7 @@
+## [1.2.5]
+
+- Updated camera.ui engine
+
 ## [1.2.4]
 
 - A stale network address no longer kills the bridge. When camera.ui is bound to an address the machine does not have anymore (changed IP, old config), the bridge and camera accessories now skip that address with a warning and publish on the remaining ones, instead of failing to start.

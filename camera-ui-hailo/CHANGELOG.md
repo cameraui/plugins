@@ -1,3 +1,7 @@
+## [1.2.2]
+
+- Updated camera.ui engine
+
 ## [1.2.1]
 
 - **A "Reset to Defaults" button in every settings section.** One click puts all values of that section back to the defaults, models included.

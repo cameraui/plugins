@@ -1,3 +1,7 @@
+## [1.2.2]
+
+- Updated camera.ui engine
+
 ## [1.2.1]
 
 - Wyze cameras record again. The plugin never reported its cameras as online, so the NVR kept deferring the recording ("Camera not connected") and the frame worker stayed down
