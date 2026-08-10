@@ -1,7 +1,7 @@
 {
   "displayName": "HomeKit",
   "name": "@camera.ui/camera-ui-homekit",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Exposes camera.ui cameras and sensors to Apple HomeKit: cameras stream and record via HomeKit Secure Video, sensors appear as accessories in the Home app.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
