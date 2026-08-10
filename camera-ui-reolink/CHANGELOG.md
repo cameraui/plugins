@@ -1,3 +1,8 @@
+## [1.2.5]
+
+- No more corrupted video frames when the system is briefly overloaded. A lost piece of the camera stream was patched over with the wrong bytes and could show up as decoder errors and picture glitches; the stream now restarts cleanly instead
+- When the video queue overflows under load, the picture now pauses briefly and resumes at the next keyframe instead of dropping random frames that left every viewer with a broken image. Audio keeps running through the pause
+
 ## [1.2.4]
 
 - The event listener stays up as long as the connection does. It used to be torn down and rebuilt every five minutes, and a detection that landed in that moment was lost
