@@ -25,12 +25,12 @@
     "as-wasi": "^0.6.0"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.84",
-    "@camera.ui/sdk": "^1.2.15",
+    "@camera.ui/cli": "^0.0.85",
+    "@camera.ui/sdk": "^1.2.16",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "26.2.0",
-    "@typescript-eslint/parser": "^8.66.0",
+    "@typescript-eslint/parser": "^8.67.0",
     "assemblyscript": "^0.28.20",
     "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
@@ -42,7 +42,7 @@
     "set-interval-async": "^3.0.3",
     "sharp": "^0.35.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.66.0",
+    "typescript-eslint": "^8.67.0",
     "updates": "^18.0.0"
   },
   "bugs": {

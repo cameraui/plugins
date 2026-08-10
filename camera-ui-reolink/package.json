@@ -21,8 +21,8 @@
     "update": "updates --update ./"
   },
   "devDependencies": {
-    "@camera.ui/cli": "~0.0.84",
-    "@camera.ui/sdk": "~1.2.15",
+    "@camera.ui/cli": "~0.0.85",
+    "@camera.ui/sdk": "~1.2.16",
     "@types/node": "^26.2.0",
     "cross-env": "^10.1.0",
     "rimraf": "^6.1.3",
