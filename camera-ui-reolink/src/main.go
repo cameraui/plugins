@@ -20,6 +20,7 @@ const (
 	defaultWebhookPort = 8557
 	adoptProbeTimeout  = 20 * time.Second
 	storageKeyNVRs     = "nvrs"
+	storageKeyDuals    = "dualLensCameras"
 	presenceGrace      = 5 * time.Minute
 	discoverySettle    = 2 * time.Second
 	discoveryRetryWait = 30 * time.Second
@@ -37,6 +38,7 @@ type ReolinkPlugin struct {
 	discovered      map[string]discoveredEntry   // discovery ID → device (+ NVR channel)
 	lastSeen        map[string]time.Time         // discovery ID → last discovery reply
 	nvrs            map[string]storedNVR         // base discovery ID → connected NVR
+	duals           map[string]storedNVR         // base discovery ID → dual-lens camera, tele channels
 	pendingSettings map[string]cameraSettings
 }
 
@@ -44,6 +46,7 @@ type discoveredEntry struct {
 	device  baichuan.DiscoveredDevice
 	channel int
 	manual  bool
+	tele    bool
 }
 
 type storedNVR struct {
@@ -85,6 +88,7 @@ func NewPlugin(logger *sdk.Logger, api *sdk.PluginAPI, storage *sdk.DeviceStorag
 		discovered:      make(map[string]discoveredEntry),
 		lastSeen:        make(map[string]time.Time),
 		nvrs:            make(map[string]storedNVR),
+		duals:           make(map[string]storedNVR),
 		pendingSettings: make(map[string]cameraSettings),
 	}
 
@@ -243,8 +247,42 @@ func (p *ReolinkPlugin) persistNVRs() {
 	}
 }
 
+func (p *ReolinkPlugin) loadDuals() {
+	raw, _ := p.Storage.GetValue(storageKeyDuals).(string)
+	if raw == "" {
+		return
+	}
+
+	var duals map[string]storedNVR
+	if err := json.Unmarshal([]byte(raw), &duals); err != nil {
+		p.Logger.Warn("Failed to parse stored dual-lens cameras:", err)
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.duals = duals
+	for baseID, dual := range duals {
+		device := baichuan.DiscoveredDevice{IP: dual.IP, UID: dual.UID, Name: dual.Name}
+		for _, ch := range dual.Channels {
+			p.discovered[fmt.Sprintf("%s:ch%d", baseID, ch)] = discoveredEntry{device: device, channel: ch, manual: dual.Manual, tele: true}
+		}
+	}
+}
+
+func (p *ReolinkPlugin) persistDuals() {
+	raw, err := json.Marshal(p.duals)
+	if err != nil {
+		return
+	}
+	if err := p.Storage.SetValue(storageKeyDuals, string(raw)); err != nil {
+		p.Logger.Warn("Failed to persist dual-lens cameras:", err)
+	}
+}
+
 func (p *ReolinkPlugin) start() {
 	p.loadNVRs()
+	p.loadDuals()
 
 	port := defaultRTSPPort
 	if v, ok := toInt(p.Storage.GetValue("rtspPort", defaultRTSPPort)); ok && v > 0 {
@@ -416,6 +454,11 @@ func (p *ReolinkPlugin) OnDiscoverCameras() ([]sdk.DiscoveredCamera, error) {
 		if _, ok := adopted[id]; ok {
 			continue
 		}
+		if entry.tele {
+			if _, ok := adopted[baseDiscoveryID(id)]; !ok {
+				continue
+			}
+		}
 		if !entry.manual {
 			presenceID := id
 			if entry.channel >= 0 {
@@ -437,9 +480,13 @@ func (p *ReolinkPlugin) OnGetCameraSettings(camera sdk.DiscoveredCamera) ([]sdk.
 
 	p.mu.Lock()
 	if entry, ok := p.discovered[camera.ID]; ok && entry.channel >= 0 {
-		if nvr, ok := p.nvrs[baseDiscoveryID(camera.ID)]; ok {
+		baseID := baseDiscoveryID(camera.ID)
+		if nvr, ok := p.nvrs[baseID]; ok {
 			username = nvr.Username
 			password = nvr.Password
+		} else if dual, ok := p.duals[baseID]; ok {
+			username = dual.Username
+			password = dual.Password
 		}
 	}
 	p.mu.Unlock()
@@ -558,6 +605,10 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 		}
 	}
 
+	if entry.channel < 0 && probe.loginInfo.IsDualLens() {
+		p.registerTeleLenses(camera.ID, entry, username, password, probe.loginInfo.ChannelNum)
+	}
+
 	p.Logger.Log("Adopted camera:", name)
 
 	return map[string]any{
@@ -624,6 +675,44 @@ func (p *ReolinkPlugin) expandNVR(camera sdk.DiscoveredCamera, nvrEntry discover
 
 	p.Logger.Log(fmt.Sprintf("NVR %s expanded into %d channel camera(s)", camera.Name, len(entries)))
 	return fmt.Errorf("NVR detected: %d channel camera(s) were added to the discovered list — adopt each channel individually (credentials are prefilled)", len(entries))
+}
+
+func (p *ReolinkPlugin) registerTeleLenses(baseID string, baseEntry discoveredEntry, username string, password string, channelNum int) {
+	channels := make([]int, 0, max(channelNum-1, 0))
+	for ch := 1; ch < channelNum; ch++ {
+		channels = append(channels, ch)
+	}
+	if len(channels) == 0 {
+		return
+	}
+	device := baseEntry.device
+
+	p.mu.Lock()
+	p.duals[baseID] = storedNVR{
+		Username: username,
+		Password: password,
+		IP:       device.IP,
+		UID:      device.UID,
+		Name:     device.Name,
+		Manual:   baseEntry.manual,
+		Channels: channels,
+	}
+	p.persistDuals()
+
+	entries := make([]sdk.DiscoveredCamera, 0, len(channels))
+	for _, ch := range channels {
+		chID := fmt.Sprintf("%s:ch%d", baseID, ch)
+		chEntry := discoveredEntry{device: device, channel: ch, manual: baseEntry.manual, tele: true}
+		p.discovered[chID] = chEntry
+		entries = append(entries, discoveredCameraFrom(chID, chEntry))
+	}
+	p.mu.Unlock()
+
+	if err := p.API.DeviceManager.PushDiscoveredCameras(entries); err != nil {
+		p.Logger.Warn("Failed to push tele lens camera:", err)
+		return
+	}
+	p.Logger.Log(fmt.Sprintf("%s is a dual-lens camera, its tele lens was added to the discovered list", device.Name))
 }
 
 type probeResult struct {
@@ -735,7 +824,9 @@ func discoveredCameraFrom(id string, entry discoveredEntry) sdk.DiscoveredCamera
 	if name == "" {
 		name = "Reolink " + entry.device.IP
 	}
-	if entry.channel >= 0 {
+	if entry.tele {
+		name += " Tele"
+	} else if entry.channel >= 0 {
 		name = fmt.Sprintf("%s CH%d", name, entry.channel+1)
 	}
 	return sdk.DiscoveredCamera{

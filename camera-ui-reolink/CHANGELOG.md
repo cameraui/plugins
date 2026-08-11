@@ -1,3 +1,9 @@
+## [1.2.7]
+
+- Live streams run close to realtime now. Every stream used to be delayed by a fixed buffer before it left the plugin; that buffer is gone and frames are passed on the moment the camera sends them
+- A hiccup in the camera's clock no longer causes a frozen picture or a jump; the stream keeps its steady pace and audio stays in sync
+- Dual-lens cameras (TrackMix, RLC-81MA) can stream their tele lens. Adopt the camera and the tele lens appears in the discovered list as its own camera, with credentials prefilled
+
 ## [1.2.5]
 
 - No more corrupted video frames when the system is briefly overloaded. A lost piece of the camera stream was patched over with the wrong bytes and could show up as decoder errors and picture glitches; the stream now restarts cleanly instead
