@@ -92,6 +92,7 @@ func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 		return err
 	}
 	c.bridgeCam = bridgeCam
+	c.watchLiveCatchUp()
 
 	if err := c.dev.Implement(&cameraImplementation{cam: c}); err != nil {
 		return err
@@ -101,6 +102,21 @@ func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 	}
 	c.subscribeEvents()
 	return nil
+}
+
+func (c *reolinkCamera) watchLiveCatchUp() {
+	schema := liveCatchUpSchema(func(newValue, _ any) any {
+		seconds, ok := toInt(newValue)
+		if !ok {
+			return newValue
+		}
+		c.bridgeCam.SetLiveCatchUp(time.Duration(seconds) * time.Second)
+		c.logger.Log("Catch up to live set to", seconds, "seconds")
+		return newValue
+	})
+	if err := c.dev.Storage().ChangeSchema(storageKeyLiveCatchUp, &schema); err != nil {
+		c.logger.Warn("Failed to make the catch-up setting live:", err)
+	}
 }
 
 func (c *reolinkCamera) release(b *bridge.Bridge) {
@@ -435,6 +451,21 @@ const (
 // cameras adopted before the setting existed.
 const defaultLiveCatchUpSeconds = 3
 
+func liveCatchUpSchema(onSet func(newValue, oldValue any) any) sdk.JsonSchema {
+	storeTrue := true
+	return sdk.JsonSchema{
+		Type:         sdk.JsonSchemaTypeNumber,
+		Key:          storageKeyLiveCatchUp,
+		Title:        "Catch Up To Live (seconds)",
+		Description:  "A camera that cannot send its video in time falls behind. Once the picture trails live by this many seconds, the old pictures are skipped and the stream continues at the next full frame. Skipped seconds are missing from recordings too, so set 0 to keep everything and accept the delay.",
+		DefaultValue: defaultLiveCatchUpSeconds,
+		Minimum:      sdk.Float64(0),
+		Maximum:      sdk.Float64(60),
+		Store:        &storeTrue,
+		OnSet:        onSet,
+	}
+}
+
 func ensureStorageSchemas(storage *sdk.DeviceStorage) {
 	storeTrue := true
 	storage.DefineSchemas([]sdk.JsonSchema{
@@ -548,14 +579,7 @@ func ensureStorageSchemas(storage *sdk.DeviceStorage) {
 			Hidden: true,
 			Store:  &storeTrue,
 		},
-		{
-			Type:         sdk.JsonSchemaTypeNumber,
-			Key:          storageKeyLiveCatchUp,
-			Title:        "Catch Up To Live (seconds)",
-			Description:  "A camera that cannot send its video in time falls behind. Once the picture trails live by this many seconds, the old pictures are skipped and the stream continues at the next full frame. Skipped seconds are missing from recordings too, so set 0 to keep everything and accept the delay. Changes apply after a plugin restart.",
-			DefaultValue: defaultLiveCatchUpSeconds,
-			Store:        &storeTrue,
-		},
+		liveCatchUpSchema(nil),
 	})
 }
 
