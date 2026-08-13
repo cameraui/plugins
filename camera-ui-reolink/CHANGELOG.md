@@ -1,5 +1,7 @@
 ## [1.2.8]
 
+- PTZ cameras show their saved positions. The presets you set up in the Reolink app appear in the PTZ controls and moving to one is a click; the list is re-read every minute, so renamed or newly added presets show up on their own
+
 - Cameras no longer show up as offline over a shaky network. A busy camera answers the connection check late because its reply waits behind the video, and that was counted as a dead camera. Video arriving on the connection now counts as proof that the camera is there, and a camera gets 30 seconds to come back before it is reported offline
 - One stuttering stream no longer drops the whole camera. A stream that goes quiet is restarted on its own, events and the other streams keep running
 - A camera that cannot deliver its video in time no longer leaves the live view stuck seconds in the past. The stream skips the old pictures and continues at the next full frame, so the live view stays live. The new camera setting "Catch Up To Live" sets how many seconds the picture may trail before that happens and takes effect right away; skipped seconds are missing from recordings too, so set it to 0 to keep every frame and accept the delay

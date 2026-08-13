@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -102,10 +103,19 @@ func (s *reolinkSpotlight) UpdateValue(property string, value any) error {
 	return s.LightControl.UpdateValue(property, value)
 }
 
+const presetRefreshInterval = time.Minute
+
 type reolinkPTZ struct {
 	*sdk.PTZControl
 	cam         *reolinkCamera
 	unsupported atomic.Bool
+	baseCaps    []string
+
+	presetMu  sync.Mutex
+	presetIDs map[string]int
+
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func newReolinkPTZ(cam *reolinkCamera) *reolinkPTZ {
@@ -125,8 +135,112 @@ func newReolinkPTZ(cam *reolinkCamera) *reolinkPTZ {
 	if cam.settings.PTZZoom {
 		caps = append(caps, string(sdk.PTZCapabilityZoom))
 	}
+	s.baseCaps = caps
 	s.SetCapabilities(caps)
 	return s
+}
+
+func (s *reolinkPTZ) OnStart() {
+	s.stop = make(chan struct{})
+	go func() {
+		s.refreshPresets()
+
+		ticker := time.NewTicker(presetRefreshInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.stop:
+				return
+			case <-ticker.C:
+				s.refreshPresets()
+			}
+		}
+	}()
+}
+
+func (s *reolinkPTZ) OnStop() {
+	s.stopOnce.Do(func() {
+		if s.stop != nil {
+			close(s.stop)
+		}
+	})
+}
+
+func (s *reolinkPTZ) refreshPresets() {
+	if s.unsupported.Load() {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
+	defer cancel()
+
+	presets, err := s.cam.bridgeCam.PTZPresets(ctx)
+	if err != nil {
+		s.cam.logger.Debug("Failed to read PTZ presets:", err)
+		return
+	}
+
+	names := make([]string, 0, len(presets))
+	ids := make(map[string]int, len(presets))
+	for _, preset := range presets {
+		// a duplicate name would make one of them unreachable
+		if _, taken := ids[preset.Name]; taken {
+			continue
+		}
+		ids[preset.Name] = preset.ID
+		names = append(names, preset.Name)
+	}
+
+	s.presetMu.Lock()
+	s.presetIDs = ids
+	s.presetMu.Unlock()
+
+	if !equalStrings(names, s.GetPresets()) {
+		s.SetPresets(names)
+		s.cam.logger.Debug("PTZ presets:", names)
+	}
+
+	caps := s.baseCaps
+	if len(names) > 0 {
+		caps = append(append([]string(nil), s.baseCaps...), string(sdk.PTZCapabilityPresets))
+	}
+	if !equalStrings(caps, s.GetCapabilities()) {
+		s.SetCapabilities(caps)
+	}
+}
+
+func (s *reolinkPTZ) SetTargetPreset(name string) {
+	if name == "" {
+		return
+	}
+
+	s.presetMu.Lock()
+	id, ok := s.presetIDs[name]
+	s.presetMu.Unlock()
+	if !ok {
+		s.cam.logger.Warn("Unknown PTZ preset:", name)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
+	defer cancel()
+	if err := s.cam.bridgeCam.PTZPreset(ctx, id); err != nil {
+		s.cam.logger.Error("Failed to move to PTZ preset", name, ":", err)
+		return
+	}
+	s.PTZControl.SetTargetPreset(name)
+}
+
+func equalStrings(a []string, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *reolinkPTZ) SetVelocity(value sdk.PTZDirection) {
@@ -154,9 +268,15 @@ func (s *reolinkPTZ) SetVelocity(value sdk.PTZDirection) {
 }
 
 func (s *reolinkPTZ) UpdateValue(property string, value any) error {
-	if property == "velocity" {
+	switch property {
+	case "velocity":
 		if direction, ok := toPTZDirection(value); ok {
 			s.SetVelocity(direction)
+			return nil
+		}
+	case "targetPreset":
+		if name, ok := value.(string); ok {
+			s.SetTargetPreset(name)
 			return nil
 		}
 	}
