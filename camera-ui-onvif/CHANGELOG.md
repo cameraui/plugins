@@ -1,3 +1,8 @@
+## [1.2.3]
+
+- Driving to a PTZ preset works again. Most cameras name a preset differently from the id they store it under, and the plugin sent the name, so the camera answered that the preset does not exist
+- Presets you add or rename in the camera's own app show up within a minute. Previously the list was read once at startup and a new preset needed a plugin restart
+
 ## [1.2.1]
 
 - Updated camera.ui engine

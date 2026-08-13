@@ -5,6 +5,7 @@ import type { Onvif, PTZStatus } from '@seydx/onvif';
 
 const POLL_INTERVAL_MS = 200;
 const POLL_BACKOFF_MAX_MS = 30_000;
+const PRESET_REFRESH_INTERVAL_MS = 60_000;
 const POSITION_EPSILON = 0.001;
 const IDLE_POLLS_TO_STOP = 3;
 const FAST_PATH_GRACE_MS = 1500;
@@ -13,11 +14,17 @@ const FAST_PATH_GRACE_MS = 1500;
 // HALF the frame (SDK deltas are full frame fractions, hence the ×2 mapping)
 const FOV_TRANSLATION_SPACE = 'http://www.onvif.org/ver10/tptz/PanTiltSpaces/TranslationSpaceFov';
 
+function clamp(value: number): number {
+  return Math.max(-1, Math.min(1, value));
+}
+
 export class OnvifPTZSensor extends PTZControl {
   private device: Onvif;
   private cameraDevice: CameraDevice;
 
   private pollingTimer?: NodeJS.Timeout;
+  private presetTimer?: NodeJS.Timeout;
+  private presetTokens = new Map<string, string>();
   private pollInFlight = false;
   private pollErrorStreak = 0;
   private pollBackoffUntilTs = 0;
@@ -77,12 +84,19 @@ export class OnvifPTZSensor extends PTZControl {
     this.pollingTimer = setInterval(() => {
       this.pollStatus();
     }, POLL_INTERVAL_MS);
+    this.presetTimer = setInterval(() => {
+      this.refreshPresets();
+    }, PRESET_REFRESH_INTERVAL_MS);
   }
 
   protected override onStop(): void {
     if (this.pollingTimer) {
       clearInterval(this.pollingTimer);
       this.pollingTimer = undefined;
+    }
+    if (this.presetTimer) {
+      clearInterval(this.presetTimer);
+      this.presetTimer = undefined;
     }
     this.lastPolledPosition = undefined;
     this.idleStreak = 0;
@@ -104,16 +118,14 @@ export class OnvifPTZSensor extends PTZControl {
   }
 
   override async setPosition(position: PTZPosition): Promise<void> {
+    const target = { pan: clamp(position.pan), tilt: clamp(position.tilt), zoom: clamp(position.zoom) };
+
     try {
       await this.device.ptz.absoluteMove({
-        position: {
-          pan: position.pan,
-          tilt: position.tilt,
-          zoom: position.zoom,
-        },
+        position: target,
       });
 
-      await super.setPosition(position);
+      await super.setPosition(target);
     } catch (error) {
       if (!this.ignoreError(error)) {
         this.cameraDevice.logger.error('PTZ absoluteMove failed:', error);
@@ -163,7 +175,6 @@ export class OnvifPTZSensor extends PTZControl {
       return;
     }
 
-    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
     const x = clamp((move.panDelta ?? 0) * 2);
     const y = clamp((move.tiltDelta ?? 0) * 2);
     const zoom = clamp(move.zoomDelta ?? 0);
@@ -196,9 +207,11 @@ export class OnvifPTZSensor extends PTZControl {
       return;
     }
 
+    const presetToken = this.presetTokens.get(preset) ?? preset;
+
     try {
       await this.device.ptz.gotoPreset({
-        presetToken: preset,
+        presetToken,
       });
 
       await super.setTargetPreset(preset);
@@ -294,13 +307,9 @@ export class OnvifPTZSensor extends PTZControl {
 
     let presetsCount = 0;
     try {
-      const presetsResponse = await this.device.ptz.getPresets();
-      if (presetsResponse && Object.keys(presetsResponse).length > 0) {
+      presetsCount = await this.loadPresets();
+      if (presetsCount > 0) {
         caps.push(PTZCapability.Presets);
-        const presetsList = Object.values(presetsResponse);
-        const presetNames = presetsList.map((p: { name?: string; token?: string }) => p.name ?? p.token ?? '').filter(Boolean);
-        this.setPresets(presetNames);
-        presetsCount = presetNames.length;
       }
     } catch {
       // ignore
@@ -334,6 +343,45 @@ export class OnvifPTZSensor extends PTZControl {
 
     // Triggers broadcast to consumers.
     this.capabilities = caps;
+  }
+
+  private async loadPresets(): Promise<number> {
+    const response = await this.device.ptz.getPresets();
+    const tokens = new Map<string, string>();
+    const labels: string[] = [];
+
+    for (const preset of Object.values(response ?? {})) {
+      const token = preset.token === undefined ? undefined : String(preset.token);
+      if (!token) continue;
+      const label = preset.name && !tokens.has(preset.name) ? preset.name : token;
+      tokens.set(label, token);
+      labels.push(label);
+    }
+
+    this.presetTokens = tokens;
+
+    const current = this.presets;
+    if (labels.length !== current.length || labels.some((label, index) => label !== current[index])) {
+      this.setPresets(labels);
+    }
+
+    return labels.length;
+  }
+
+  private async refreshPresets(): Promise<void> {
+    let count: number;
+    try {
+      count = await this.loadPresets();
+    } catch {
+      return;
+    }
+
+    const advertised = this.capabilities.includes(PTZCapability.Presets);
+    if (count > 0 && !advertised) {
+      this.capabilities = [...this.capabilities, PTZCapability.Presets];
+    } else if (count === 0 && advertised) {
+      this.capabilities = this.capabilities.filter((capability) => capability !== PTZCapability.Presets);
+    }
   }
 
   private async pollStatus(): Promise<void> {
