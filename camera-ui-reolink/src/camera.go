@@ -38,6 +38,8 @@ type reolinkCamera struct {
 	connEverSet     bool
 	sleeping        bool
 	disconnectTimer *time.Timer
+
+	connGen uint64
 }
 
 func (p *ReolinkPlugin) initializeCamera(dev *sdk.CameraDevice) {
@@ -71,6 +73,7 @@ func (p *ReolinkPlugin) initializeCamera(dev *sdk.CameraDevice) {
 }
 
 func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
+	liveCatchUp := time.Duration(c.settings.LiveCatchUpSeconds) * time.Second
 	bridgeCam, err := b.AddCamera(bridge.CameraConfig{
 		Name:           c.dev.ID(),
 		Logger:         bridgeLogger{c.logger},
@@ -83,6 +86,7 @@ func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 		IdleDisconnect: true,
 		BatteryCamera:  c.settings.BatteryCamera,
 		AudioHints:     c.loadAudioHints(),
+		LiveCatchUp:    &liveCatchUp,
 	})
 	if err != nil {
 		return err
@@ -105,6 +109,7 @@ func (c *reolinkCamera) release(b *bridge.Bridge) {
 		c.disconnectTimer.Stop()
 		c.disconnectTimer = nil
 	}
+	c.connGen++
 	c.connReported = false
 	c.connMu.Unlock()
 
@@ -262,7 +267,10 @@ func (c *reolinkCamera) storeAudioHint(profile string, hint bridge.AudioHint) {
 }
 
 func (c *reolinkCamera) handleConnection(connected bool) {
-	const disconnectGrace = 10 * time.Second
+	// A dropped Baichuan session is routine: the camera often refuses a new
+	// login for a while, so a reconnect can take longer than it sounds. Only
+	// a camera that stays away this long is really offline.
+	const disconnectGrace = 30 * time.Second
 
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -272,6 +280,7 @@ func (c *reolinkCamera) handleConnection(connected bool) {
 			c.disconnectTimer.Stop()
 			c.disconnectTimer = nil
 		}
+		c.connGen++
 		if !c.connEverSet || !c.connReported {
 			c.connEverSet = true
 			c.connReported = true
@@ -283,12 +292,15 @@ func (c *reolinkCamera) handleConnection(connected bool) {
 	if c.disconnectTimer != nil {
 		return
 	}
+	gen := c.connGen
 	c.disconnectTimer = time.AfterFunc(disconnectGrace, func() {
 		c.connMu.Lock()
-		c.disconnectTimer = nil
 		// A sleeping battery camera drops the connection by design — it is
 		// standby, not offline.
-		stillReported := c.connReported && !c.sleeping
+		stillReported := gen == c.connGen && c.connReported && !c.sleeping
+		if gen == c.connGen {
+			c.disconnectTimer = nil
+		}
 		if stillReported {
 			c.connReported = false
 		}
@@ -416,7 +428,12 @@ const (
 	storageKeyHasAI         = "hasAI"
 	storageKeyChannel       = "channel"
 	storageKeyAudioHints    = "audioHints"
+	storageKeyLiveCatchUp   = "liveCatchUpSeconds"
 )
+
+// defaultLiveCatchUpSeconds matches the bridge default and is written for
+// cameras adopted before the setting existed.
+const defaultLiveCatchUpSeconds = 3
 
 func ensureStorageSchemas(storage *sdk.DeviceStorage) {
 	storeTrue := true
@@ -531,6 +548,14 @@ func ensureStorageSchemas(storage *sdk.DeviceStorage) {
 			Hidden: true,
 			Store:  &storeTrue,
 		},
+		{
+			Type:         sdk.JsonSchemaTypeNumber,
+			Key:          storageKeyLiveCatchUp,
+			Title:        "Catch Up To Live (seconds)",
+			Description:  "A camera that cannot send its video in time falls behind. Once the picture trails live by this many seconds, the old pictures are skipped and the stream continues at the next full frame. Skipped seconds are missing from recordings too, so set 0 to keep everything and accept the delay. Changes apply after a plugin restart.",
+			DefaultValue: defaultLiveCatchUpSeconds,
+			Store:        &storeTrue,
+		},
 	})
 }
 
@@ -552,6 +577,7 @@ func persistSettings(storage *sdk.DeviceStorage, settings cameraSettings) error 
 		storageKeyHasDoorbell:   settings.HasDoorbell,
 		storageKeyHasAI:         settings.HasAI,
 		storageKeyChannel:       settings.Channel,
+		storageKeyLiveCatchUp:   settings.LiveCatchUpSeconds,
 	}
 	for key, value := range values {
 		if err := storage.SetValue(key, value); err != nil {
@@ -580,6 +606,10 @@ func loadSettings(storage *sdk.DeviceStorage) cameraSettings {
 	}
 	if v, ok := toInt(storage.GetValue(storageKeyChannel)); ok {
 		settings.Channel = v
+	}
+	settings.LiveCatchUpSeconds = defaultLiveCatchUpSeconds
+	if v, ok := toInt(storage.GetValue(storageKeyLiveCatchUp)); ok {
+		settings.LiveCatchUpSeconds = v
 	}
 
 	switch v := storage.GetValue(storageKeyStreams).(type) {

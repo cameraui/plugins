@@ -60,21 +60,22 @@ type storedNVR struct {
 }
 
 type cameraSettings struct {
-	Host          string
-	UID           string
-	Username      string
-	Password      string
-	Channel       int
-	Streams       []string
-	BatteryCamera bool
-	HasSiren      bool
-	HasSpotlight  bool
-	HasPTZ        bool
-	PTZPan        bool
-	PTZTilt       bool
-	PTZZoom       bool
-	HasDoorbell   bool
-	HasAI         bool
+	Host               string
+	UID                string
+	Username           string
+	Password           string
+	Channel            int
+	Streams            []string
+	BatteryCamera      bool
+	HasSiren           bool
+	HasSpotlight       bool
+	HasPTZ             bool
+	PTZPan             bool
+	PTZTilt            bool
+	PTZZoom            bool
+	HasDoorbell        bool
+	HasAI              bool
+	LiveCatchUpSeconds int
 }
 
 var _ sdk.DiscoveryProvider = (*ReolinkPlugin)(nil)
@@ -564,6 +565,8 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 		PTZZoom:       probe.caps.Zoom,
 		HasDoorbell:   probe.caps.Doorbell,
 		HasAI:         len(probe.caps.AITypes) > 0,
+
+		LiveCatchUpSeconds: defaultLiveCatchUpSeconds,
 	}
 	p.Logger.Log(fmt.Sprintf("Detected capabilities for %s: streams=%v battery=%t siren=%t spotlight=%t ptz=%t doorbell=%t ai=%v",
 		camera.Name, probe.streams, probe.caps.Battery, probe.caps.Siren, probe.caps.Floodlight, probe.caps.PTZ, probe.caps.Doorbell, probe.caps.AITypes))
