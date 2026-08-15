@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, TypedDict
+import re
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from camera_ui_ml import detect_plates, reset_stored_settings
 from camera_ui_sdk import (
     JsonSchema,
+    LicensePlateDetection,
     LicensePlateDetectorSensor,
     LicensePlateResult,
     ModelSpec,
@@ -22,9 +24,21 @@ from defaults import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from camera_ui_sdk import CameraDevice, LoggerService
 
     from main import OpenVinoPlugin
+
+
+PLATE_NOISE = re.compile(r"[^0-9A-Z]")
+
+
+def _readable(detection: LicensePlateDetection, ocr_confidence: float, min_length: int) -> bool:
+    if len(PLATE_NOISE.sub("", detection.get("plateText", "").upper())) < min_length:
+        return False
+    confidence = detection.get("ocrConfidence")
+    return confidence is None or confidence >= ocr_confidence
 
 
 class LPDStorageValues(TypedDict):
@@ -95,7 +109,7 @@ class OpenVinoLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     async def detectLicensePlates(self, frames: list[VideoFrameData]) -> list[LicensePlateResult]:
         detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
         ocr_name = resolve_model(self.storage.values.get("ocr_model"), DEFAULT_OCR)
-        threshold = self._camera_confidence(0.3)
+        confidence, ocr_confidence, min_length = self._plate_settings()
 
         detector = self._plugin.plate_detectors.get(detector_name)
         ocr = self._plugin.ocr_models.get(ocr_name)
@@ -103,7 +117,12 @@ class OpenVinoLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
         if detector is None or not detector.initialized or ocr is None or not ocr.initialized:
             return [{"detected": False, "detections": []} for _ in frames]
 
-        return await detect_plates(detector, ocr, frames, threshold)
+        results = await detect_plates(detector, ocr, frames, confidence)
+        for result in results:
+            kept = [d for d in result["detections"] if _readable(d, ocr_confidence, min_length)]
+            result["detected"] = len(kept) > 0
+            result["detections"] = kept
+        return results
 
     async def destroy(self) -> None:
         pass
@@ -132,7 +151,13 @@ class OpenVinoLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
 
-    def _camera_confidence(self, fallback: float) -> float:
-        settings = self._camera.detectionSettings.get("licensePlate") or {}
-        value = settings.get("confidence")
-        return float(value) if value is not None else fallback
+    def _plate_settings(self) -> tuple[float, float, int]:
+        settings: Mapping[str, Any] = self._camera.detectionSettings.get("licensePlate") or {}
+        confidence = settings.get("confidence")
+        ocr_confidence = settings.get("ocrConfidence")
+        min_length = settings.get("minLength")
+        return (
+            float(confidence) if confidence is not None else 0.3,
+            float(ocr_confidence) if ocr_confidence is not None else 0.9,
+            int(min_length) if min_length is not None else 4,
+        )
