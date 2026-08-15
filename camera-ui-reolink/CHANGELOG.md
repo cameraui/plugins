@@ -1,6 +1,6 @@
 ## [1.2.10]
 
-- Update camera.ui SDK
+- Bugfixes and improvements
 
 ## [1.2.9]
 
