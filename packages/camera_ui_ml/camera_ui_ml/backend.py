@@ -40,6 +40,16 @@ class InferenceBackend(ABC):
         """Human-readable hardware this backend runs on (e.g. "CUDA:0", "CPU")."""
         return "unknown"
 
+    @property
+    def runtime(self) -> str | None:
+        """Inference framework and version, e.g. "openvino 2025.3.0"."""
+        return None
+
+    @property
+    def precision(self) -> str | None:
+        """Weight precision of the loaded model: "fp32", "fp16", "int8"."""
+        return None
+
     @abstractmethod
     async def infer(self, inputs: Sequence[Any]) -> Outputs: ...
 

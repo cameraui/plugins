@@ -47,9 +47,11 @@ from .preprocess import (
     to_pil,
     to_tensor,
 )
+from .runtime import model_runtime
 from .settings import reset_stored_settings
 
 __all__ = [
+    "model_runtime",
     "InferenceBackend",
     "InputSpec",
     "Outputs",
