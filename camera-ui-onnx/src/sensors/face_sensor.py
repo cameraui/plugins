@@ -121,17 +121,20 @@ class ONNXFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
             self._plugin.get_face_detector(detector_name),
             self._plugin.get_face_embedder(embedder_name),
         )
+        self.updateModelSpec()
 
     async def _on_change_detector(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
             resolved = resolve_model(new_model, DEFAULT_FACE_DETECTOR)
             await self._plugin.get_face_detector(resolved)
+            self.updateModelSpec()
             self._logger.log(f"Face detector changed to {resolved}")
 
     async def _on_change_embedder(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
             resolved = resolve_model(new_model, DEFAULT_FACE_EMBEDDER)
             await self._plugin.get_face_embedder(resolved)
+            self.updateModelSpec()
             self._logger.log(f"Face embedder changed to {resolved}")
 
     async def _reset_settings(self) -> None:

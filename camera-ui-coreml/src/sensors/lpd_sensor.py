@@ -139,17 +139,20 @@ class CoreMLLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
             self._plugin.get_plate_detector(detector_name),
             self._plugin.get_ocr(ocr_name),
         )
+        self.updateModelSpec()
 
     async def _on_change_detector(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
             resolved = resolve_model(new_model, DEFAULT_LPD_DETECTOR)
             await self._plugin.get_plate_detector(resolved)
+            self.updateModelSpec()
             self._logger.log(f"Plate detector changed to {resolved}")
 
     async def _on_change_ocr(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
             resolved = resolve_model(new_model, DEFAULT_OCR)
             await self._plugin.get_ocr(resolved)
+            self.updateModelSpec()
             self._logger.log(f"OCR model changed to {resolved}")
 
     async def _reset_settings(self) -> None:

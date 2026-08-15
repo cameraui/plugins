@@ -140,6 +140,7 @@ class YAMNetAudioSensor(AudioDetectorSensor[YAMNetStorageValues]):
         try:
             self._detector = AudioDetector(self._api, self._logger)
             await self._detector.initialize()
+            self.updateModelSpec()
 
             if self._detector.labels:
                 self._available_labels.clear()

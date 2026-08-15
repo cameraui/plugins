@@ -88,11 +88,13 @@ class ONNXClipSensor(ClipDetectorSensor["ClipStorageValues"]):
     async def on_start(self) -> None:
         model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
         await self._plugin.get_clip_encoder(model_name)
+        self.updateModelSpec()
 
     async def _on_change_model(self, new_model: str, _old_model: str) -> None:
         if new_model != _old_model:
             resolved = resolve_model(new_model, DEFAULT_CLIP_VISION)
             await self._plugin.get_clip_encoder(resolved)
+            self.updateModelSpec()
             self._logger.log(f"CLIP vision model changed to {resolved}")
 
     async def _reset_settings(self) -> None:
