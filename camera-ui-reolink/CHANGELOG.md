@@ -1,3 +1,8 @@
+## [1.2.9]
+
+- Motion and AI detections from cameras whose firmware packs the events differently are recognized again. Some models wrap them in a list the plugin did not know, and every detection from those cameras was dropped
+- A camera that reports its detections for a different channel than the one it was added as now says so in the log instead of looking like a camera that never detects anything
+
 ## [1.2.8]
 
 - PTZ cameras show their saved positions. The presets you set up in the Reolink app appear in the PTZ controls and moving to one is a click; the list is re-read every minute, so renamed or newly added presets show up on their own
