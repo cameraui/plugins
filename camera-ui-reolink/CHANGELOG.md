@@ -1,3 +1,7 @@
+## [1.2.10]
+
+- Update camera.ui SDK
+
 ## [1.2.9]
 
 - Motion and AI detections from cameras whose firmware packs the events differently are recognized again. Some models wrap them in a list the plugin did not know, and every detection from those cameras was dropped
