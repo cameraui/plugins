@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from camera_ui_ml import detect_clip, reset_stored_settings
+from camera_ui_ml import detect_clip, model_runtime, reset_stored_settings
 from camera_ui_sdk import (
     ClipDetectorSensor,
     ClipResult,
@@ -70,6 +70,7 @@ class ONNXClipSensor(ClipDetectorSensor["ClipStorageValues"]):
             "input": {"width": input_size, "height": input_size, "format": "rgb"},
             "triggerLabels": ["person", "vehicle", "animal"],
             "embeddingModel": DEFAULT_CLIP_EMBEDDER,
+            **model_runtime((self._plugin.clip_encoders.get(model_name), "encode")),
         }
 
     async def detectEmbeddings(self, frames: list[VideoFrameData]) -> list[ClipResult]:

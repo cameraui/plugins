@@ -23,7 +23,7 @@ from defaults import (
 from detector import AudioDetector, build_detections
 
 if TYPE_CHECKING:
-    from camera_ui_sdk import LoggerService, PluginAPI
+    from camera_ui_sdk import LoggerService, ModelRuntime, PluginAPI
 
 
 class YAMNetStorageValues(TypedDict):
@@ -91,6 +91,7 @@ class YAMNetAudioSensor(AudioDetectorSensor[YAMNetStorageValues]):
 
     @property
     def modelSpec(self) -> AudioModelSpec:
+        runtime: ModelRuntime = self._detector.model_runtime() if self._detector else {}
         return {
             "input": {
                 "sampleRate": YAMNET_SAMPLE_RATE,
@@ -98,6 +99,7 @@ class YAMNetAudioSensor(AudioDetectorSensor[YAMNetStorageValues]):
                 "format": YAMNET_FORMAT,
                 "samplesPerFrame": YAMNET_SAMPLES_PER_FRAME,
             },
+            **runtime,
         }
 
     async def detectAudio(self, audio: AudioFrameData) -> AudioResult:

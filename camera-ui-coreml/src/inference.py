@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+import coremltools
 import numpy as np
 from camera_ui_ml import (
     InferenceBackend,
@@ -46,6 +47,10 @@ class CoreMlBackend(InferenceBackend):
 
     def metadata(self) -> Mapping[str, str]:
         return self._metadata
+
+    @property
+    def runtime(self) -> str:
+        return f"coreml {coremltools.__version__}"
 
     @property
     def device(self) -> str:

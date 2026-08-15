@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import TYPE_CHECKING
 
-from camera_ui_sdk import LoadedModel, LoggerService
+from camera_ui_sdk import LoggerService
 
 from ..backend import InferenceBackend
 from ..model_manager import BaseModelManager
+
+if TYPE_CHECKING:
+    from camera_ui_sdk import LoadedModel
 
 
 class BaseDetector:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
@@ -14,7 +15,13 @@ from defaults import YAMNET_LABELS_URL, YAMNET_MODEL_URL, YAMNET_TO_LABEL
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from camera_ui_sdk import Detection, LoggerService, PluginAPI
+    from camera_ui_sdk import (
+        Detection,
+        LoadedModel,
+        LoggerService,
+        ModelRuntime,
+        PluginAPI,
+    )
 
 
 def build_detections(
@@ -58,6 +65,7 @@ class AudioDetector:
         self.labels: list[str] = []
 
         self.closed = False
+        self.load_ms = 0
         self._init_task: asyncio.Task[None] | None = None
 
     async def initialize(self) -> None:
@@ -69,6 +77,7 @@ class AudioDetector:
 
     async def _do_initialize(self) -> None:
         try:
+            started = time.monotonic()
             model_file = "yamnet.tflite"
             labels_file = "yamnet_class_map.csv"
             await self._download_file(YAMNET_MODEL_URL, model_file)
@@ -90,12 +99,28 @@ class AudioDetector:
             self.input_details = self.interpreter.get_input_details()
             self.output_details = self.interpreter.get_output_details()
 
+            self.load_ms = round((time.monotonic() - started) * 1000)
             self.initialized = True
             self.logger.log(f"YAMNet model loaded ({len(self.labels)} classes)")
         except Exception as e:
             self.logger.error(f"Failed to initialize YAMNet: {e}")
         finally:
             self._init_task = None
+
+    def model_runtime(self) -> ModelRuntime:
+        if not self.initialized:
+            return {}
+
+        entry: LoadedModel = {"name": "yamnet", "role": "detect", "device": "CPU"}
+        if self.load_ms:
+            entry["loadMs"] = self.load_ms
+
+        try:
+            from ai_edge_litert import __version__ as litert_version  # type: ignore[import-untyped]
+
+            return {"runtime": f"litert {litert_version}", "models": [entry]}
+        except Exception:
+            return {"runtime": "litert", "models": [entry]}
 
     def _load_model(self, model_path: str) -> Any:
         from ai_edge_litert.interpreter import Interpreter  # type: ignore[import-untyped]

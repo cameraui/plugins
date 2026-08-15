@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
-from camera_ui_ml import detect_objects, reset_stored_settings
+from camera_ui_ml import detect_objects, model_runtime, reset_stored_settings
 from camera_ui_sdk import (
     JsonSchema,
     ObjectDetectorSensor,
@@ -64,7 +64,13 @@ class HailoObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
 
     @property
     def modelSpec(self) -> ObjectModelSpec:
-        return {"input": {"width": 640, "height": 640, "format": "rgb"}}
+        detector = self._plugin.object_detectors.get(
+            resolve_model(self.storage.values.get("model"), DEFAULT_OBJECT_MODEL)
+        )
+        return {
+            "input": {"width": 640, "height": 640, "format": "rgb"},
+            **model_runtime((detector, "detect")),
+        }
 
     async def detectObjects(self, frame: VideoFrameData) -> ObjectResult:
         detector = self._plugin.object_detectors.get(

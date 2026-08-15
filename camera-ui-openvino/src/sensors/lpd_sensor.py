@@ -4,7 +4,7 @@ import asyncio
 import re
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from camera_ui_ml import detect_plates, reset_stored_settings
+from camera_ui_ml import detect_plates, model_runtime, reset_stored_settings
 from camera_ui_sdk import (
     JsonSchema,
     LicensePlateDetection,
@@ -101,9 +101,14 @@ class OpenVinoLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     def modelSpec(self) -> ModelSpec:
         detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
         size = LPD_DETECTOR_MODELS.get(detector_name, 384)
+        ocr_name = resolve_model(self.storage.values.get("ocr_model"), DEFAULT_OCR)
         return {
             "input": {"width": size, "height": size, "format": "rgb"},
             "triggerLabels": ["vehicle"],
+            **model_runtime(
+                (self._plugin.plate_detectors.get(detector_name), "detect"),
+                (self._plugin.ocr_models.get(ocr_name), "ocr"),
+            ),
         }
 
     async def detectLicensePlates(self, frames: list[VideoFrameData]) -> list[LicensePlateResult]:

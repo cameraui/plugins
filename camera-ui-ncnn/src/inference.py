@@ -33,6 +33,10 @@ class NcnnBackend(InferenceBackend):
         return {}  # ncnn .param carries no class names
 
     @property
+    def runtime(self) -> str:
+        return f"ncnn {getattr(ncnn, '__version__', '')}".strip()
+
+    @property
     def device(self) -> str:
         return self._device
 

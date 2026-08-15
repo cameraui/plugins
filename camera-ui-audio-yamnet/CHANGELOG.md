@@ -1,3 +1,11 @@
+## [1.2.3]
+
+- The plugin reports which model it loaded and which device it runs on, so camera.ui can show it in the camera metrics.
+
+## [1.2.2]
+
+- Bugfixes and improvements
+
 ## [1.2.1]
 
 - Updated camera.ui engine

@@ -51,6 +51,10 @@ class HailoBackend(InferenceBackend):
         return {}  # HEF carries no usable class names; labels are hardcoded in the plugin
 
     @property
+    def runtime(self) -> str:
+        return "hailort"
+
+    @property
     def device(self) -> str:
         return self._device
 

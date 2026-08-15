@@ -1,6 +1,7 @@
 ## [1.2.4]
 
 - The confidence threshold is gone from the plugin settings. Object detection now uses the value from the camera's detection settings, so it is set in one place and a change takes effect right away.
+- The plugin reports which model it loaded and which device it runs on, so camera.ui can show it in the camera metrics.
 
 ## [1.2.2]
 

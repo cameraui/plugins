@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, TypedDict
 
-from camera_ui_ml import detect_faces, reset_stored_settings
+from camera_ui_ml import detect_faces, model_runtime, reset_stored_settings
 from camera_ui_sdk import (
     FaceDetectorSensor,
     FaceResult,
@@ -92,6 +92,10 @@ class NCNNFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
             "input": {"width": size, "height": size, "format": "rgb"},
             "triggerLabels": ["person"],
             "embeddingModel": embedder_name,
+            **model_runtime(
+                (self._plugin.face_detectors.get(detector_name), "detect"),
+                (self._plugin.face_embedders.get(embedder_name), "embed"),
+            ),
         }
 
     async def detectFaces(self, frames: list[VideoFrameData]) -> list[FaceResult]:

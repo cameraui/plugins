@@ -34,6 +34,10 @@ class CoralBackend(InferenceBackend):
         return {}  # tflite carries no usable class names; labels are hardcoded in the plugin
 
     @property
+    def runtime(self) -> str:
+        return "tflite (edgetpu)"
+
+    @property
     def device(self) -> str:
         return self._device
 

@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+import onnxruntime as ort
 from camera_ui_ml import InferenceBackend, Outputs
 
 _PROVIDER_LABELS = {
@@ -48,6 +49,10 @@ class OnnxBackend(InferenceBackend):
 
     def metadata(self) -> Mapping[str, str]:
         return self._metadata
+
+    @property
+    def runtime(self) -> str:
+        return f"onnxruntime {ort.__version__}"
 
     @property
     def device(self) -> str:

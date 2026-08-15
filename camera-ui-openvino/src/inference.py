@@ -31,6 +31,10 @@ class OpenVinoBackend(InferenceBackend):
         return {}  # OpenVINO IR carries no class names
 
     @property
+    def runtime(self) -> str:
+        return f"openvino {ov.__version__}"
+
+    @property
     def device(self) -> str:
         try:
             resolved = ",".join(self._compiled.get_property("EXECUTION_DEVICES"))
