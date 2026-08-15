@@ -75,7 +75,10 @@ class NCNNPlugin(
         gpus = gpu_count()
         self.logger.log(f"Available devices: CPU{f', Vulkan GPU x{gpus}' if gpus > 0 else ''}")
         self.model_manager = NcnnModelManager(
-            api.storagePath, logger, self._resolve_use_vulkan, self._resolve_vulkan_device
+            api.storagePath,
+            logger,
+            self._resolve_use_vulkan,
+            self._resolve_vulkan_device,
         )
 
         self.object_detectors: dict[str, BoxDetector] = {}
@@ -166,6 +169,8 @@ class NCNNPlugin(
                 raise
             # ncnn .param has no embedded class names; inject the trained labels.
             detector.labels = {index: str(label) for index, label in OBJECT_LABELS.items()}
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def get_face_detector(self, model_name: str) -> BoxDetector:
@@ -178,6 +183,8 @@ class NCNNPlugin(
             except Exception:
                 self.face_detectors.pop(model_name, None)
                 raise
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def get_face_embedder(self, model_name: str) -> Embedder:
@@ -191,6 +198,8 @@ class NCNNPlugin(
             except Exception:
                 self.face_embedders.pop(model_name, None)
                 raise
+        else:
+            await embedder.initialize(model_name)
         return embedder
 
     async def get_plate_detector(self, model_name: str) -> BoxDetector:
@@ -211,6 +220,8 @@ class NCNNPlugin(
             except Exception:
                 self.plate_detectors.pop(model_name, None)
                 raise
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def get_ocr(self, model_name: str) -> PlateOcr:
@@ -231,6 +242,8 @@ class NCNNPlugin(
             except Exception:
                 self.ocr_models.pop(model_name, None)
                 raise
+        else:
+            await ocr.initialize(model_name)
         return ocr
 
     async def objectDetectionSettings(self) -> list[JsonSchema] | None:

@@ -123,6 +123,8 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
                 raise
             # HEF carries no embedded class names; inject the (mapped) labels.
             detector.labels = {index: str(label) for index, label in OBJECT_LABELS.items()}
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def objectDetectionSettings(self) -> list[JsonSchema] | None:

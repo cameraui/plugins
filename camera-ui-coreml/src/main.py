@@ -160,6 +160,8 @@ class CoreMLPlugin(
             except Exception:
                 self.object_detectors.pop(model_name, None)
                 raise
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def get_face_detector(self, model_name: str) -> BoxDetector:
@@ -172,6 +174,8 @@ class CoreMLPlugin(
             except Exception:
                 self.face_detectors.pop(model_name, None)
                 raise
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def get_face_embedder(self, model_name: str) -> Embedder:
@@ -185,6 +189,8 @@ class CoreMLPlugin(
             except Exception:
                 self.face_embedders.pop(model_name, None)
                 raise
+        else:
+            await embedder.initialize(model_name)
         return embedder
 
     async def get_plate_detector(self, model_name: str) -> BoxDetector:
@@ -205,6 +211,8 @@ class CoreMLPlugin(
             except Exception:
                 self.plate_detectors.pop(model_name, None)
                 raise
+        else:
+            await detector.initialize(model_name)
         return detector
 
     async def get_ocr(self, model_name: str) -> PlateOcr:
@@ -225,6 +233,8 @@ class CoreMLPlugin(
             except Exception:
                 self.ocr_models.pop(model_name, None)
                 raise
+        else:
+            await ocr.initialize(model_name)
         return ocr
 
     async def get_clip_encoder(self, model_name: str) -> ClipEncoder:
@@ -237,6 +247,8 @@ class CoreMLPlugin(
             except Exception:
                 self.clip_encoders.pop(model_name, None)
                 raise
+        else:
+            await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
         return encoder
 
     async def objectDetectionSettings(self) -> list[JsonSchema] | None:
