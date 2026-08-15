@@ -477,15 +477,15 @@ class NCNNPlugin(
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
-        obj = NCNNObjectSensor(self, self.logger)
+        obj = NCNNObjectSensor(self, camera, self.logger)
         await camera.addSensor(obj)
         sensors["object"] = obj
 
-        face = NCNNFaceSensor(self, self.logger)
+        face = NCNNFaceSensor(self, camera, self.logger)
         await camera.addSensor(face)
         sensors["face"] = face
 
-        lpd = NCNNLPDSensor(self, self.logger)
+        lpd = NCNNLPDSensor(self, camera, self.logger)
         await camera.addSensor(lpd)
         sensors["lpd"] = lpd
 

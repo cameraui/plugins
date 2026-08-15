@@ -1,3 +1,7 @@
+## [1.2.5]
+
+- The confidence threshold is gone from the plugin settings. Object, face and plate detection now uses the value from the camera's detection settings, so it is set in one place and a change takes effect right away.
+
 ## [1.2.3]
 
 - Updated camera.ui engine

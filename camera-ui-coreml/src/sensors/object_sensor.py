@@ -14,19 +14,25 @@ from camera_ui_sdk import (
 from defaults import DEFAULT_OBJECT_MODEL, DEFAULT_OPTION, OBJECT_MODELS, resolve_model
 
 if TYPE_CHECKING:
-    from camera_ui_sdk import LoggerService
+    from camera_ui_sdk import CameraDevice, LoggerService
 
     from main import CoreMLPlugin
 
 
 class ObjectStorageValues(TypedDict):
     model: str
-    confidence_threshold: float
 
 
 class CoreMLObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
-    def __init__(self, plugin: CoreMLPlugin, logger: LoggerService, name: str = "CoreML Object") -> None:
+    def __init__(
+        self,
+        plugin: CoreMLPlugin,
+        camera: CameraDevice,
+        logger: LoggerService,
+        name: str = "CoreML Object",
+    ) -> None:
         super().__init__(name)
+        self._camera = camera
         self._plugin = plugin
         self._logger = logger
 
@@ -44,19 +50,6 @@ class CoreMLObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
                 "defaultValue": DEFAULT_OPTION,
                 "required": True,
                 "onSet": self._on_change_model,
-            },
-            {
-                "type": "number",
-                "key": "confidence_threshold",
-                "title": "Confidence Threshold",
-                "description": "Minimum confidence for detections (0-1)",
-                "group": "Object Detection",
-                "store": True,
-                "defaultValue": 0.5,
-                "minimum": 0.1,
-                "maximum": 1.0,
-                "step": 0.05,
-                "required": True,
             },
             {
                 "type": "button",
@@ -79,7 +72,7 @@ class CoreMLObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
         )
         if detector is None or not detector.initialized:
             return {"detected": False, "detections": []}
-        return await detect_objects(detector, frame, self.storage.values["confidence_threshold"])
+        return await detect_objects(detector, frame, self._camera_confidence(0.5))
 
     async def destroy(self) -> None:
         pass
@@ -97,3 +90,7 @@ class CoreMLObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
+
+    def _camera_confidence(self, fallback: float) -> float:
+        value = self._camera.detectionSettings["object"].get("confidence")
+        return float(value) if value is not None else fallback

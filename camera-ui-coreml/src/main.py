@@ -551,15 +551,15 @@ class CoreMLPlugin(
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
-        obj = CoreMLObjectSensor(self, self.logger)
+        obj = CoreMLObjectSensor(self, camera, self.logger)
         await camera.addSensor(obj)
         sensors["object"] = obj
 
-        face = CoreMLFaceSensor(self, self.logger)
+        face = CoreMLFaceSensor(self, camera, self.logger)
         await camera.addSensor(face)
         sensors["face"] = face
 
-        lpd = CoreMLLPDSensor(self, self.logger)
+        lpd = CoreMLLPDSensor(self, camera, self.logger)
         await camera.addSensor(lpd)
         sensors["lpd"] = lpd
 

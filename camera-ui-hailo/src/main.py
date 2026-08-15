@@ -181,7 +181,7 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
-        obj = HailoObjectSensor(self, self.logger)
+        obj = HailoObjectSensor(self, camera, self.logger)
         await camera.addSensor(obj)
         sensors["object"] = obj
 

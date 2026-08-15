@@ -21,9 +21,7 @@ export class HaNotifier {
 
     const previousCount = this.targetKeys().length;
     this.entities = new Map(
-      states
-        .filter((state) => state.entity_id.startsWith('notify.'))
-        .map((state) => [state.entity_id, state.attributes.friendly_name ?? state.entity_id]),
+      states.filter((state) => state.entity_id.startsWith('notify.')).map((state) => [state.entity_id, state.attributes.friendly_name ?? state.entity_id]),
     );
     try {
       this.services = await client.fetchNotifyServices();

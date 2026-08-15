@@ -567,15 +567,15 @@ class ONNXPlugin(
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
-        obj = ONNXObjectSensor(self, self.logger)
+        obj = ONNXObjectSensor(self, camera, self.logger)
         await camera.addSensor(obj)
         sensors["object"] = obj
 
-        face = ONNXFaceSensor(self, self.logger)
+        face = ONNXFaceSensor(self, camera, self.logger)
         await camera.addSensor(face)
         sensors["face"] = face
 
-        lpd = ONNXLPDSensor(self, self.logger)
+        lpd = ONNXLPDSensor(self, camera, self.logger)
         await camera.addSensor(lpd)
         sensors["lpd"] = lpd
 

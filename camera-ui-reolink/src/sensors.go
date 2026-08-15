@@ -310,10 +310,7 @@ func ptzCommand(direction sdk.PTZDirection) (string, int) {
 }
 
 func ptzSpeed(v float64) int {
-	speed := max(int(math.Round(math.Abs(v)*32)), 1)
-	if speed > 32 {
-		speed = 32
-	}
+	speed := min(max(int(math.Round(math.Abs(v)*32)), 1), 32)
 	return speed
 }
 

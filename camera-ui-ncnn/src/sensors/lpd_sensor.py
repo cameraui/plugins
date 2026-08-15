@@ -22,7 +22,7 @@ from defaults import (
 )
 
 if TYPE_CHECKING:
-    from camera_ui_sdk import LoggerService
+    from camera_ui_sdk import CameraDevice, LoggerService
 
     from main import NCNNPlugin
 
@@ -30,17 +30,18 @@ if TYPE_CHECKING:
 class LPDStorageValues(TypedDict):
     detector_model: str
     ocr_model: str
-    confidence_threshold: float
 
 
 class NCNNLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     def __init__(
         self,
         plugin: NCNNPlugin,
+        camera: CameraDevice,
         logger: LoggerService,
         name: str = "NCNN License Plate",
     ) -> None:
         super().__init__(name)
+        self._camera = camera
         self._plugin = plugin
         self._logger = logger
 
@@ -72,19 +73,6 @@ class NCNNLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
                 "onSet": self._on_change_ocr,
             },
             {
-                "type": "number",
-                "key": "confidence_threshold",
-                "title": "Confidence Threshold",
-                "description": "Minimum confidence for plate detections (0-1)",
-                "group": "License Plate",
-                "store": True,
-                "defaultValue": 0.3,
-                "minimum": 0.1,
-                "maximum": 1.0,
-                "step": 0.05,
-                "required": True,
-            },
-            {
                 "type": "button",
                 "key": "reset_defaults",
                 "title": "Reset to Defaults",
@@ -107,7 +95,7 @@ class NCNNLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     async def detectLicensePlates(self, frames: list[VideoFrameData]) -> list[LicensePlateResult]:
         detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
         ocr_name = resolve_model(self.storage.values.get("ocr_model"), DEFAULT_OCR)
-        threshold = self.storage.values.get("confidence_threshold", 0.3)
+        threshold = self._camera_confidence(0.3)
 
         detector = self._plugin.plate_detectors.get(detector_name)
         ocr = self._plugin.ocr_models.get(ocr_name)
@@ -143,3 +131,8 @@ class NCNNLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
+
+    def _camera_confidence(self, fallback: float) -> float:
+        settings = self._camera.detectionSettings.get("licensePlate") or {}
+        value = settings.get("confidence")
+        return float(value) if value is not None else fallback

@@ -22,7 +22,7 @@ from defaults import (
 )
 
 if TYPE_CHECKING:
-    from camera_ui_sdk import LoggerService
+    from camera_ui_sdk import CameraDevice, LoggerService
 
     from main import NCNNPlugin
 
@@ -30,12 +30,18 @@ if TYPE_CHECKING:
 class FaceStorageValues(TypedDict):
     detector_model: str
     embedder_model: str
-    confidence_threshold: float
 
 
 class NCNNFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
-    def __init__(self, plugin: NCNNPlugin, logger: LoggerService, name: str = "NCNN Face") -> None:
+    def __init__(
+        self,
+        plugin: NCNNPlugin,
+        camera: CameraDevice,
+        logger: LoggerService,
+        name: str = "NCNN Face",
+    ) -> None:
         super().__init__(name)
+        self._camera = camera
         self._plugin = plugin
         self._logger = logger
 
@@ -67,19 +73,6 @@ class NCNNFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
                 "onSet": self._on_change_embedder,
             },
             {
-                "type": "number",
-                "key": "confidence_threshold",
-                "title": "Confidence Threshold",
-                "description": "Minimum confidence for face detections (0-1)",
-                "group": "Face Detection",
-                "store": True,
-                "defaultValue": 0.5,
-                "minimum": 0.1,
-                "maximum": 1.0,
-                "step": 0.05,
-                "required": True,
-            },
-            {
                 "type": "button",
                 "key": "reset_defaults",
                 "title": "Reset to Defaults",
@@ -104,7 +97,7 @@ class NCNNFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
     async def detectFaces(self, frames: list[VideoFrameData]) -> list[FaceResult]:
         detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_FACE_DETECTOR)
         embedder_name = resolve_model(self.storage.values.get("embedder_model"), DEFAULT_FACE_EMBEDDER)
-        threshold = self.storage.values.get("confidence_threshold", 0.5)
+        threshold = self._camera_confidence(0.5)
 
         detector = self._plugin.face_detectors.get(detector_name)
         embedder = self._plugin.face_embedders.get(embedder_name)
@@ -140,3 +133,8 @@ class NCNNFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
+
+    def _camera_confidence(self, fallback: float) -> float:
+        settings = self._camera.detectionSettings.get("face") or {}
+        value = settings.get("confidence")
+        return float(value) if value is not None else fallback

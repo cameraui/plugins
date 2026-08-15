@@ -563,15 +563,15 @@ class OpenVinoPlugin(
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
-        obj = OpenVinoObjectSensor(self, self.logger)
+        obj = OpenVinoObjectSensor(self, camera, self.logger)
         await camera.addSensor(obj)
         sensors["object"] = obj
 
-        face = OpenVinoFaceSensor(self, self.logger)
+        face = OpenVinoFaceSensor(self, camera, self.logger)
         await camera.addSensor(face)
         sensors["face"] = face
 
-        lpd = OpenVinoLPDSensor(self, self.logger)
+        lpd = OpenVinoLPDSensor(self, camera, self.logger)
         await camera.addSensor(lpd)
         sensors["lpd"] = lpd
 
