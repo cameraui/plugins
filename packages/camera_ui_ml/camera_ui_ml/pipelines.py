@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast
 
 from camera_ui_sdk import (
@@ -26,9 +27,13 @@ if TYPE_CHECKING:
 
 
 async def detect_objects(
-    detector: BoxDetector, frame: VideoFrameData, threshold: float | None = None
+    detector: BoxDetector,
+    frame: VideoFrameData,
+    threshold: float | Mapping[str, float] | None = None,
 ) -> ObjectResult:
-    raw = await detector.detect_frame(frame, threshold)
+    per_label = threshold if isinstance(threshold, Mapping) else None
+    floor = min(per_label.values()) if per_label else cast("float | None", threshold)
+    raw = await detector.detect_frame(frame, floor)
     width, height = frame["width"], frame["height"]
     detections: list[TrackedDetection] = [
         {
@@ -38,6 +43,9 @@ async def detect_objects(
         }
         for cid, conf, box in raw
     ]
+    if per_label:
+        min_conf = floor if floor is not None else 0.0
+        detections = [d for d in detections if d["confidence"] >= per_label.get(d["label"], min_conf)]
     return {"detected": len(detections) > 0, "detections": detections}
 
 
