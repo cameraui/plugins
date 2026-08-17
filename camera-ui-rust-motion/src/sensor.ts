@@ -1,6 +1,6 @@
 import { MotionDetectorSensor } from '@camera.ui/sdk';
 
-import { DEFAULT_BLUR_RADIUS, DEFAULT_DILATION_SIZE, DEFAULT_MOTION_AREA, DEFAULT_THRESHOLD } from './defaults.js';
+import { DEFAULT_BLUR_RADIUS, DEFAULT_DILATION_SIZE, DEFAULT_MOTION_AREA, DEFAULT_REFERENCE_HOLD, DEFAULT_THRESHOLD } from './defaults.js';
 
 import type * as RustDetector from '@camera.ui/rust-detector';
 import type { ImageProcessor } from '@camera.ui/rust-detector';
@@ -18,12 +18,15 @@ export interface RustMotionStorageValues {
   threshold: number;
   blurRadius: number;
   dilationSize: number;
+  referenceHold: number;
+  defaults2: boolean;
 }
 
 export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValues> {
   private imageProcessor?: ImageProcessor;
   private lastWidth = 0;
   private lastHeight = 0;
+  private referenceAt = 0;
 
   constructor(name = 'Rust Motion') {
     super(name);
@@ -39,7 +42,7 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
         type: 'number',
         key: 'area',
         title: 'Area',
-        description: 'Smallest region size that counts as motion.',
+        description: 'Smallest combined size of nearby changed regions that counts as motion.',
         store: true,
         defaultValue: DEFAULT_MOTION_AREA,
         minimum: 10,
@@ -84,6 +87,18 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
         required: true,
       },
       {
+        type: 'number',
+        key: 'referenceHold',
+        title: 'Reference Hold',
+        description: 'Seconds the comparison image is kept. Higher values catch very slow movement, lower values keep motion boxes closer to the current position.',
+        store: true,
+        defaultValue: DEFAULT_REFERENCE_HOLD,
+        minimum: 1,
+        maximum: 10,
+        step: 1,
+        required: true,
+      },
+      {
         type: 'button',
         key: 'default',
         title: 'Default Settings',
@@ -92,6 +107,15 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
         onSet: async () => {
           await this.resetToDefaults();
         },
+      },
+      {
+        type: 'boolean',
+        key: 'defaults2',
+        title: 'Defaults migrated',
+        description: '',
+        hidden: true,
+        store: true,
+        defaultValue: false,
       },
     ];
   }
@@ -109,11 +133,13 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
 
     const config = this.getConfig();
     const blurRadius = config.blurRadius % 2 === 0 ? config.blurRadius + 1 : config.blurRadius;
-
-    // rust-detector expects a Uint8Array
     const frameData = frame.data instanceof Uint8Array ? frame.data : new Uint8Array(frame.data);
 
-    const boundingBoxes = this.imageProcessor.processImage(frameData, config.threshold, blurRadius, config.dilationSize, config.area);
+    const now = Date.now();
+    const updateReference = now - this.referenceAt >= config.referenceHold * 1000;
+    if (updateReference) this.referenceAt = now;
+
+    const boundingBoxes = this.imageProcessor.processImage(frameData, config.threshold, blurRadius, config.dilationSize, config.area, updateReference);
 
     return {
       detected: boundingBoxes.length > 0,
@@ -134,16 +160,27 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
     };
   }
 
-  resetState(): void {
-    this.imageProcessor?.resetState();
+  protected override async onStart(): Promise<void> {
+    if (this.storage.values.defaults2) {
+      return;
+    }
+    await this.storage.setValue('threshold', DEFAULT_THRESHOLD);
+    await this.storage.setValue('area', DEFAULT_MOTION_AREA);
+    await this.storage.setValue('defaults2', true);
   }
 
-  private getConfig(): RustMotionStorageValues {
+  resetState(): void {
+    this.imageProcessor?.resetState();
+    this.referenceAt = 0;
+  }
+
+  private getConfig(): Omit<RustMotionStorageValues, 'defaults2'> {
     return {
       area: this.storage.values.area,
       threshold: this.storage.values.threshold,
       blurRadius: this.storage.values.blurRadius,
       dilationSize: this.storage.values.dilationSize,
+      referenceHold: this.storage.values.referenceHold,
     };
   }
 
@@ -164,6 +201,7 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
 
     this.lastWidth = width;
     this.lastHeight = height;
+    this.referenceAt = 0;
   }
 
   private async resetToDefaults(): Promise<void> {
@@ -172,6 +210,7 @@ export class RustMotionSensor extends MotionDetectorSensor<RustMotionStorageValu
       await this.storage.setValue('threshold', DEFAULT_THRESHOLD);
       await this.storage.setValue('blurRadius', DEFAULT_BLUR_RADIUS);
       await this.storage.setValue('dilationSize', DEFAULT_DILATION_SIZE);
+      await this.storage.setValue('referenceHold', DEFAULT_REFERENCE_HOLD);
     }
   }
 }

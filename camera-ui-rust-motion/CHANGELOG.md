@@ -1,3 +1,13 @@
+## [1.2.3]
+
+- Small and slow movement is detected reliably now, day and night. The detector briefly holds its comparison image, so slow movement adds up instead of slipping below the threshold. Nearby changed regions count as one movement, so a distant animal is one hit instead of a few specks. A camera move or a sudden exposure change resets the detector instead of lighting up the whole picture.
+- New Reference Hold setting: how many seconds the comparison image is kept. Higher catches slower movement, lower keeps boxes closer to the current position.
+- The Area setting changed its meaning with this and applies to the combined size of nearby regions. All installations are moved to the new defaults once; your own tuning stays untouched after that.
+
+## [1.2.2]
+
+- Updated camera.ui engine
+
 ## [1.2.1]
 
 - Updated camera.ui engine
