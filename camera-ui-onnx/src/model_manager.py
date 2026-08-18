@@ -11,8 +11,6 @@ from camera_ui_ml import BaseModelManager, InferenceBackend
 from camera_ui_sdk import LoggerService
 
 from defaults import (
-    DEFAULT_CLIP_TEXT,
-    DEFAULT_CLIP_VISION,
     LEGACY_RUNTIME,
     MODEL_BASE_URL,
     MODEL_LFS_URL,
@@ -118,8 +116,7 @@ class OnnxModelManager(BaseModelManager):
 
     @staticmethod
     def _rel_path(model_name: str) -> str:
-        if model_name == DEFAULT_CLIP_VISION:
-            return "clip-vit-base-patch32/vision.onnx"
-        if model_name == DEFAULT_CLIP_TEXT:
-            return "clip-vit-base-patch32/text.onnx"
+        if model_name.startswith("clip-") and model_name.endswith(("-vision", "-text")):
+            family, _, tower = model_name.rpartition("-")
+            return f"{family}/{tower}.onnx"
         return f"{model_name}/{model_name}.onnx"

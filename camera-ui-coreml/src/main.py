@@ -42,7 +42,6 @@ from camera_ui_sdk import (
 from defaults import (
     CLIP_VISION_MODELS,
     COMPUTE_UNITS,
-    DEFAULT_CLIP_TEXT,
     DEFAULT_CLIP_VISION,
     DEFAULT_COMPUTE_UNITS,
     DEFAULT_FACE_DETECTOR,
@@ -62,6 +61,8 @@ from defaults import (
     OCR_MAX_SLOTS,
     OCR_MODELS,
     OCR_PAD_CHAR,
+    clip_family,
+    clip_text_for,
     resolve_model,
 )
 from model_manager import CoreMlModelManager
@@ -240,15 +241,15 @@ class CoreMLPlugin(
     async def get_clip_encoder(self, model_name: str) -> ClipEncoder:
         encoder = self.clip_encoders.get(model_name)
         if not encoder:
-            encoder = ClipEncoder(self.model_manager, self.logger)
+            encoder = ClipEncoder(self.model_manager, self.logger, embedding_model=clip_family(model_name))
             self.clip_encoders[model_name] = encoder
             try:
-                await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
+                await encoder.initialize(model_name, clip_text_for(model_name))
             except Exception:
                 self.clip_encoders.pop(model_name, None)
                 raise
         else:
-            await encoder.initialize(model_name, DEFAULT_CLIP_TEXT)
+            await encoder.initialize(model_name, clip_text_for(model_name))
         return encoder
 
     async def objectDetectionSettings(self) -> list[JsonSchema] | None:
@@ -553,12 +554,76 @@ class CoreMLPlugin(
         }
 
     async def getTextEmbedding(self, text: str) -> ClipTextEmbeddingResult:
-        encoder = await self.get_clip_encoder(DEFAULT_CLIP_VISION)
+        encoder = await self.get_clip_encoder(self._search_clip_model())
         if not encoder.initialized:
             return {"embedding": [], "embeddingModel": ""}
 
         embedding = await encoder.embed_text(text)
         return {"embedding": embedding, "embeddingModel": encoder.embedding_model}
+
+    async def embedImages(
+        self, images: list[bytes], config: dict[str, Any] | None = None
+    ) -> list[ClipDetectionPluginResponse | None]:
+        model_name = resolve_model((config or {}).get("vision_model"), DEFAULT_CLIP_VISION)
+        encoder = await self.get_clip_encoder(model_name)
+        if not encoder.initialized:
+            return [None for _ in images]
+
+        results: list[ClipDetectionPluginResponse | None] = []
+        for image_data in images:
+            try:
+                embedding = await encoder.embed_image(decode_image(image_data))
+            except Exception:
+                embedding = []
+            if not embedding:
+                results.append(None)
+                continue
+            results.append(
+                {
+                    "embeddings": [
+                        {
+                            "label": "image",
+                            "box": {"x": 0, "y": 0, "width": 1, "height": 1},
+                            "embedding": embedding,
+                        }
+                    ],
+                    "embeddingModel": encoder.embedding_model,
+                }
+            )
+        return results
+
+    async def getTextEmbeddings(self, text: str) -> list[ClipTextEmbeddingResult]:
+        # search model first, then every other space still loaded, so queries
+        # can cover old embeddings during a model transition
+        names = [self._search_clip_model()]
+        names += [name for name in self.clip_encoders if name not in names]
+
+        results: list[ClipTextEmbeddingResult] = []
+        seen: set[str] = set()
+        for name in names:
+            encoder = await self.get_clip_encoder(name)
+            if not encoder.initialized or encoder.embedding_model in seen:
+                continue
+            embedding = await encoder.embed_text(text)
+            if not embedding:
+                continue
+            seen.add(encoder.embedding_model)
+            results.append({"embedding": embedding, "embeddingModel": encoder.embedding_model})
+        return results
+
+    def _search_clip_model(self) -> str:
+        active = {
+            resolve_model(clip.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
+            for sensors in self._sensors.values()
+            if (clip := sensors.get("clip")) is not None
+        }
+        if len(active) == 1:
+            return next(iter(active))
+        if len(active) > 1:
+            self.logger.warn(
+                f"Cameras use different CLIP models {sorted(active)}, text search uses the default"
+            )
+        return DEFAULT_CLIP_VISION
 
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}

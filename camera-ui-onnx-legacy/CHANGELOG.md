@@ -1,5 +1,6 @@
 ## [1.2.9]
 
+- A second CLIP model is available for semantic search. The dropdown now has a Default option, existing setups move to it automatically, and search picks the matching text model on its own.
 - Object detection follows the per-type confidence values (person, vehicle, animal) from the camera settings
 
 ## [1.2.8]

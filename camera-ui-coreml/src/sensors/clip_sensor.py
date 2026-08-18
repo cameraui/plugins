@@ -14,9 +14,9 @@ from typing_extensions import TypedDict
 
 from defaults import (
     CLIP_VISION_MODELS,
-    DEFAULT_CLIP_EMBEDDER,
     DEFAULT_CLIP_VISION,
     DEFAULT_OPTION,
+    clip_family,
     resolve_model,
 )
 
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 class ClipStorageValues(TypedDict):
     vision_model: str
+    model_default_applied: bool
 
 
 class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
@@ -60,6 +61,16 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
                 "color": "danger",
                 "onSet": self._reset_settings,
             },
+            {
+                "type": "boolean",
+                "key": "model_default_applied",
+                "title": "Model default applied",
+                "description": "Internal marker, set once the model selection moved to the default option",
+                "group": "CLIP",
+                "store": True,
+                "hidden": True,
+                "defaultValue": False,
+            },
         ]
 
     @property
@@ -69,7 +80,7 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         return {
             "input": {"width": input_size, "height": input_size, "format": "rgb"},
             "triggerLabels": ["person", "vehicle", "animal"],
-            "embeddingModel": DEFAULT_CLIP_EMBEDDER,
+            "embeddingModel": clip_family(model_name),
             **model_runtime((self._plugin.clip_encoders.get(model_name), "encode")),
         }
 
@@ -78,7 +89,7 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         encoder = self._plugin.clip_encoders.get(model_name)
 
         if encoder is None or not encoder.initialized:
-            return [{"embeddings": [], "embeddingModel": DEFAULT_CLIP_EMBEDDER} for _ in frames]
+            return [{"embeddings": [], "embeddingModel": clip_family(model_name)} for _ in frames]
 
         return await detect_clip(encoder, frames)
 
@@ -86,6 +97,9 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         pass
 
     async def on_start(self) -> None:
+        if not self.storage.values.get("model_default_applied"):
+            await self.storage.setValue("vision_model", DEFAULT_OPTION)
+            await self.storage.setValue("model_default_applied", True)
         model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
         await self._plugin.get_clip_encoder(model_name)
         self.updateModelSpec()

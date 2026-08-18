@@ -10,8 +10,6 @@ from camera_ui_ml import BaseModelManager, InferenceBackend
 from camera_ui_sdk import LoggerService
 
 from defaults import (
-    DEFAULT_CLIP_TEXT,
-    DEFAULT_CLIP_VISION,
     LEGACY_RUNTIME,
     MODEL_BASE_URL,
     MODEL_LFS_URL,
@@ -166,10 +164,10 @@ class OpenVinoModelManager(BaseModelManager):
 
     @staticmethod
     def _rel_files(model_name: str) -> tuple[str, str]:
-        if model_name == DEFAULT_CLIP_VISION:
-            base = "clip-vit-base-patch32/vision"
-        elif model_name == DEFAULT_CLIP_TEXT:
-            base = "clip-vit-base-patch32/text"
+        # clip families live in one folder per family: <family>/{vision,text}.{xml,bin}
+        if model_name.startswith("clip-") and model_name.endswith(("-vision", "-text")):
+            family, _, tower = model_name.rpartition("-")
+            base = f"{family}/{tower}"
         else:
             base = f"{model_name}/{model_name}"
         return f"{base}.xml", f"{base}.bin"

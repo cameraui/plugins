@@ -36,10 +36,12 @@ LPD_DETECTOR_MODELS: dict[str, int] = {
 
 CLIP_VISION_MODELS: dict[str, int] = {
     "clip-vit-base-patch32-vision": 224,
+    "clip-vit-base-patch32-datacomp-vision": 224,
 }
 
 CLIP_TEXT_MODELS: dict[str, int] = {
     "clip-vit-base-patch32-text": 77,
+    "clip-vit-base-patch32-datacomp-text": 77,
 }
 
 # value = model input size in px
@@ -85,3 +87,11 @@ DEFAULT_OPTION = "default"
 
 def resolve_model(name: str | None, fallback: str) -> str:
     return fallback if not name or name == DEFAULT_OPTION else name
+
+
+def clip_family(vision_model: str) -> str:
+    return vision_model.removesuffix("-vision")
+
+
+def clip_text_for(vision_model: str) -> str:
+    return f"{clip_family(vision_model)}-text"
