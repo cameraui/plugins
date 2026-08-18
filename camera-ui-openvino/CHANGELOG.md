@@ -1,6 +1,6 @@
 ## [1.2.11]
 
-- A second CLIP model is available for semantic search. The dropdown now has a Default option, existing setups move to it automatically, and search picks the matching text model on its own.
+- A second CLIP model is available for the semantic search, and the model is a single plugin setting now instead of a per-camera choice. After switching, the recordings view offers to reindex existing events so old footage stays searchable.
 - Object detection follows the per-type confidence values (person, vehicle, animal) from the camera settings
 
 ## [1.2.10]
