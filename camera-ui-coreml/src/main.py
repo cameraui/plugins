@@ -100,6 +100,18 @@ class CoreMLPlugin(
         return [
             {
                 "type": "string",
+                "key": "clip_vision_model",
+                "title": "CLIP Vision Model",
+                "description": "CLIP model for semantic-search embeddings, shared by every camera. Changing it requires reindexing the recordings.",
+                "group": "CLIP",
+                "enum": [DEFAULT_OPTION, *CLIP_VISION_MODELS],
+                "store": True,
+                "defaultValue": DEFAULT_OPTION,
+                "required": True,
+                "onSet": self._on_clip_model_change,
+            },
+            {
+                "type": "string",
                 "key": "compute_units",
                 "title": "Compute Units",
                 "description": (
@@ -510,7 +522,7 @@ class CoreMLPlugin(
     async def testClipEmbedding(
         self, image_data: bytes, metadata: ImageMetadata, config: dict[str, Any]
     ) -> ClipDetectionPluginResponse | None:
-        model_name: str = resolve_model(config.get("vision_model"), DEFAULT_CLIP_VISION)
+        model_name: str = resolve_model(config.get("vision_model"), self.clip_model())
         encoder = await self.get_clip_encoder(model_name)
         if not encoder.initialized:
             return None
@@ -533,7 +545,7 @@ class CoreMLPlugin(
     async def detectClipEmbedding(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
     ) -> ClipDetectionPluginResponse | None:
-        model_name = resolve_model((config or {}).get("vision_model"), DEFAULT_CLIP_VISION)
+        model_name = resolve_model((config or {}).get("vision_model"), self.clip_model())
         encoder = await self.get_clip_encoder(model_name)
         if not encoder.initialized:
             return None
@@ -554,7 +566,7 @@ class CoreMLPlugin(
         }
 
     async def getTextEmbedding(self, text: str) -> ClipTextEmbeddingResult:
-        encoder = await self.get_clip_encoder(self._search_clip_model())
+        encoder = await self.get_clip_encoder(self.clip_model())
         if not encoder.initialized:
             return {"embedding": [], "embeddingModel": ""}
 
@@ -564,7 +576,7 @@ class CoreMLPlugin(
     async def embedImages(
         self, images: list[bytes], config: dict[str, Any] | None = None
     ) -> list[ClipDetectionPluginResponse | None]:
-        model_name = resolve_model((config or {}).get("vision_model"), DEFAULT_CLIP_VISION)
+        model_name = resolve_model((config or {}).get("vision_model"), self.clip_model())
         encoder = await self.get_clip_encoder(model_name)
         if not encoder.initialized:
             return [None for _ in images]
@@ -593,10 +605,7 @@ class CoreMLPlugin(
         return results
 
     async def getTextEmbeddings(self, text: str) -> list[ClipTextEmbeddingResult]:
-        # search model first, then every other space still loaded, so queries
-        # can cover old embeddings during a model transition
-        names = [self._search_clip_model()]
-        names += [name for name in self.clip_encoders if name not in names]
+        names = [self.clip_model()]
 
         results: list[ClipTextEmbeddingResult] = []
         seen: set[str] = set()
@@ -611,19 +620,18 @@ class CoreMLPlugin(
             results.append({"embedding": embedding, "embeddingModel": encoder.embedding_model})
         return results
 
-    def _search_clip_model(self) -> str:
-        active = {
-            resolve_model(clip.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
-            for sensors in self._sensors.values()
-            if (clip := sensors.get("clip")) is not None
-        }
-        if len(active) == 1:
-            return next(iter(active))
-        if len(active) > 1:
-            self.logger.warn(
-                f"Cameras use different CLIP models {sorted(active)}, text search uses the default"
-            )
-        return DEFAULT_CLIP_VISION
+    def clip_model(self) -> str:
+        return resolve_model(self.storage.values.get("clip_vision_model"), DEFAULT_CLIP_VISION)
+
+    async def _on_clip_model_change(self, new_model: str, _old_model: str) -> None:
+        if new_model == _old_model:
+            return
+        resolved = resolve_model(new_model, DEFAULT_CLIP_VISION)
+        await self.get_clip_encoder(resolved)
+        for sensors in self._sensors.values():
+            if (clip := sensors.get("clip")) is not None:
+                clip.updateModelSpec()
+        self.logger.log(f"CLIP vision model changed to {resolved}")
 
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
@@ -724,7 +732,7 @@ class CoreMLPlugin(
 
     async def _preload_clip(self) -> None:
         try:
-            await self.get_clip_encoder(DEFAULT_CLIP_VISION)
+            await self.get_clip_encoder(self.clip_model())
             self.logger.log("CLIP models preloaded")
         except Exception as e:
             self.logger.error(f"Failed to preload CLIP models: {e}")

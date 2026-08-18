@@ -2,23 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from camera_ui_ml import detect_clip, model_runtime, reset_stored_settings
+from camera_ui_ml import detect_clip, model_runtime
 from camera_ui_sdk import (
     ClipDetectorSensor,
     ClipResult,
-    JsonSchema,
     ModelSpec,
     VideoFrameData,
 )
-from typing_extensions import TypedDict
 
-from defaults import (
-    CLIP_VISION_MODELS,
-    DEFAULT_CLIP_VISION,
-    DEFAULT_OPTION,
-    clip_family,
-    resolve_model,
-)
+from defaults import CLIP_VISION_MODELS, clip_family
 
 if TYPE_CHECKING:
     from camera_ui_sdk import LoggerService
@@ -26,56 +18,15 @@ if TYPE_CHECKING:
     from main import CoreMLPlugin
 
 
-class ClipStorageValues(TypedDict):
-    vision_model: str
-    model_default_applied: bool
-
-
-class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
+class CoreMLClipSensor(ClipDetectorSensor):
     def __init__(self, plugin: CoreMLPlugin, logger: LoggerService, name: str = "CoreML CLIP") -> None:
         super().__init__(name)
         self._plugin = plugin
         self._logger = logger
 
     @property
-    def storage_schema(self) -> list[JsonSchema]:
-        return [
-            {
-                "type": "string",
-                "key": "vision_model",
-                "title": "Vision Model",
-                "description": "CLIP vision model for embedding generation",
-                "group": "CLIP",
-                "enum": [DEFAULT_OPTION, *CLIP_VISION_MODELS],
-                "store": True,
-                "defaultValue": DEFAULT_OPTION,
-                "required": True,
-                "onSet": self._on_change_model,
-            },
-            {
-                "type": "button",
-                "key": "reset_defaults",
-                "title": "Reset to Defaults",
-                "description": "Reset all settings to their default values",
-                "group": "CLIP",
-                "color": "danger",
-                "onSet": self._reset_settings,
-            },
-            {
-                "type": "boolean",
-                "key": "model_default_applied",
-                "title": "Model default applied",
-                "description": "Internal marker, set once the model selection moved to the default option",
-                "group": "CLIP",
-                "store": True,
-                "hidden": True,
-                "defaultValue": False,
-            },
-        ]
-
-    @property
     def modelSpec(self) -> ModelSpec:
-        model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
+        model_name = self._plugin.clip_model()
         input_size = CLIP_VISION_MODELS.get(model_name, 224)
         return {
             "input": {"width": input_size, "height": input_size, "format": "rgb"},
@@ -85,7 +36,7 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         }
 
     async def detectEmbeddings(self, frames: list[VideoFrameData]) -> list[ClipResult]:
-        model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
+        model_name = self._plugin.clip_model()
         encoder = self._plugin.clip_encoders.get(model_name)
 
         if encoder is None or not encoder.initialized:
@@ -97,20 +48,5 @@ class CoreMLClipSensor(ClipDetectorSensor["ClipStorageValues"]):
         pass
 
     async def on_start(self) -> None:
-        if not self.storage.values.get("model_default_applied"):
-            await self.storage.setValue("vision_model", DEFAULT_OPTION)
-            await self.storage.setValue("model_default_applied", True)
-        model_name = resolve_model(self.storage.values.get("vision_model"), DEFAULT_CLIP_VISION)
-        await self._plugin.get_clip_encoder(model_name)
+        await self._plugin.get_clip_encoder(self._plugin.clip_model())
         self.updateModelSpec()
-
-    async def _on_change_model(self, new_model: str, _old_model: str) -> None:
-        if new_model != _old_model:
-            resolved = resolve_model(new_model, DEFAULT_CLIP_VISION)
-            await self._plugin.get_clip_encoder(resolved)
-            self.updateModelSpec()
-            self._logger.log(f"CLIP vision model changed to {resolved}")
-
-    async def _reset_settings(self) -> None:
-        await reset_stored_settings(self.storage)
-        self._logger.log("Settings reset to defaults")
