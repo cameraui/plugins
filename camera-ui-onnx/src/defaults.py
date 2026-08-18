@@ -93,5 +93,15 @@ def clip_family(vision_model: str) -> str:
     return vision_model.removesuffix("-vision")
 
 
+CLIP_SCORE_BANDS: dict[str, list[float]] = {
+    "clip-vit-base-patch32": [0.15, 0.38],
+    "clip-vit-base-patch32-datacomp": [0.10, 0.26],
+}
+
+
+def clip_score_band(family: str) -> list[float]:
+    return CLIP_SCORE_BANDS.get(family, CLIP_SCORE_BANDS["clip-vit-base-patch32"])
+
+
 def clip_text_for(vision_model: str) -> str:
     return f"{clip_family(vision_model)}-text"

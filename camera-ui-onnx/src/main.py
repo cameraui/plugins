@@ -65,6 +65,7 @@ from defaults import (
     OCR_MODELS,
     OCR_PAD_CHAR,
     clip_family,
+    clip_score_band,
     clip_text_for,
     resolve_model,
 )
@@ -556,6 +557,7 @@ class ONNXPlugin(
                 }
             ],
             "embeddingModel": encoder.embedding_model,
+            "scoreBand": clip_score_band(encoder.embedding_model),
         }
 
     async def detectClipEmbedding(
@@ -579,15 +581,20 @@ class ONNXPlugin(
                 }
             ],
             "embeddingModel": encoder.embedding_model,
+            "scoreBand": clip_score_band(encoder.embedding_model),
         }
 
     async def getTextEmbedding(self, text: str) -> ClipTextEmbeddingResult:
         encoder = await self.get_clip_encoder(self.clip_model())
         if not encoder.initialized:
-            return {"embedding": [], "embeddingModel": ""}
+            return {"embedding": [], "embeddingModel": "", "scoreBand": []}
 
         embedding = await encoder.embed_text(text)
-        return {"embedding": embedding, "embeddingModel": encoder.embedding_model}
+        return {
+            "embedding": embedding,
+            "embeddingModel": encoder.embedding_model,
+            "scoreBand": clip_score_band(encoder.embedding_model),
+        }
 
     async def embedImages(
         self, images: list[bytes], config: dict[str, Any] | None = None
@@ -616,6 +623,7 @@ class ONNXPlugin(
                         }
                     ],
                     "embeddingModel": encoder.embedding_model,
+                    "scoreBand": clip_score_band(encoder.embedding_model),
                 }
             )
         return results
@@ -634,7 +642,13 @@ class ONNXPlugin(
             if not embedding:
                 continue
             seen.add(encoder.embedding_model)
-            results.append({"embedding": embedding, "embeddingModel": encoder.embedding_model})
+            results.append(
+                {
+                    "embedding": embedding,
+                    "embeddingModel": encoder.embedding_model,
+                    "scoreBand": clip_score_band(encoder.embedding_model),
+                }
+            )
         return results
 
     def clip_model(self) -> str:
