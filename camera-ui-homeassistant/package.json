@@ -23,8 +23,8 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.95",
-    "@camera.ui/sdk": "^1.2.26",
+    "@camera.ui/cli": "^0.0.96",
+    "@camera.ui/sdk": "^1.2.28",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.2.0",
     "@types/ws": "^8.18.1",
@@ -37,7 +37,7 @@
     "tsx": "^4.23.12",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.67.0",
-    "updates": "^18.0.0"
+    "updates": "^18.0.1"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"

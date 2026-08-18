@@ -1,3 +1,8 @@
+## [1.2.4]
+
+- The sensor settings are gone: the plugin always listens for the standard camera.ui sounds, and the confidence comes from the camera's audio confidence setting
+- Detections use the standard camera.ui labels; unmapped YAMNet classes no longer leak through as raw class names
+
 ## [1.2.3]
 
 - The plugin reports which model it loaded and which device it runs on, so camera.ui can show it in the camera metrics.

@@ -1,3 +1,7 @@
+## [1.2.5]
+
+- Object detection follows the per-type confidence values (person, vehicle, animal) from the camera settings
+
 ## [1.2.4]
 
 - The confidence threshold is gone from the plugin settings. Object detection now uses the value from the camera's detection settings, so it is set in one place and a change takes effect right away.

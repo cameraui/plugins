@@ -30,7 +30,6 @@ class YAMNetPlugin(BasePlugin, AudioDetectionInterface):
 
         self.sensors: dict[str, YAMNetAudioSensor] = {}
         self.audio_detectors: dict[str, AudioDetector] = {}
-        self._available_labels: list[str] = list(DEFAULT_LISTEN_LABELS)
 
         self.api.on(API_EVENT.SHUTDOWN, self.on_shutdown)
 
@@ -52,7 +51,7 @@ class YAMNetPlugin(BasePlugin, AudioDetectionInterface):
             del self.sensors[cameraId]
 
     async def add_sensor_to_camera(self, camera: CameraDevice) -> None:
-        sensor = YAMNetAudioSensor(self.api, self.logger, self._available_labels)
+        sensor = YAMNetAudioSensor(self.api, self.logger, camera)
         await camera.addSensor(sensor)
         self.sensors[camera.id] = sensor
 
@@ -62,9 +61,9 @@ class YAMNetPlugin(BasePlugin, AudioDetectionInterface):
                 "type": "string",
                 "key": "listen_labels",
                 "title": "Listen Labels",
-                "description": "Audio event classes to detect",
+                "description": "Sounds to detect",
                 "defaultValue": DEFAULT_LISTEN_LABELS,
-                "enum": self._available_labels,
+                "enum": DEFAULT_LISTEN_LABELS,
                 "multiple": True,
                 "store": False,
             },

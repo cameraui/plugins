@@ -25,13 +25,13 @@ if TYPE_CHECKING:
 
 
 def build_detections(
-    scores: Iterable[tuple[str, float]], listen_set: set[str], threshold: float
+    scores: Iterable[tuple[str, float]], listen_labels: set[str], threshold: float
 ) -> list[Detection]:
     best: dict[str, float] = {}
-    for label, score in scores:
-        if label not in listen_set or score < threshold:
+    for yamnet_class, score in scores:
+        mapped = YAMNET_TO_LABEL.get(yamnet_class)
+        if mapped is None or mapped not in listen_labels or score < threshold:
             continue
-        mapped = YAMNET_TO_LABEL.get(label, label)
         if score > best.get(mapped, 0.0):
             best[mapped] = score
 
