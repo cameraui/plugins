@@ -20,7 +20,7 @@
     "sync": "node scripts/sync.mjs"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.77",
+    "@camera.ui/cli": "^0.0.90",
     "@camera.ui/sdk": "^1.2.4",
     "cross-env": "^10.1.0"
   },
