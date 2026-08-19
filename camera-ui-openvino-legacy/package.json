@@ -17,11 +17,12 @@
     "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
     "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
     "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
-    "sync": "node scripts/sync.mjs"
+    "sync": "node scripts/sync.mjs",
+    "update": "updates --update ./ && cupdate"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.77",
-    "@camera.ui/sdk": "^1.2.4",
+    "@camera.ui/cli": "^0.0.98",
+    "@camera.ui/sdk": "^1.2.30",
     "cross-env": "^10.1.0"
   },
   "bugs": {
