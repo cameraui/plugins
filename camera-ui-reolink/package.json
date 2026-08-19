@@ -27,7 +27,7 @@
     "cross-env": "^10.1.0",
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
-    "updates": "^18.0.1"
+    "updates": "^18.0.2"
   },
   "license": "MIT",
   "bugs": {

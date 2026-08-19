@@ -43,7 +43,7 @@
     "sharp": "^0.35.3",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.67.0",
-    "updates": "^18.0.1"
+    "updates": "^18.0.2"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
