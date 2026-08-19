@@ -1,3 +1,3 @@
 export default {
-  exclude: ['typescript', 'eslint', 'numpy'],
+  exclude: ['typescript', 'eslint'],
 };
