@@ -1,7 +1,7 @@
 {
   "displayName": "ONNX Legacy",
   "name": "@camera.ui/camera-ui-onnx-legacy",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "ONNX Runtime detection backend for camera.ui with the older CUDA 12 runtime. For NVIDIA GPUs before GTX 1650 (Maxwell, Pascal, Volta) and for systems that stay on CUDA 12. Use the regular ONNX plugin on newer hardware.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
