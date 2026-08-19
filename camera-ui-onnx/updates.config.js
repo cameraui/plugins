@@ -1,3 +1,3 @@
 export default {
-  exclude: ['typescript', 'eslint', 'onnxruntime', 'onnxruntime-gpu', 'numpy'],
+  exclude: ['typescript', 'eslint'],
 };
