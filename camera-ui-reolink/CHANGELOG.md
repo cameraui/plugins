@@ -1,3 +1,7 @@
+## [1.2.12]
+
+- Updated camera.ui engine and deps
+
 ## [1.2.11]
 
 - Update camera.ui SDK

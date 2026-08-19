@@ -1,3 +1,7 @@
+## [1.2.4]
+
+- Updated camera.ui engine and deps
+
 ## [1.2.3]
 
 - Driving to a PTZ preset works again. Most cameras name a preset differently from the id they store it under, and the plugin sent the name, so the camera answered that the preset does not exist

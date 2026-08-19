@@ -1,3 +1,7 @@
+## [1.0.10]
+
+- Updated camera.ui engine and deps
+
 ## [1.0.8]
 
 - The "entities imported" sync log only appears at startup and when entities were actually added or removed, instead of repeating every few minutes.
