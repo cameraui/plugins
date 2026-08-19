@@ -236,7 +236,11 @@ export class RecordingSession extends EventEmitter {
     ];
 
     await session.startStream({
-      supportedVideoCodecs: ['h264'],
+      // An empty supported-codec list deliberately makes node-av transcode the
+      // input to H.264. This is useful for cameras whose already-compatible
+      // H.264 stream exceeds the resolution, frame-rate, or bitrate negotiated
+      // by HomeKit: stream-copy mode cannot apply those encoder constraints.
+      supportedVideoCodecs: this.cameraAccessory.cameraStorage.values.forceVideoTranscodingForRecording ? [] : ['h264'],
       supportedAudioCodecs: ['aac'],
       boxMode: true,
       fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,
