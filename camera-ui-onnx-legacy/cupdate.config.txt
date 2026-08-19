@@ -1,7 +1,3 @@
-# both runtimes ship the same `onnxruntime` package and overwrite each other,
-# so the environment markers decide which one a platform gets. cupdate rewrites
-# every line it looks up and drops the marker, excluding them keeps it.
 # gpu 1.27+ builds against CUDA 13 (docker image ships 12) and drops pre-Turing
 # cards; 1.26 still carries sm_52-61 and runs Blackwell via 90-virtual PTX
-onnxruntime
 onnxruntime-gpu
