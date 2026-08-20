@@ -1,3 +1,10 @@
+## [1.2.13]
+
+- Battery cameras and doorbells no longer lose their charge within a day. The plugin kept a connection to the camera open around the clock, which is what stops a battery model from sleeping. It now hands the camera a push address and lets the connection go; motion, doorbell presses and the battery level arrive on their own. Cameras whose firmware cannot push say so in the log and keep the old behavior
+- The connection to a battery camera is only dropped once the camera has actually reached camera.ui with a push. If it cannot, the connection stays up and the log says so, so a camera in an odd network setup never ends up silent
+- New camera setting "Permanently Powered" for battery models. A doorbell wired to its bell transformer has no reason to sleep, so it keeps a connection like a mains camera and reacts faster. It takes effect right away
+- A camera you disabled is now really disabled. Disabling only stopped the recording and streaming side, the plugin stayed logged in to the camera and kept asking it for events. Enabling and disabling takes effect right away
+
 ## [1.2.12]
 
 - Updated camera.ui engine and deps

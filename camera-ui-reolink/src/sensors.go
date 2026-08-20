@@ -30,7 +30,12 @@ func newReolinkSiren(cam *reolinkCamera) *reolinkSiren {
 func (s *reolinkSiren) SetActive() {
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
-	if err := s.cam.bridgeCam.SetSiren(ctx, true); err != nil {
+	cam, err := s.cam.cam()
+	if err != nil {
+		s.cam.logger.Error("Failed to activate siren:", err)
+		return
+	}
+	if err := cam.SetSiren(ctx, true); err != nil {
 		s.cam.logger.Error("Failed to activate siren:", err)
 		return
 	}
@@ -40,7 +45,12 @@ func (s *reolinkSiren) SetActive() {
 func (s *reolinkSiren) SetInactive() {
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
-	if err := s.cam.bridgeCam.SetSiren(ctx, false); err != nil {
+	cam, err := s.cam.cam()
+	if err != nil {
+		s.cam.logger.Error("Failed to deactivate siren:", err)
+		return
+	}
+	if err := cam.SetSiren(ctx, false); err != nil {
 		s.cam.logger.Error("Failed to deactivate siren:", err)
 		return
 	}
@@ -74,7 +84,12 @@ func newReolinkSpotlight(cam *reolinkCamera) *reolinkSpotlight {
 func (s *reolinkSpotlight) SetOn() {
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
-	if err := s.cam.bridgeCam.SetWhiteLed(ctx, true); err != nil {
+	cam, err := s.cam.cam()
+	if err != nil {
+		s.cam.logger.Error("Failed to turn spotlight on:", err)
+		return
+	}
+	if err := cam.SetWhiteLed(ctx, true); err != nil {
 		s.cam.logger.Error("Failed to turn spotlight on:", err)
 		return
 	}
@@ -84,7 +99,12 @@ func (s *reolinkSpotlight) SetOn() {
 func (s *reolinkSpotlight) SetOff() {
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
-	if err := s.cam.bridgeCam.SetWhiteLed(ctx, false); err != nil {
+	cam, err := s.cam.cam()
+	if err != nil {
+		s.cam.logger.Error("Failed to turn spotlight off:", err)
+		return
+	}
+	if err := cam.SetWhiteLed(ctx, false); err != nil {
 		s.cam.logger.Error("Failed to turn spotlight off:", err)
 		return
 	}
@@ -174,7 +194,11 @@ func (s *reolinkPTZ) refreshPresets() {
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
 
-	presets, err := s.cam.bridgeCam.PTZPresets(ctx)
+	cam, err := s.cam.cam()
+	if err != nil {
+		return
+	}
+	presets, err := cam.PTZPresets(ctx)
 	if err != nil {
 		s.cam.logger.Debug("Failed to read PTZ presets:", err)
 		return
@@ -224,7 +248,12 @@ func (s *reolinkPTZ) SetTargetPreset(name string) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
-	if err := s.cam.bridgeCam.PTZPreset(ctx, id); err != nil {
+	cam, err := s.cam.cam()
+	if err != nil {
+		s.cam.logger.Error("Failed to move to PTZ preset", name, ":", err)
+		return
+	}
+	if err := cam.PTZPreset(ctx, id); err != nil {
 		s.cam.logger.Error("Failed to move to PTZ preset", name, ":", err)
 		return
 	}
@@ -252,7 +281,12 @@ func (s *reolinkPTZ) SetVelocity(value sdk.PTZDirection) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
-	if err := s.cam.bridgeCam.PTZ(ctx, command, speed); err != nil {
+	cam, err := s.cam.cam()
+	if err != nil {
+		s.cam.logger.Error("PTZ command failed:", err)
+		return
+	}
+	if err := cam.PTZ(ctx, command, speed); err != nil {
 		var statusErr *baichuan.StatusError
 		if errors.As(err, &statusErr) && s.unsupported.CompareAndSwap(false, true) {
 			s.cam.logger.Warn("Camera rejected PTZ command (not a PTZ model?) — disabling PTZ control. Re-adopt the camera without PTZ to remove the sensor.")

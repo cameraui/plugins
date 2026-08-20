@@ -75,6 +75,7 @@ type cameraSettings struct {
 	PTZZoom            bool
 	HasDoorbell        bool
 	HasAI              bool
+	MainsPowered       bool
 	LiveCatchUpSeconds int
 }
 
