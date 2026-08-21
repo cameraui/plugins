@@ -55,8 +55,7 @@ def decode_ocr(logits: NDArray, alphabet: str, pad_char: str = "_") -> tuple[str
         char = alphabet[index] if index < len(alphabet) else pad_char
         if char == pad_char:
             break
-        shifted = np.exp(slot - np.max(slot))
-        confidences.append(float(shifted[index] / np.sum(shifted)))
+        confidences.append(_slot_confidence(slot, index))
         chars.append(char)
     return "".join(chars), (float(np.mean(confidences)) if confidences else 0.0)
 
@@ -98,3 +97,10 @@ def _iou(box: NDArray, others: NDArray) -> NDArray:
     areas = (others[:, 2] - others[:, 0]) * (others[:, 3] - others[:, 1])
     union = area + areas - inter
     return np.where(union > 0.0, inter / union, 0.0)
+
+
+def _slot_confidence(slot: NDArray, index: int) -> float:
+    if float(np.min(slot)) >= 0.0 and abs(float(np.sum(slot)) - 1.0) < 1e-3:
+        return float(slot[index])
+    shifted = np.exp(slot - np.max(slot))
+    return float(shifted[index] / np.sum(shifted))

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "camera-ui-ml"
-version = "1.2.12"
+version = "1.2.13"
 description = "Shared ML inference framework for camera.ui detection plugins (onnx, openvino, coreml, ncnn)"
 keywords = ["camera.ui", "python", "ml", "inference", "detection"]
 readme = "README.md"
@@ -21,11 +21,11 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-dependencies = ["typing_extensions>=4.15.0", "camera-ui-sdk>=1.0.95", "numpy>=2.0", "pillow>=12.0", "aiohttp>=3.12"]
+dependencies = ["typing_extensions>=4.16.0", "camera-ui-sdk>=1.2.29", "numpy>=2.5.2", "pillow>=12.3.0", "aiohttp>=3.14.3"]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
-clip = ["transformers>=4.40"]
+test = ["pytest>=9.1.1"]
+clip = ["transformers>=5.15.1"]
 
 [project.urls]
 Homepage = "https://github.com/cameraui/ml"
