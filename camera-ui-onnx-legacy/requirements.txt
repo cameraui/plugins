@@ -1,6 +1,6 @@
 onnxruntime-gpu==1.26.0
 camera-ui-sdk==1.2.29
-camera-ui-ml==1.2.12
+camera-ui-ml==1.2.13
 numpy==2.4.6
 Pillow==12.3.0
 aiohttp==3.14.3

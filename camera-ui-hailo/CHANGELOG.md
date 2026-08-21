@@ -1,3 +1,7 @@
+## [1.2.6]
+
+- Updated deps
+
 ## [1.2.5]
 
 - Object detection follows the per-type confidence values (person, vehicle, animal) from the camera settings

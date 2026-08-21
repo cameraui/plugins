@@ -1,3 +1,7 @@
+## [1.2.12]
+
+- **License plates are read again.** Every read was scored as unreadable and dropped before it reached an event, whatever the camera saw. If you lowered the reading confidence in the camera settings to work around it, put it back.
+
 ## [1.2.11]
 
 - A second CLIP model is available for the semantic search, and the model is a single plugin setting now instead of a per-camera choice. After switching, the recordings view offers to reindex existing events so old footage stays searchable.
