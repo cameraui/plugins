@@ -1,4 +1,4 @@
-## [1.2.10]
+## [1.2.11]
 
 - **License plates are read again.** Every read was scored as unreadable and dropped before it reached an event, whatever the camera saw. If you lowered the reading confidence in the camera settings to work around it, put it back.
 
