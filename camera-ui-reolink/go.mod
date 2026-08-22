@@ -1,6 +1,6 @@
 module github.com/cameraui/plugins/camera-ui-reolink
 
-go 1.26.3
+go 1.27.0
 
 require (
 	github.com/cameraui/sdk/go v1.2.38

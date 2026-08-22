@@ -749,8 +749,8 @@ func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username
 		return probeResult{}, err
 	}
 
-	result := probeResult{streams: []string{"main", "sub"}}
-	result.loginInfo = client.LoginDeviceInfo()
+	result := probeResult{streams: []string{"main", "sub"},
+		loginInfo: client.LoginDeviceInfo()}
 
 	if result.loginInfo.IsNVR() {
 		if channels, err := client.OccupiedChannels(ctx); err == nil {
