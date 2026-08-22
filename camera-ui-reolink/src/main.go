@@ -731,12 +731,10 @@ func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username
 	cfg := baichuan.Config{
 		Host:     device.IP,
 		Port:     9000,
+		UID:      device.UID,
 		Username: username,
 		Password: password,
 		Timeout:  10 * time.Second,
-	}
-	if cfg.Host == "" {
-		cfg.UID = device.UID
 	}
 
 	client, err := baichuan.Dial(ctx, cfg)

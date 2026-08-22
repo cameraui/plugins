@@ -1,3 +1,7 @@
+## [1.2.14]
+
+- Battery-only cameras can be added again. A camera that is asleep keeps no connection port open, so adopting one failed with "connection refused" even though the Reolink app reached it. The plugin now falls back to the camera's UID connection
+
 ## [1.2.13]
 
 - Battery cameras and doorbells no longer lose their charge within a day. The plugin kept a connection to the camera open around the clock, which is what stops a battery model from sleeping. It now hands the camera a push address and lets the connection go; motion, doorbell presses and the battery level arrive on their own. Cameras whose firmware cannot push say so in the log and keep the old behavior
