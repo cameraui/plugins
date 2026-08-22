@@ -1,6 +1,6 @@
 onnxruntime-gpu==1.29.0; platform_machine == "x86_64" or platform_machine == "AMD64"
 onnxruntime==1.29.0; platform_machine != "x86_64" and platform_machine != "AMD64"
-camera-ui-sdk==1.2.29
+camera-ui-sdk==1.2.30
 camera-ui-ml==1.2.14
 numpy==2.4.6
 Pillow==12.3.0

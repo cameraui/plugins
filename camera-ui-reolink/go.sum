@@ -2,10 +2,10 @@ github.com/bluenviron/gortsplib/v5 v5.6.0 h1:pLEIifcDFRCTMjXyppmXoYBF5Z0ct9Kyc0D
 github.com/bluenviron/gortsplib/v5 v5.6.0/go.mod h1:x2ULFBWPxZbuHjxNnGIBGr15O+/VB+p3TsJWQyshV50=
 github.com/bluenviron/mediacommon/v2 v2.9.0 h1:8gBeby10B/qD8ctnesKTHx3pgdsxiZcaQZe+RR6Djx4=
 github.com/bluenviron/mediacommon/v2 v2.9.0/go.mod h1:syqw4j2RmBCKZgUtGFtB/7gcnh1aaX8I3vd24+bgXWc=
-github.com/cameraui/rpc/go v1.0.11 h1:066+FEUkQtFqda1uSxmXZVDR6OedUvfx5aRKH9z6arY=
-github.com/cameraui/rpc/go v1.0.11/go.mod h1:XVMIjtHgl9+s0/3pYy3Mtz7oCCF2X6TafeQ/h+hycEU=
-github.com/cameraui/sdk/go v1.2.38 h1:i+OLDnL8CCK6vURE/HQ64Lk0ub5ZL+hhGGL8IfkEGdo=
-github.com/cameraui/sdk/go v1.2.38/go.mod h1:zoAk4SqlSWQsvnxdbuxUpzp4Tz5ZWnzCR23hKfu+z98=
+github.com/cameraui/rpc/go v1.0.13 h1:LCHoxCHhWdZJSdE3ln8EtUfZYYjsSobL+M35FznE++o=
+github.com/cameraui/rpc/go v1.0.13/go.mod h1:tDv0/YcxGZxfoik99Uopkn6JbZbb9R0wQBZVW6ygaDQ=
+github.com/cameraui/sdk/go v1.2.39 h1:4df0+4AVt6QM2HFIjHIAKn2xrM8sY2hL/g+YQDmbEhw=
+github.com/cameraui/sdk/go v1.2.39/go.mod h1:F6pkw+XR5VQA3tehTs1fI2JVJZ9ZfaXQRt5WFqwHU8M=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
