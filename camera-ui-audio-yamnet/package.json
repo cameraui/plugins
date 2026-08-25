@@ -23,7 +23,7 @@
     "@camera.ui/cli": "^0.0.99",
     "@camera.ui/sdk": "^1.2.31",
     "cross-env": "^10.1.0",
-    "updates": "^18.0.5"
+    "updates": "^18.0.6"
   },
   "os": [],
   "cpu": [],

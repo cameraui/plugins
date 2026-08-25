@@ -26,8 +26,8 @@
     "@camera.ui/cli": "^0.0.99",
     "@camera.ui/sdk": "^1.2.31",
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@types/node": "^26.2.0",
-    "@typescript-eslint/parser": "^8.67.0",
+    "@types/node": "^26.3.0",
+    "@typescript-eslint/parser": "^8.68.0",
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
@@ -37,8 +37,8 @@
     "set-interval-async": "^3.0.3",
     "sharp": "^0.35.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.67.0",
-    "updates": "^18.0.5"
+    "typescript-eslint": "^8.68.0",
+    "updates": "^18.0.6"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
