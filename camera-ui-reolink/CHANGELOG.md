@@ -1,3 +1,7 @@
+## [1.2.16]
+
+- Adding a slow-waking battery camera no longer gives up mid-attempt. The adoption allowed exactly as much time as the wake-up needs, so it could abort a moment before the camera answered
+
 ## [1.2.15]
 
 - Battery-only cameras can now be added by IP address alone. The UID fallback needed the UID to be known, which it is not when a camera is typed in by hand; the camera is now asked for its UID over the same port the Reolink app uses, and the answer is saved with the camera

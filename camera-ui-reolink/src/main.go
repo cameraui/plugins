@@ -18,7 +18,7 @@ const (
 	discoveryPrefix    = "reolink:"
 	defaultRTSPPort    = 8556
 	defaultWebhookPort = 8557
-	adoptProbeTimeout  = 20 * time.Second
+	adoptProbeTimeout  = 45 * time.Second
 	storageKeyNVRs     = "nvrs"
 	storageKeyDuals    = "dualLensCameras"
 	presenceGrace      = 5 * time.Minute
