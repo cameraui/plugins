@@ -550,9 +550,13 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 		return nil, p.expandNVR(camera, entry, username, password, probe.channels)
 	}
 
+	uid := device.UID
+	if uid == "" {
+		uid = probe.uid
+	}
 	camSettings := cameraSettings{
 		Host:          device.IP,
-		UID:           device.UID,
+		UID:           uid,
 		Username:      username,
 		Password:      password,
 		Channel:       channel,
@@ -725,6 +729,7 @@ type probeResult struct {
 	streams   []string
 	loginInfo baichuan.LoginDeviceInfo
 	channels  []int
+	uid       string
 }
 
 func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username string, password string, channel uint8) (probeResult, error) {
@@ -747,8 +752,11 @@ func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username
 		return probeResult{}, err
 	}
 
-	result := probeResult{streams: []string{"main", "sub"},
-		loginInfo: client.LoginDeviceInfo()}
+	result := probeResult{
+		streams:   []string{"main", "sub"},
+		loginInfo: client.LoginDeviceInfo(),
+		uid:       client.UID(),
+	}
 
 	if result.loginInfo.IsNVR() {
 		if channels, err := client.OccupiedChannels(ctx); err == nil {

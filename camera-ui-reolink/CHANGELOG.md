@@ -1,3 +1,8 @@
+## [1.2.15]
+
+- Battery-only cameras can now be added by IP address alone. The UID fallback needed the UID to be known, which it is not when a camera is typed in by hand; the camera is now asked for its UID over the same port the Reolink app uses, and the answer is saved with the camera
+- Waking a sleeping camera gets the time it needs. A battery camera answers only after about ten seconds of knocking, and the connection attempt gave up just before that
+
 ## [1.2.14]
 
 - Battery-only cameras can be added again. A camera that is asleep keeps no connection port open, so adopting one failed with "connection refused" even though the Reolink app reached it. The plugin now falls back to the camera's UID connection
