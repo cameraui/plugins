@@ -1,10 +1,10 @@
-import { DoorbellTrigger, MotionSensor, Sensor } from '@camera.ui/sdk';
+import { DoorbellTrigger, MotionSensor, Sensor, SensorType } from '@camera.ui/sdk';
 
 import { applyControlState, controlKindForEntity, createControl } from './controls.js';
 import { entityDisplayName, mapEntity } from './mapping.js';
 import { importOptions } from './types.js';
 
-import type { SensorCategory, SensorMeta, SensorType } from '@camera.ui/sdk';
+import type { SensorCategory, SensorMeta } from '@camera.ui/sdk';
 import type { CommandFn, ControlKind, HaControl } from './controls.js';
 import type { HaState } from './types.js';
 
@@ -39,6 +39,25 @@ export type ImportedSensor =
 
 export function isImportableEntity(state: HaState): boolean {
   return controlKindForEntity(state) !== undefined || mapEntity(state) !== undefined;
+}
+
+const CONTROL_SENSOR_TYPES: Record<ControlKind, SensorType> = {
+  lock: SensorType.Lock,
+  garage: SensorType.Garage,
+  securitySystem: SensorType.SecuritySystem,
+  switch: SensorType.Switch,
+  light: SensorType.Light,
+  siren: SensorType.Siren,
+};
+
+export function importableSensorType(state: HaState): SensorType | undefined {
+  const controlKind = controlKindForEntity(state);
+  if (controlKind) return CONTROL_SENSOR_TYPES[controlKind];
+  const mapping = mapEntity(state);
+  if (!mapping) return undefined;
+  if (mapping.kind === 'motion') return SensorType.Motion;
+  if (mapping.kind === 'doorbell') return SensorType.Doorbell;
+  return mapping.meta.type;
 }
 
 export function createImportedSensor(state: HaState, commandFor: (kind: ControlKind) => CommandFn): ImportedSensor | undefined {

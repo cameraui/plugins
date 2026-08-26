@@ -1,3 +1,7 @@
+## [1.0.11]
+
+- Entities are imported by choice now. Instead of importing every entity it can map, the plugin lists them in the Discovered section of the sensors page, with name, type and room; you pick what comes over, and removing a sensor there stops its import for good. This also applies to entities imported by earlier versions: after the update they all show up as discovered again, so pick the ones you actually use; their old entries clean themselves up, so a re-added entity starts fresh, without earlier camera assignments. Needs camera.ui 2.1.11.
+
 ## [1.0.10]
 
 - Updated camera.ui engine and deps

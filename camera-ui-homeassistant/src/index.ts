@@ -2,10 +2,21 @@ import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 
 import { commandToService } from './controls.js';
 import { HaClient, resolveTarget } from './ha.js';
+import { entityDisplayName } from './mapping.js';
 import { HaNotifier } from './notifier.js';
-import { applyEntityState, createImportedSensor, isImportableEntity } from './sensors.js';
+import { applyEntityState, createImportedSensor, importableSensorType, isImportableEntity } from './sensors.js';
 
-import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice, NotifierInterface, PluginAPI } from '@camera.ui/sdk';
+import type {
+  DeviceStorage,
+  DiscoveredSensor,
+  JsonSchema,
+  LoggerService,
+  Notification,
+  NotifierDevice,
+  NotifierInterface,
+  PluginAPI,
+  SensorDiscoveryProvider,
+} from '@camera.ui/sdk';
 import type { ImportedSensor } from './sensors.js';
 import type { HaState, StorageValues } from './types.js';
 
@@ -19,11 +30,21 @@ const OWN_ENTITIES_TEMPLATE = `
 {%- endfor -%}
 {{ ns.ids | tojson }}`;
 
-export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface {
+const AREA_MAP_TEMPLATE = `
+{%- set ns = namespace(m=[]) -%}
+{%- for s in states -%}
+{%- set a = area_name(s.entity_id) -%}
+{%- if a -%}{%- set ns.m = ns.m + [[s.entity_id, a]] -%}{%- endif -%}
+{%- endfor -%}
+{{ ns.m | tojson }}`;
+
+export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface, SensorDiscoveryProvider {
   private client?: HaClient;
   private imported = new Map<string, ImportedSensor>();
   private skippedLogged = new Set<string>();
   private ownEntities = new Set<string>();
+  private adopted = new Set<string>();
+  private lastStates = new Map<string, HaState>();
   private guardLoaded = false;
   private syncLogged = false;
   private resyncTimer?: NodeJS.Timeout;
@@ -114,7 +135,61 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   async onCameraReleased(): Promise<void> {}
 
+  async onDiscoverSensors(): Promise<DiscoveredSensor[]> {
+    const client = this.client;
+    if (!client) return [];
+
+    await this.loadOwnEntities(client);
+    if (!this.guardLoaded) return [];
+    const states = await client.fetchStates();
+    const areas = await this.fetchAreaMap(client);
+
+    const result: DiscoveredSensor[] = [];
+    for (const state of states) {
+      const entityId = state.entity_id;
+      if (this.adopted.has(entityId) || this.imported.has(entityId)) continue;
+      if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) continue;
+      const type = importableSensorType(state);
+      if (!type) continue;
+      this.lastStates.set(entityId, state);
+      result.push({ id: entityId, name: entityDisplayName(state), type, room: areas.get(entityId) });
+    }
+    return result;
+  }
+
+  async onAdoptSensor(sensor: DiscoveredSensor): Promise<void> {
+    this.adopted.add(sensor.id);
+    await this.storage.setValue('adoptedEntities', [...this.adopted]);
+
+    let state = this.lastStates.get(sensor.id);
+    if (!state && this.client) {
+      state = (await this.client.fetchStates()).find((s) => s.entity_id === sensor.id);
+    }
+    if (state) this.applyOrImport(state, false);
+  }
+
+  async onReleaseSensor(discoveredId: string): Promise<void> {
+    this.adopted.delete(discoveredId);
+    await this.storage.setValue('adoptedEntities', [...this.adopted]);
+
+    const imported = this.imported.get(discoveredId);
+    if (imported) {
+      this.imported.delete(discoveredId);
+      await this.api.sensorManager.removeSensor(imported.sensor);
+    }
+  }
+
+  private async fetchAreaMap(client: HaClient): Promise<Map<string, string>> {
+    try {
+      const rendered = await client.renderTemplate(AREA_MAP_TEMPLATE);
+      return new Map(JSON.parse(rendered) as [string, string][]);
+    } catch {
+      return new Map();
+    }
+  }
+
   private async start(): Promise<void> {
+    this.adopted = new Set(this.storage.values.adoptedEntities ?? []);
     const target = resolveTarget({ host: this.storage.values.host, token: this.storage.values.token });
     if (!target) {
       this.logger.warn('Home Assistant URL and access token are not configured');
@@ -161,7 +236,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       const before = new Set(this.imported.keys());
 
       for (const [entityId, imported] of this.imported) {
-        if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) {
+        if (this.ownEntities.has(entityId) || this.isExcluded(entityId) || !this.adopted.has(entityId)) {
           this.imported.delete(entityId);
           this.api.sensorManager.removeSensor(imported.sensor);
         }
@@ -221,6 +296,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   private applyOrImport(state: HaState, live: boolean): boolean {
     const entityId = state.entity_id;
     if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) return false;
+    if (!this.adopted.has(entityId)) return false;
 
     const existing = this.imported.get(entityId);
     if (existing) {

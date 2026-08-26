@@ -11,6 +11,7 @@ export interface StorageValues {
   host?: string;
   token?: string;
   excludeEntities?: string;
+  adoptedEntities?: string[];
 }
 
 export interface HaStateAttributes {
