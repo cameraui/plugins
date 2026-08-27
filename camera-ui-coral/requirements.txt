@@ -1,5 +1,5 @@
 ai-edge-litert==2.2.0
-camera-ui-sdk==1.2.31
+camera-ui-sdk==1.2.32
 camera-ui-ml==1.2.14
 numpy==2.4.6
 Pillow==12.3.0

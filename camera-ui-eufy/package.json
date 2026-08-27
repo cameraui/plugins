@@ -25,8 +25,8 @@
     "eufy-security-client": "file:../externals/eufy-security-client"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.100",
-    "@camera.ui/sdk": "^1.2.32",
+    "@camera.ui/cli": "^0.0.101",
+    "@camera.ui/sdk": "^1.2.33",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.4.0",
     "@typescript-eslint/parser": "^8.68.0",
