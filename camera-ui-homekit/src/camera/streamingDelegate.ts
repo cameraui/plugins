@@ -88,6 +88,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
         this.sessions[request.sessionID] = session;
 
         callback(undefined, {
+          addressOverride: session.sourceAddress,
           audio: {
             port: session.audioSplitter.port!,
             ssrc: session.audioSsrc,

@@ -1,3 +1,7 @@
+## [1.2.9]
+
+- Bugfixes and improvements
+
 ## [1.2.8]
 
 - When a stream ends, one line reports what the Apple device measured: packet loss, jitter, round trip time and keyframe requests. If no reports arrived, the line says so.

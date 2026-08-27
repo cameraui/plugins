@@ -39,6 +39,8 @@ export class StreamingSession {
   public audioSplitter = new RtpSplitter();
   public videoSplitter = new RtpSplitter();
 
+  public sourceAddress?: string;
+
   private videoSrtcpSession: SrtcpSession;
   private audioSrtcpSession: SrtcpSession;
   private homekitSrtcpSession: SrtcpSession;
@@ -61,6 +63,8 @@ export class StreamingSession {
   private videoReceiverStats = createReceiverStats();
   private audioReceiverStats = createReceiverStats();
   private audioClockRate = 48000;
+  private audioNegotiated = '';
+  private audioPacketsPerSecond = 50;
 
   constructor(cameraAccessory: CameraAccessory, cameraDevice: CameraDevice, prepareStreamRequest: PrepareStreamRequest, start: number) {
     this.cameraAccessory = cameraAccessory;
@@ -77,6 +81,7 @@ export class StreamingSession {
 
   public async prepare(): Promise<void> {
     const { socketType, sourceAddress } = await this.setupAddress();
+    this.sourceAddress = sourceAddress;
 
     await Promise.all([this.audioSplitter.prepare(socketType, sourceAddress), this.videoSplitter.prepare(socketType, sourceAddress)]);
 
@@ -367,6 +372,8 @@ export class StreamingSession {
 
   private async run(session: RtpSession, startStreamRequest: StartStreamRequest): Promise<void> {
     this.audioClockRate = startStreamRequest.audio.sample_rate * 1000;
+    this.audioNegotiated = `${startStreamRequest.audio.codec.toLowerCase()} ${startStreamRequest.audio.sample_rate}k/${startStreamRequest.audio.packet_time}ms`;
+    this.audioPacketsPerSecond = Math.round(1000 / startStreamRequest.audio.packet_time);
 
     this.listenForAudioPackets(session, startStreamRequest);
     this.listenForVideoPackets(session);
@@ -452,15 +459,16 @@ export class StreamingSession {
 
     const audioSrtpSession = new SrtpSession(getSessionConfig(this.audioSrtp));
 
-    // HAP wants Opus timestamps on an RFC 3550 clock built from the
-    // negotiated sample rate and packet time, as an exception to the fixed
-    // 48 kHz clock of RFC 7587 that ffmpeg stamps. Left at 48 kHz the audio
-    // timeline runs twice as fast as real time for HomeKit, and the receiver
-    // drags the lip-synced video ever further behind the live picture.
+    // HAP wants Opus timestamps on an RFC 3550 clock built from the negotiated
+    // sample rate, as an exception to the fixed 48 kHz clock of RFC 7587 that
+    // ffmpeg stamps. Left at 48 kHz the audio timeline runs twice as fast as
+    // real time for HomeKit, and the receiver drags the lip-synced video ever
+    // further behind. The deltas are rescaled rather than counted, so a gap
+    // in the source audio stays a gap instead of stitching the timeline shut.
     const rewriteTimestamps = startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS;
-    const increment = 160 * (startStreamRequest.audio.sample_rate / 8) * (startStreamRequest.audio.packet_time / 20);
-    let baseTimestamp: number | undefined;
-    let packetIndex = 0;
+    const clockScale = (startStreamRequest.audio.sample_rate * 1000) / 48000;
+    let sourceBase: number | undefined;
+    let targetBase: number | undefined;
 
     session.addSubscriptions(
       session.onAudioRtp.subscribe(async (rtp: RtpPacket) => {
@@ -471,9 +479,10 @@ export class StreamingSession {
 
         try {
           if (rewriteTimestamps) {
-            baseTimestamp ??= rtp.header.timestamp;
-            rtp.header.timestamp = (baseTimestamp + packetIndex * increment) >>> 0;
-            packetIndex++;
+            sourceBase ??= rtp.header.timestamp;
+            targetBase ??= rtp.header.timestamp;
+            const elapsed = (rtp.header.timestamp - sourceBase) >>> 0;
+            rtp.header.timestamp = (targetBase + Math.round(elapsed * clockScale)) >>> 0;
           }
 
           const encryptedPacket = audioSrtpSession.encrypt(rtp.payload, rtp.header);
@@ -564,8 +573,10 @@ export class StreamingSession {
       return;
     }
 
-    const video = summarizeReceiverStats('video', this.videoReceiverStats, this.videoSenderState, 90000);
-    const audio = summarizeReceiverStats('audio', this.audioReceiverStats, this.audioSenderState, this.audioClockRate);
+    const video = summarizeReceiverStats('video', this.videoReceiverStats, this.videoSenderState, 90000, { fps: true });
+    const audio = summarizeReceiverStats(`audio (${this.audioNegotiated})`, this.audioReceiverStats, this.audioSenderState, this.audioClockRate, {
+      expectedPacketsPerSecond: this.audioPacketsPerSecond,
+    });
     this.cameraLogger.debug(`Live stream summary (${getDurationSeconds(this.start)}s): ${video}; ${audio}`);
   }
 
