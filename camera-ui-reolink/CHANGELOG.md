@@ -1,3 +1,7 @@
+## [1.2.17]
+
+- Updated camera.ui engine and deps
+
 ## [1.2.16]
 
 - Adding a slow-waking battery camera no longer gives up mid-attempt. The adoption allowed exactly as much time as the wake-up needs, so it could abort a moment before the camera answered
