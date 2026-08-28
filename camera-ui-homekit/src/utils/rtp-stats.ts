@@ -2,6 +2,7 @@ import type { RtpPacket } from 'werift';
 
 export interface RtpSenderState {
   timestamp: number;
+  firstTimestamp: number;
   wallclock: number;
   firstWallclock: number;
   packets: number;
@@ -26,6 +27,7 @@ export function recordRtpPacket(state: RtpSenderState | undefined, rtp: RtpPacke
 
   return {
     timestamp: rtp.header.timestamp,
+    firstTimestamp: state?.firstTimestamp ?? rtp.header.timestamp,
     wallclock,
     firstWallclock: state?.firstWallclock ?? wallclock,
     packets: (state?.packets ?? 0) + 1,
@@ -59,12 +61,18 @@ export interface SenderRateInfo {
   expectedPacketsPerSecond?: number;
 }
 
-function senderRate(sender: RtpSenderState, rate: SenderRateInfo): string | undefined {
+function senderSpeed(sender: RtpSenderState, clockRate: number, wallSeconds: number): string {
+  const mediaSeconds = ((sender.timestamp - sender.firstTimestamp) >>> 0) / clockRate;
+  return `speed ${(mediaSeconds / wallSeconds).toFixed(2)}x`;
+}
+
+function senderRate(sender: RtpSenderState, rate: SenderRateInfo, clockRate: number): string | undefined {
   const seconds = (sender.wallclock - sender.firstWallclock) / 1000;
   if (seconds < 1) return undefined;
-  if (rate.fps) return `${(sender.frames / seconds).toFixed(1)} fps`;
-  if (rate.expectedPacketsPerSecond) return `${(sender.packets / seconds).toFixed(1)} pkt/s (expected ${rate.expectedPacketsPerSecond})`;
-  return undefined;
+  const speed = senderSpeed(sender, clockRate, seconds);
+  if (rate.fps) return `${(sender.frames / seconds).toFixed(1)} fps, ${speed}`;
+  if (rate.expectedPacketsPerSecond) return `${(sender.packets / seconds).toFixed(1)} pkt/s (expected ${rate.expectedPacketsPerSecond}), ${speed}`;
+  return speed;
 }
 
 export function summarizeReceiverStats(
@@ -78,7 +86,7 @@ export function summarizeReceiverStats(
   if (sent === 0 || !sender) return `${label}: nothing sent`;
 
   const parts: string[] = [];
-  const rateInfo = senderRate(sender, rate);
+  const rateInfo = senderRate(sender, rate, clockRate);
   if (rateInfo) parts.push(`${label}: ${rateInfo}`);
   const prefix = rateInfo ? '' : `${label}: `;
   if (stats.rrCount === 0) {
