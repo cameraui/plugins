@@ -1,3 +1,12 @@
+## [1.0.12]
+
+**Needs camera.ui 2.1.13.**
+
+- **Adopted entities stay adopted, across restarts of the plugin and of camera.ui.** camera.ui keeps the list now, the plugin cannot lose it anymore.
+- **Renaming an entity in Home Assistant keeps the sensor**, with its camera assignments, automations and history.
+- **Entities you delete in Home Assistant are marked as removed in camera.ui.** They stay, with everything assigned to them, until you delete them on the sensors page too.
+- Once after this update: entities adopted with 1.0.11 show up as discovered again and their old entries are marked as removed. Delete the old entries and adopt the entities once more.
+
 ## [1.0.11]
 
 - Entities are imported by choice now. Instead of importing every entity it can map, the plugin lists them in the Discovered section of the sensors page, with name, type and room; you pick what comes over, and removing a sensor there stops its import for good. This also applies to entities imported by earlier versions: after the update they all show up as discovered again, so pick the ones you actually use; their old entries clean themselves up, so a re-added entity starts fresh, without earlier camera assignments. Needs camera.ui 2.1.11.
