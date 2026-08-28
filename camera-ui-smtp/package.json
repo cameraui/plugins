@@ -20,12 +20,12 @@
     "update": "updates --update ./"
   },
   "dependencies": {
-    "mailparser": "^3.9.16",
-    "smtp-server": "^3.19.3"
+    "mailparser": "^3.9.17",
+    "smtp-server": "^3.19.4"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.101",
-    "@camera.ui/sdk": "^1.2.33",
+    "@camera.ui/cli": "^0.0.102",
+    "@camera.ui/sdk": "^1.2.34",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/mailparser": "^3.4.6",
     "@types/node": "26.4.0",

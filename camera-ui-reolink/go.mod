@@ -3,7 +3,7 @@ module github.com/cameraui/plugins/camera-ui-reolink
 go 1.27.0
 
 require (
-	github.com/cameraui/sdk/go v1.2.41
+	github.com/cameraui/sdk/go v1.2.42
 	github.com/shareed2k/reolinkproxy v0.2.5
 )
 
