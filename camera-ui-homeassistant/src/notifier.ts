@@ -24,7 +24,9 @@ export class HaNotifier {
       states.filter((state) => state.entity_id.startsWith('notify.')).map((state) => [state.entity_id, state.attributes.friendly_name ?? state.entity_id]),
     );
     try {
-      this.services = await client.fetchNotifyServices();
+      // 'notify' fans out to every mobile_app service and 'persistent_notification' is not a device,
+      // both would duplicate what the concrete targets already deliver
+      this.services = (await client.fetchNotifyServices()).filter((service) => service !== 'notify' && service !== 'persistent_notification');
     } catch (error) {
       this.logger.debug('Could not list Home Assistant notify services:', error);
     }
@@ -103,7 +105,10 @@ export class HaNotifier {
   }
 
   private targetKeys(): string[] {
-    return [...this.services, ...this.entities.keys()];
+    // mobile_app registers a notify entity next to its service for the same phone, keep the
+    // service (it can carry a picture) and drop the entity twin
+    const entityKeys = [...this.entities.keys()].filter((entity) => !this.services.includes(`mobile_app_${entity.split('.')[1]}`));
+    return [...this.services, ...entityKeys];
   }
 
   private keyForId(deviceId: string): string | undefined {
