@@ -5,7 +5,8 @@
 - **Adopted entities stay adopted, across restarts of the plugin and of camera.ui.** camera.ui keeps the list now, the plugin cannot lose it anymore.
 - **Renaming an entity in Home Assistant keeps the sensor**, with its camera assignments, automations and history.
 - **Entities you delete in Home Assistant are marked as removed in camera.ui.** They stay, with everything assigned to them, until you delete them on the sensors page too.
-- **One push per phone.** The plugin offered Home Assistant's catch-all notify service, the phone's own service and the phone's notify entity as three separate targets, so a notification arrived up to three times. Only real device targets are listed now.
+- **Notification pictures show up on the phone.** Without remote access the picture URL only worked inside the LAN, so Home Assistant notifications usually arrived without an image. Pictures now load through Home Assistant itself. Needs the Home Assistant integration 0.4.0.
+- **One push per phone.** The plugin offered Home Assistant's catch-all notify service, the phone's own service and the phone's notify entity as three separate targets, so a notification arrived up to three times. Only real device targets are listed now. Follow-up pushes of the same event replace the notification instead of stacking, and silent updates stay silent.
 - Once after this update: entities adopted with 1.0.11 show up as discovered again and their old entries are marked as removed. Delete the old entries and adopt the entities once more.
 
 ## [1.0.11]

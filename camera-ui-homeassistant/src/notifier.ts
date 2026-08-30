@@ -4,6 +4,12 @@ import type { HaState, StorageValues } from './types.js';
 
 const DEVICE_PREFIX = 'notify:';
 
+function toHaImageUrl(imageUrl: string | undefined): string | undefined {
+  if (!imageUrl) return undefined;
+  if (/^https?:\/\//.test(imageUrl)) return imageUrl;
+  return `/api/cameraui/notify${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+}
+
 export class HaNotifier {
   private services: string[] = [];
   private entities = new Map<string, string>();
@@ -51,10 +57,14 @@ export class HaNotifier {
   public async sendNotification(deviceIds: string[], n: Notification): Promise<void> {
     const client = this.getClient();
     if (!client) return;
+    // silent replaces an existing banner in the apps; HA notify can only add a new audible one
+    if (n.silent) return;
 
     const message = [n.subtitle, n.body].filter(Boolean).join('\n') || n.title;
     const data: Record<string, unknown> = {};
-    if (n.imageUrl) data.image = n.imageUrl;
+    const image = toHaImageUrl(n.imageUrl);
+    if (image) data.image = image;
+    if (n.tag) data.tag = n.tag;
 
     // before the first sync the target list is empty, send blind rather than drop
     const known = this.targetKeys();
