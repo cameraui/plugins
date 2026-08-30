@@ -1,3 +1,7 @@
+## [1.2.18]
+
+- Updated camera.ui engine and deps
+
 ## [1.2.17]
 
 - Updated camera.ui engine and deps
