@@ -24,8 +24,8 @@
     "@seydx/onvif": "file:../externals/onvif"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.102",
-    "@camera.ui/sdk": "^1.2.34",
+    "@camera.ui/cli": "^0.0.103",
+    "@camera.ui/sdk": "^1.2.35",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.4.0",
     "@typescript-eslint/parser": "^8.68.0",
