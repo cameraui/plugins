@@ -1,7 +1,7 @@
 {
   "displayName": "OpenVino Legacy",
   "name": "@camera.ui/camera-ui-openvino-legacy",
-  "version": "1.2.13",
+  "version": "1.2.14",
   "description": "OpenVINO detection backend for camera.ui with the older 2024.6 runtime. For Intel GPUs up to 10th gen Core on Windows, whose drivers cannot build the GPU code of newer OpenVINO releases. On Linux the camera.ui Docker image covers these GPUs with legacy compute libs; use the regular OpenVino plugin everywhere else.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/main.py",
