@@ -14,6 +14,7 @@ export class HaNotifier {
   private services: string[] = [];
   private entities = new Map<string, string>();
   private lastOwnerUserId = '';
+  private panelPath: string | undefined;
 
   constructor(
     private readonly storage: DeviceStorage<StorageValues>,
@@ -35,6 +36,14 @@ export class HaNotifier {
       this.services = (await client.fetchNotifyServices()).filter((service) => service !== 'notify' && service !== 'persistent_notification');
     } catch (error) {
       this.logger.debug('Could not list Home Assistant notify services:', error);
+    }
+
+    try {
+      const panels = await client.fetchPanels();
+      const panel = Object.values(panels).find((p) => p.config?._panel_custom?.name === 'cameraui-panel');
+      this.panelPath = panel ? `/${panel.url_path}` : undefined;
+    } catch (error) {
+      this.logger.debug('Could not list Home Assistant panels:', error);
     }
 
     const keys = this.targetKeys();
@@ -65,6 +74,11 @@ export class HaNotifier {
     const image = toHaImageUrl(n.imageUrl);
     if (image) data.image = image;
     if (n.tag) data.tag = n.tag;
+    if (n.deepLink && this.panelPath) {
+      const link = `${this.panelPath}${n.deepLink}`;
+      data.url = link; // iOS
+      data.clickAction = link; // Android
+    }
 
     // before the first sync the target list is empty, send blind rather than drop
     const known = this.targetKeys();

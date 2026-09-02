@@ -50,6 +50,12 @@ export interface HaDevice {
   identifiers?: [string, string][];
 }
 
+export interface HaPanel {
+  component_name: string;
+  url_path: string;
+  config?: { _panel_custom?: { name?: string } } | null;
+}
+
 export interface HaRegistryEvent {
   action: 'create' | 'update' | 'remove';
   entity_id: string;

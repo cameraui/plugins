@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 
 import type { LoggerService } from '@camera.ui/sdk';
-import type { HaArea, HaDevice, HaMessage, HaRegistryEntry, HaRegistryEvent, HaState } from './types.js';
+import type { HaArea, HaDevice, HaMessage, HaPanel, HaRegistryEntry, HaRegistryEvent, HaState } from './types.js';
 
 const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 10_000;
@@ -86,6 +86,10 @@ export class HaClient {
 
   public async fetchDeviceRegistry(): Promise<HaDevice[]> {
     return this.command<HaDevice[]>('config/device_registry/list');
+  }
+
+  public async fetchPanels(): Promise<Record<string, HaPanel>> {
+    return this.command<Record<string, HaPanel>>('get_panels');
   }
 
   public async callService(domain: string, service: string, data: Record<string, unknown>): Promise<void> {
