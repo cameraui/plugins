@@ -1,3 +1,7 @@
+## [1.2.8]
+
+- Minor bugfixes
+
 ## [1.2.7]
 
 - Updated deps

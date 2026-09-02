@@ -1,3 +1,8 @@
+## [1.2.13]
+
+- **TensorRT rebuilds its engines faster after a model or plugin update.** The kernel timing measurements are kept next to the engine cache.
+- Minor bugfixes
+
 ## [1.2.12]
 
 - **When CUDA cannot load, the log now says which Docker image fits.** This plugin needs the CUDA 12 libraries (Docker image `:nvidia-cuda12`). On CUDA 13 (`:nvidia` image), use the regular ONNX plugin.

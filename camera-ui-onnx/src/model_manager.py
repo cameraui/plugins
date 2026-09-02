@@ -94,6 +94,12 @@ class OnnxModelManager(BaseModelManager):
                 "the regular ONNX plugin instead"
             )
             return
+        if "TensorrtExecutionProvider" in names:
+            self.logger.warn(
+                "TensorRT needs the TensorRT 10 libraries: in Docker use the "
+                "ghcr.io/cameraui/camera.ui:nvidia-tensorrt image, elsewhere install TensorRT 10 yourself"
+            )
+            return
         self.logger.warn(
             "CUDA detection needs the CUDA 13 libraries and an NVIDIA driver 580 or newer: in Docker "
             "use the ghcr.io/cameraui/camera.ui:nvidia image. Stuck on CUDA 12 or a GPU before "

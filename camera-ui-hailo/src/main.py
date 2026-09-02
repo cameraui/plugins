@@ -215,6 +215,10 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
         self.model_manager.reset()
         await asyncio.gather(*(self.get_object_detector(n) for n in obj), return_exceptions=True)
 
+        for sensors in self._sensors.values():
+            for sensor in sensors.values():
+                sensor.updateModelSpec()
+
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self.logger.log("Settings reset to defaults")

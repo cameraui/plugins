@@ -1,3 +1,9 @@
+## [1.2.13]
+
+- **TensorRT rebuilds its engines faster after a model or plugin update.** The kernel timing measurements are kept next to the engine cache.
+- **A missing TensorRT runtime now points to the right image.** With the tensorrt provider selected, the log names the `:nvidia-tensorrt` image that ships the libraries.
+- Minor bugfixes
+
 ## [1.2.12]
 
 - **When CUDA cannot load, the log now says which Docker image fits.** This plugin needs the CUDA 13 libraries (Docker image `:nvidia`, host driver 580 or newer). On a CUDA 12 setup, use the `:nvidia-cuda12` image with the ONNX Legacy plugin.

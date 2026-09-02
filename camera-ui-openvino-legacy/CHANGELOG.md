@@ -1,3 +1,7 @@
+## [1.2.14]
+
+- Minor bugfixes
+
 ## [1.2.13]
 
 - **License plates are read again.** Every read was scored as unreadable and dropped before it reached an event, whatever the camera saw. If you lowered the reading confidence in the camera settings to work around it, put it back.

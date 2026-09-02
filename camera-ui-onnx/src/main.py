@@ -735,6 +735,8 @@ class ONNXPlugin(
                             "device_id": device_id,
                             "trt_engine_cache_enable": True,
                             "trt_engine_cache_path": cache_dir,
+                            "trt_timing_cache_enable": True,
+                            "trt_timing_cache_path": cache_dir,
                             "trt_fp16_enable": True,
                         },
                     ),
@@ -801,6 +803,10 @@ class ONNXPlugin(
             *(self.get_clip_encoder(n) for n in clip),
             return_exceptions=True,
         )
+
+        for sensors in self._sensors.values():
+            for sensor in sensors.values():
+                sensor.updateModelSpec()
 
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
