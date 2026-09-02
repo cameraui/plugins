@@ -81,15 +81,23 @@ class OnnxModelManager(BaseModelManager):
             return self._create_cpu_session(path)
 
     def _hint_legacy(self, providers: list[Any]) -> None:
-        if LEGACY_RUNTIME or self._hinted_legacy:
+        if self._hinted_legacy:
             return
         names = {p[0] if isinstance(p, tuple) else p for p in providers}
         if not names & {"CUDAExecutionProvider", "TensorrtExecutionProvider"}:
             return
         self._hinted_legacy = True
+        if LEGACY_RUNTIME:
+            self.logger.warn(
+                "CUDA detection with this plugin needs the CUDA 12 libraries: in Docker use the "
+                "ghcr.io/cameraui/camera.ui:nvidia-cuda12 image. On CUDA 13 (:nvidia image) install "
+                "the regular ONNX plugin instead"
+            )
+            return
         self.logger.warn(
-            "NVIDIA GPUs before GTX 1650 (Maxwell, Pascal, Volta) and CUDA 12 setups "
-            "work with the ONNX Legacy plugin instead"
+            "CUDA detection needs the CUDA 13 libraries and an NVIDIA driver 580 or newer: in Docker "
+            "use the ghcr.io/cameraui/camera.ui:nvidia image. Stuck on CUDA 12 or a GPU before "
+            "GTX 1650 (Maxwell, Pascal, Volta)? Use the :nvidia-cuda12 image with the ONNX Legacy plugin"
         )
 
     def _create_cpu_session(self, path: str) -> Any:

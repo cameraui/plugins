@@ -1,3 +1,7 @@
+## [1.2.12]
+
+- **When CUDA cannot load, the log now says which Docker image fits.** This plugin needs the CUDA 13 libraries (Docker image `:nvidia`, host driver 580 or newer). On a CUDA 12 setup, use the `:nvidia-cuda12` image with the ONNX Legacy plugin.
+
 ## [1.2.11]
 
 - **License plates are read again.** Every read was scored as unreadable and dropped before it reached an event, whatever the camera saw. If you lowered the reading confidence in the camera settings to work around it, put it back.
