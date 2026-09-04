@@ -17,11 +17,11 @@
     "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
     "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
     "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
-    "update": "updates --update ./"
+    "update": "updates -M npm,pypi,go,cargo,docker,make --update ./"
   },
   "dependencies": {
     "mailparser": "^3.9.20",
-    "smtp-server": "^3.19.6"
+    "smtp-server": "^3.19.7"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.103",
@@ -38,7 +38,7 @@
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.69.0",
-    "updates": "^18.0.7"
+    "updates": "^18.1.0"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"

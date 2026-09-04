@@ -17,7 +17,7 @@
     "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
     "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
     "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
-    "update": "updates --update ./"
+    "update": "updates -M npm,pypi,go,cargo,docker,make --update ./"
   },
   "dependencies": {
     "@camera.ui/rust-detector": "~0.0.12"
@@ -38,7 +38,7 @@
     "sharp": "^0.35.4",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.69.0",
-    "updates": "^18.0.7"
+    "updates": "^18.1.0"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"

@@ -18,7 +18,7 @@
     "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
     "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
     "sync": "node scripts/sync.mjs",
-    "update": "updates --update ./ && cupdate"
+    "update": "updates -M npm,pypi,go,cargo,docker,make --update ./ && cupdate"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.103",

@@ -17,13 +17,13 @@
     "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
     "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
     "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
-    "update": "updates --update ./ && cupdate"
+    "update": "updates -M npm,pypi,go,cargo,docker,make --update ./ && cupdate"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.103",
     "@camera.ui/sdk": "^1.2.35",
     "cross-env": "^10.1.0",
-    "updates": "^18.0.7"
+    "updates": "^18.1.0"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
