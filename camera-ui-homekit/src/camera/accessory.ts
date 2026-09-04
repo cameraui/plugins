@@ -415,6 +415,19 @@ export class CameraAccessory extends Subscribed {
           this.recordingDelegate?.refreshPrebuffer();
         },
       },
+      {
+        type: 'boolean',
+        key: 'forceVideoTranscodingForRecording',
+        title: 'Force Video Transcoding for HKSV',
+        description: 'Re-encode video for HomeKit Secure Video so its negotiated resolution, frame rate, and bitrate limits are applied.',
+        group: 'Advanced',
+        defaultValue: false,
+        store: true,
+        onSet: async (state: boolean) => {
+          this.cameraLogger.log('Force video transcoding for HKSV:', state);
+          this.recordingDelegate?.refreshPrebuffer();
+        },
+      },
     ]);
   }
 
