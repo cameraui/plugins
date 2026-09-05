@@ -1,3 +1,11 @@
+## [1.2.20]
+
+- Minor bugfixes
+
+## [1.2.19]
+
+- Updated camera.ui engine and deps
+
 ## [1.2.18]
 
 - Updated camera.ui engine and deps
