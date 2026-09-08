@@ -1,3 +1,7 @@
+## [1.2.21]
+
+- Changing a camera between H.264 and H.265 no longer crashes the plugin. The stream now renegotiates with the new codec on the fly.
+
 ## [1.2.20]
 
 - Minor bugfixes
