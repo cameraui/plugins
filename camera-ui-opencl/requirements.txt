@@ -2,4 +2,4 @@ numpy==2.4.6
 opencv-python-headless==5.0.0.93
 camera-ui-sdk==1.2.34
 pyopencl==2026.1.4
-siphash24==1.8
+siphash24==1.9
