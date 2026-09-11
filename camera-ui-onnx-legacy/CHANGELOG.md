@@ -1,3 +1,7 @@
+## [1.2.14]
+
+- Updated camera.ui engine
+
 ## [1.2.13]
 
 - **TensorRT rebuilds its engines faster after a model or plugin update.** The kernel timing measurements are kept next to the engine cache.

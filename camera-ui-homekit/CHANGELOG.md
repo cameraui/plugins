@@ -1,3 +1,7 @@
+## [1.2.11]
+
+- Updated camera.ui engine
+
 ## [1.2.10]
 
 - Bugfixes and improvements

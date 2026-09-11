@@ -1,3 +1,7 @@
+## [1.2.4]
+
+- Updated camera.ui engine
+
 ## [1.2.3]
 
 - Small and slow movement is detected reliably now, day and night. The detector briefly holds its comparison image, so slow movement adds up instead of slipping below the threshold. Nearby changed regions count as one movement, so a distant animal is one hit instead of a few specks. A camera move or a sudden exposure change resets the detector instead of lighting up the whole picture.

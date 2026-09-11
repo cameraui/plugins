@@ -1,3 +1,7 @@
+## [1.2.5]
+
+- Updated camera.ui engine
+
 ## [1.2.4]
 
 - The sensor settings are gone: the plugin always listens for the standard camera.ui sounds, and the confidence comes from the camera's audio confidence setting

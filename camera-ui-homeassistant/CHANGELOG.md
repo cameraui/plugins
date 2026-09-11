@@ -1,3 +1,7 @@
+## [1.0.14]
+
+- Updated camera.ui engine
+
 ## [1.0.13]
 
 - **Tapping a notification opens the event.** The Home Assistant app jumps to the camera.ui panel, straight to the camera's timeline at the moment of the detection. Needs the Home Assistant integration with the sidebar panel; without it the tap keeps opening just the app.
