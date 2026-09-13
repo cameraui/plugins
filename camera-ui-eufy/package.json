@@ -2,13 +2,13 @@
   "displayName": "Eufy",
   "name": "@camera.ui/camera-ui-eufy",
   "version": "1.2.4",
-  "description": "Integrates Eufy security cameras and doorbells into camera.ui, with device discovery, live streaming, and motion, object, battery and doorbell events.",
+  "description": "Integrates Eufy cameras, doorbells, HomeBases and sensors into camera.ui, with device discovery, live streaming, two-way audio, detection events, camera controls and adoptable Eufy sensors.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
   "type": "module",
   "scripts": {
     "build": "rimraf dist && npm run build:eufy && tsc",
-    "build:eufy": "npm --prefix ../externals/eufy-security-client ci --ignore-scripts && npm --prefix ../externals/eufy-security-client run build",
+    "build:eufy": "npm --prefix ../externals/eufy-sdk ci --ignore-scripts && npm --prefix ../externals/eufy-sdk run build",
     "bundle": "npm run format && npm run lint && npm run build && cui bundle",
     "bundle:dev": "npm run format && npm run lint && npm run build && cross-env MODE=development cui bundle",
     "format": "prettier --write \"src/\" --ignore-unknown --no-error-on-unmatched-pattern",
@@ -21,8 +21,8 @@
     "update": "updates -M npm,pypi,go,cargo,docker,make --update ./"
   },
   "dependencies": {
-    "@seydx/rtsp": "^1.0.6",
-    "eufy-security-client": "file:../externals/eufy-security-client"
+    "@mega-yfue/eufy-sdk": "file:../externals/eufy-sdk",
+    "@seydx/rtsp": "^1.0.7"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.105",
@@ -45,8 +45,8 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.2.0",
-    "node": ">=22.0.0"
+    "camera.ui": ">=2.2.3",
+    "node": ">=24.5.0"
   },
   "os": [],
   "cpu": [],
@@ -55,7 +55,8 @@
     "camera-ui-plugin",
     "cameras",
     "eufy",
-    "doorbell"
+    "doorbell",
+    "sensors"
   ],
   "license": "MIT",
   "repository": {

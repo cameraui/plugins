@@ -1,320 +1,363 @@
-import { BackchannelTranscoder, Relay } from '@seydx/rtsp';
-import { PropertyName } from 'eufy-security-client';
+import { DoorbellTrigger } from '@camera.ui/sdk';
+import { Relay } from '@seydx/rtsp';
 
-import { LocalLivestreamManager } from './eufy/LocalLiveStreamManager.js';
-import { EufyP2PSource } from './eufy/P2PSource.js';
-import { TalkbackStream } from './eufy/Talkback.js';
-import { EufyBatteryInfo, EufyDoorbellTrigger, EufyMotionSensor, EufyObjectSensor } from './sensors.js';
+import {
+  EufyAudioSensor,
+  EufyBatteryInfo,
+  EufyCameraSwitch,
+  EufyLightControl,
+  EufyMotionSensor,
+  EufyObjectSensor,
+  EufyPtzControl,
+  EufySecuritySystem,
+  EufySirenControl,
+} from './sensors.js';
+import { EufyLiveSource } from './stream.js';
+import { EufyTalkback, TALKBACK_ADVERTISE } from './talkback.js';
+import { errorMessage } from './utils.js';
 
-import type { CameraDevice, DeviceStorage, LoggerService, SnapshotInterface, StreamingInterface, TrackedDetection } from '@camera.ui/sdk';
+import type { CameraDevice, DeviceStorage, LoggerService, Sensor, SnapshotInterface, StreamingInterface } from '@camera.ui/sdk';
+import type { AnyDeviceEvent, Device } from '@mega-yfue/eufy-sdk';
 import type { Logger, RtspServerSink } from '@seydx/rtsp';
-import type { Device, Camera as EufyCamera, EufySecurity } from 'eufy-security-client';
-import type Eufy from './index.js';
-import type { EufyCameraStorage, EufyHome } from './types.js';
+import type { BindableSensor } from './sensors.js';
+import type { EufyCameraStorage, EufyContext, StreamMode } from './types.js';
 
-const TALKBACK_ADVERTISE = { codec: 'pcm_alaw', payloadType: 8, clockRate: 8000, channels: 1 } as const;
-const TALKBACK_TARGET = { codec: 'aac', sampleRate: 16000, channels: 1, format: 'adts', bitRate: 32000 } as const;
+const RTSP_URL_ATTEMPTS = 2;
 
 class CameraDeviceImplementations implements StreamingInterface, SnapshotInterface {
-  constructor(
-    private camera: Camera,
-    private eufyCamera: EufyCamera,
-    private logger: LoggerService,
-  ) {}
+  constructor(private readonly camera: EufyCamera) {}
 
-  async streamUrl(_sourceId: string): Promise<string> {
+  public async streamUrl(_sourceId: string): Promise<string> {
     return this.camera.getStreamUrl();
   }
 
-  async snapshot(_sourceId: string, _forceNew?: boolean): Promise<ArrayBuffer | undefined> {
-    try {
-      const imageData = this.eufyCamera.getLastCameraImageURL();
-      if (imageData && typeof imageData === 'object' && 'imageUrl' in imageData) {
-        const response = await fetch(imageData.imageUrl as string);
-        if (response.ok) {
-          return await response.arrayBuffer();
-        }
-      }
-    } catch (error) {
-      this.logger.error('Failed to get snapshot:', error);
-    }
+  public async snapshot(_sourceId: string, forceNew?: boolean): Promise<ArrayBuffer | undefined> {
+    return this.camera.getSnapshot(forceNew);
   }
 }
 
-export class Camera {
-  public readonly eufyClient: EufySecurity;
-  public readonly eufyDevice: EufyCamera;
-  public readonly cameraDevice: CameraDevice;
+export class EufyCamera {
+  private readonly logger: LoggerService;
+  private readonly bindables: BindableSensor[] = [];
 
-  private readonly storage: DeviceStorage<EufyCameraStorage>;
-
-  private platform: Eufy;
-  private home: EufyHome;
-  private cameraLogger: LoggerService;
-
+  private device?: Device;
+  private context?: EufyContext;
+  private storage?: DeviceStorage<EufyCameraStorage>;
+  private implemented = false;
+  private queue: Promise<void> = Promise.resolve();
   private relay?: Relay;
-  private rtspServer?: RtspServerSink;
-  private relayLogger?: Logger;
-  private talkbackTranscoder?: BackchannelTranscoder;
-  private talkbackStarting?: Promise<void>;
-  private localLivestreamManager!: LocalLivestreamManager;
-  private talkbackStream!: TalkbackStream;
-
+  private relayReady?: Promise<RtspServerSink>;
+  private talkback?: EufyTalkback;
   private motionSensor?: EufyMotionSensor;
   private objectSensor?: EufyObjectSensor;
-  private batterySensor?: EufyBatteryInfo;
-  private doorbellTrigger?: EufyDoorbellTrigger;
+  private audioSensor?: EufyAudioSensor;
+  private batteryInfo?: EufyBatteryInfo;
+  private doorbellTrigger?: DoorbellTrigger;
+  private lightControl?: EufyLightControl;
+  private sirenControl?: EufySirenControl;
+  private ptzControl?: EufyPtzControl;
+  private cameraSwitch?: EufyCameraSwitch;
+  private securitySystem?: EufySecuritySystem;
 
-  private activeObjectCategories = new Set<'person' | 'animal' | 'vehicle'>();
-
-  constructor(platform: Eufy, home: EufyHome, eufyClient: EufySecurity, eufyDevice: EufyCamera, cameraDevice: CameraDevice) {
-    this.platform = platform;
-    this.home = home;
-    this.eufyClient = eufyClient;
-    this.eufyDevice = eufyDevice;
-
-    this.cameraDevice = cameraDevice;
-    this.storage = this.createStorage();
-
-    this.cameraLogger = cameraDevice.logger;
+  constructor(public readonly cameraDevice: CameraDevice) {
+    this.logger = cameraDevice.logger;
   }
 
-  public async initialize(): Promise<void> {
-    this.localLivestreamManager = new LocalLivestreamManager(this.home, this.eufyClient, this.eufyDevice, this.cameraDevice, this.cameraLogger);
-    this.talkbackStream = new TalkbackStream(this.home, this.eufyClient, this.eufyDevice, this.cameraDevice, this.cameraLogger);
+  public bind(device: Device, context: EufyContext): Promise<void> {
+    return this.serialize(async () => {
+      await this.detach();
+      this.device = device;
+      this.context = context;
+      try {
+        this.storage ??= this.createStorage(device);
+        if (!this.implemented) {
+          await this.cameraDevice.implement(new CameraDeviceImplementations(this));
+          this.implemented = true;
+        }
+        await this.addSensors(device);
+        for (const sensor of this.bindables) {
+          sensor.device = device;
+          sensor.sync();
+        }
+        if (this.streamMode === 'p2p') await this.ensureRelay();
+        await this.cameraDevice.connect();
+      } catch (error) {
+        await this.detach();
+        throw error;
+      }
+    });
+  }
 
-    await this.setupStreaming();
-    await this.cameraDevice.implement(new CameraDeviceImplementations(this, this.eufyDevice, this.cameraLogger));
-    await this.initializeSensors();
+  public unbind(): Promise<void> {
+    return this.serialize(() => this.detach());
+  }
 
-    this.subscribeToEvents();
-    this.cameraDevice.connect();
+  public release(): Promise<void> {
+    return this.serialize(async () => {
+      if (this.streamMode === 'rtsp') await this.withdrawRtsp();
+      await this.detach();
+    });
   }
 
   public async getStreamUrl(): Promise<string> {
-    if (this.storage.values.useP2P && this.rtspServer) {
-      return `${this.rtspServer.url}#timeout=30`;
-    }
-    return this.getNativeRTSPUrl();
+    const device = this.requireDevice();
+    if (this.streamMode === 'rtsp') return this.getRtspUrl(device);
+    const server = await this.ensureRelay();
+    return `${server.url}#timeout=30`;
   }
 
-  private async initializeSensors(): Promise<void> {
-    this.motionSensor = new EufyMotionSensor();
-    await this.cameraDevice.addSensor(this.motionSensor);
+  public async getSnapshot(forceNew?: boolean): Promise<ArrayBuffer | undefined> {
+    const device = this.device;
+    const camera = device?.camera?.();
+    if (!device || !camera) return undefined;
 
-    this.objectSensor = new EufyObjectSensor();
-    await this.cameraDevice.addSensor(this.objectSensor);
-
-    if (this.eufyDevice.hasBattery()) {
-      this.batterySensor = new EufyBatteryInfo();
-      await this.cameraDevice.addSensor(this.batterySensor);
-
-      this.batterySensor.updateFromEufyCamera(this.eufyDevice);
-    }
-
-    if (this.eufyDevice.isDoorbell()) {
-      this.doorbellTrigger = new EufyDoorbellTrigger();
-      await this.cameraDevice.addSensor(this.doorbellTrigger);
-    }
-  }
-
-  private subscribeToEvents(): void {
-    this.eufyDevice.on('motion detected', (_device: Device, state: boolean) => {
-      if (this.motionSensor) {
-        this.motionSensor.reportDetections(state);
+    if (!forceNew && camera.snapshotStored) {
+      try {
+        return toArrayBuffer(await camera.snapshotStored());
+      } catch (error) {
+        if (this.context?.debug) this.logger.debug(`No stored snapshot: ${errorMessage(error)}`);
       }
-    });
-
-    this.eufyDevice.on('person detected', (_device: Device, state: boolean) => {
-      if (this.objectSensor) {
-        this.reportObjectCategory('person', state);
-      }
-    });
-
-    this.eufyDevice.on('pet detected', (_device: Device, state: boolean) => {
-      if (this.objectSensor) {
-        this.reportObjectCategory('animal', state);
-      }
-    });
-
-    this.eufyDevice.on('vehicle detected', (_device: Device, state: boolean) => {
-      if (this.objectSensor) {
-        this.reportObjectCategory('vehicle', state);
-      }
-    });
-
-    if (this.doorbellTrigger) {
-      this.eufyDevice.on('rings', (_device: Device, state: boolean) => {
-        if (state && this.doorbellTrigger) {
-          this.doorbellTrigger.trigger();
-        }
-      });
     }
 
-    if (this.batterySensor) {
-      const batteryProps = [PropertyName.DeviceBattery, PropertyName.DeviceBatteryLow, PropertyName.DeviceChargingStatus] as string[];
-      this.eufyDevice.on('property changed', (_device: Device, name: string) => {
-        if (batteryProps.includes(name)) {
-          this.batterySensor?.updateFromEufyCamera(this.eufyDevice);
-        }
-      });
+    // a fresh still wakes a battery camera, only an explicit request may pay for that
+    if (!camera.snapshotLive || (!forceNew && device.has('battery'))) return undefined;
 
-      this.eufyDevice.on('low battery', (_device: Device, state: boolean) => {
-        if (this.batterySensor) {
-          this.batterySensor.setLow(state);
-        }
-      });
+    try {
+      const shot = await camera.snapshotLive();
+      return toArrayBuffer(shot.jpeg);
+    } catch (error) {
+      this.logger.warn(`Could not capture a snapshot: ${errorMessage(error)}`);
+      return undefined;
     }
   }
 
-  private reportObjectCategory(category: 'person' | 'animal' | 'vehicle', detected: boolean): void {
-    if (!this.objectSensor) return;
-
-    if (detected) {
-      this.activeObjectCategories.add(category);
-    } else {
-      this.activeObjectCategories.delete(category);
+  public handleEvent(event: AnyDeviceEvent): void {
+    switch (event.eventName) {
+      case 'motion':
+        this.motionSensor?.pulse();
+        break;
+      case 'personDetected':
+      case 'strangerDetected':
+        this.objectSensor?.pulse('person');
+        break;
+      case 'vehicleDetected':
+        this.objectSensor?.pulse('vehicle');
+        break;
+      case 'petDetection':
+      case 'dogDetected':
+        this.objectSensor?.pulse('animal');
+        break;
+      case 'soundDetected':
+        this.audioSensor?.pulse();
+        break;
+      case 'cryingDetected':
+        this.audioSensor?.pulse('baby_cry');
+        break;
+      case 'doorbellPress':
+        this.doorbellTrigger?.trigger();
+        break;
+      case 'batteryAlert':
+        if (event.state === 'low') this.batteryInfo?.reportLow();
+        break;
+      case 'alarm':
+        this.securitySystem?.handleAlarm(event);
+        break;
+      case 'propertyChanged':
+      case 'armingModeChanged':
+      case 'cameraEnabledChanged':
+        for (const sensor of this.bindables) sensor.sync();
+        break;
     }
-
-    if (this.activeObjectCategories.size === 0) {
-      this.objectSensor.reportDetections(false);
-      return;
-    }
-
-    // Eufy events lack bounding boxes — synthesize a full-frame detection per category.
-    const detections: TrackedDetection[] = Array.from(this.activeObjectCategories).map((label) => ({
-      label,
-      confidence: 1,
-      box: { x: 0, y: 0, width: 1, height: 1 },
-    }));
-
-    this.objectSensor.reportDetections(true, detections);
   }
 
-  private async setupStreaming(): Promise<void> {
-    const useP2P = this.storage.values.useP2P ?? false;
+  private get streamMode(): StreamMode {
+    if (!this.device?.rtsp?.()) return 'p2p';
+    return this.storage?.values.streamMode ?? 'p2p';
+  }
 
-    if (useP2P) {
-      await this.createP2PRTSPServer();
-    } else {
-      this.cameraLogger.log('Using direct RTSP stream');
+  private serialize(fn: () => Promise<void>): Promise<void> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async detach(): Promise<void> {
+    const wasBound = this.device !== undefined;
+    await this.stopRelay();
+    this.device = undefined;
+    this.context = undefined;
+    for (const sensor of this.bindables) sensor.device = undefined;
+    if (wasBound) await this.cameraDevice.disconnect().catch(() => undefined);
+  }
+
+  private requireDevice(): Device {
+    if (!this.device) throw new Error(`${this.cameraDevice.name} is not connected to Eufy`);
+    return this.device;
+  }
+
+  private async addSensors(device: Device): Promise<void> {
+    const camera = device.camera?.();
+
+    this.motionSensor ??= await this.add(new EufyMotionSensor('Eufy Motion'));
+    this.objectSensor ??= await this.add(new EufyObjectSensor('Eufy Object'));
+
+    if (!this.audioSensor && camera?.soundDetection !== undefined) {
+      this.audioSensor = await this.add(new EufyAudioSensor('Eufy Audio'));
+    }
+
+    if (!this.batteryInfo && device.battery?.()?.level !== undefined) {
+      this.batteryInfo = await this.addBindable(new EufyBatteryInfo(device));
+    }
+
+    if (!this.doorbellTrigger && device.has('doorbell')) {
+      this.doorbellTrigger = await this.add(new DoorbellTrigger('Eufy Doorbell'));
+    }
+
+    if (!this.lightControl && device.light?.()) {
+      this.lightControl = await this.addBindable(new EufyLightControl(device, this.logger));
+    }
+
+    if (!this.sirenControl && device.siren?.()?.trigger) {
+      this.sirenControl = await this.addBindable(new EufySirenControl(device, this.logger));
+    }
+
+    if (!this.ptzControl && device.ptz?.()) {
+      this.ptzControl = await this.addBindable(new EufyPtzControl(device, this.logger));
+    }
+
+    if (!this.cameraSwitch && camera?.enabled !== undefined) {
+      this.cameraSwitch = await this.addBindable(new EufyCameraSwitch(device, this.logger));
+    }
+
+    // a HomeBase owns the guard mode of its cameras, that one is adopted as a standalone sensor
+    if (!this.securitySystem && device.arming?.() && device.stationSn === device.sn) {
+      this.securitySystem = await this.addBindable(new EufySecuritySystem(device, this.logger));
     }
   }
 
-  private async createP2PRTSPServer(): Promise<void> {
-    this.relayLogger = this.createRelayLogger();
+  private async add<T extends Sensor<any, any, any>>(sensor: T): Promise<T> {
+    await this.cameraDevice.addSensor(sensor);
+    return sensor;
+  }
 
-    this.relay = new Relay({
-      source: new EufyP2PSource(this.localLivestreamManager, this.relayLogger),
-      idleTimeout: this.eufyDevice.hasBattery() ? 10_000 : 30_000,
+  private async addBindable<T extends Sensor<any, any, any> & BindableSensor>(sensor: T): Promise<T> {
+    await this.add(sensor);
+    this.bindables.push(sensor);
+    return sensor;
+  }
+
+  private ensureRelay(): Promise<RtspServerSink> {
+    const device = this.requireDevice();
+    this.relayReady ??= this.startRelay(device, this.context!).catch((error: unknown) => {
+      this.relayReady = undefined;
+      throw error;
+    });
+    return this.relayReady;
+  }
+
+  private async startRelay(device: Device, context: EufyContext): Promise<RtspServerSink> {
+    const logger = this.createRelayLogger(context);
+    const talkback = new EufyTalkback(device, logger);
+    const relay = new Relay({
+      source: new EufyLiveSource(device, context.maxLiveStreamDuration * 1000, logger),
+      idleTimeout: device.has('battery') ? 10_000 : 30_000,
       stallTimeout: 8_000,
-      logger: this.relayLogger,
+      logger,
     });
+    relay.on('stop', () => talkback.stop());
 
-    this.relay.on('stop', () => this.resetTalkback());
+    this.relay = relay;
+    this.talkback = talkback;
 
-    this.rtspServer = await this.relay.serveRtsp({
-      path: 'live',
-      backchannel: { ...TALKBACK_ADVERTISE },
-      sdpTimeout: 30000,
-    });
-
-    this.rtspServer.on('backchannel', (rtp) => this.handleTalkbackRtp(rtp));
-
-    this.cameraLogger.log('P2P RTSP relay started');
-  }
-
-  private handleTalkbackRtp(rtp: Buffer): void {
-    if (!this.talkbackTranscoder) {
-      this.talkbackTranscoder = new BackchannelTranscoder({
-        from: { ...TALKBACK_ADVERTISE },
-        to: { ...TALKBACK_TARGET },
-        output: (chunk) => this.talkbackStream.write(chunk),
-        logger: this.relayLogger,
+    try {
+      const server = await relay.serveRtsp({
+        path: 'live',
+        backchannel: device.camera?.()?.talkback ? { ...TALKBACK_ADVERTISE } : false,
+        sdpTimeout: 30_000,
       });
-      this.talkbackStarting = this.talkbackTranscoder.start();
+      server.on('backchannel', (rtp) => talkback.push(rtp));
+      if (context.debug) this.logger.debug('P2P relay started');
+      return server;
+    } catch (error) {
+      await relay.stop().catch(() => undefined);
+      throw error;
     }
-    this.talkbackStarting?.then(() => this.talkbackTranscoder?.push(rtp)).catch((error) => this.cameraLogger.error('Talkback transcode failed:', error));
   }
 
-  private resetTalkback(): void {
-    this.talkbackTranscoder?.close();
-    this.talkbackTranscoder = undefined;
-    this.talkbackStarting = undefined;
+  private async stopRelay(): Promise<void> {
+    const ready = this.relayReady;
+    const relay = this.relay;
+    const talkback = this.talkback;
+    this.relayReady = undefined;
+    this.relay = undefined;
+    this.talkback = undefined;
+
+    await talkback?.stop();
+    const server = await ready?.catch(() => undefined);
+    await server?.shutdown().catch(() => undefined);
+    await relay?.stop().catch(() => undefined);
   }
 
-  private createRelayLogger(): Logger {
+  private async getRtspUrl(device: Device): Promise<string> {
+    // publishes on demand and returns the credentials in force, a cold station can miss the first window
+    for (let attempt = 0; attempt < RTSP_URL_ATTEMPTS; attempt++) {
+      const url = await this.context?.client.reportedRtspUrl(device.sn);
+      if (url) return url;
+    }
+    throw new Error(`${device.name} did not report an RTSP address`);
+  }
+
+  private async withdrawRtsp(): Promise<void> {
+    try {
+      await this.device?.rtsp?.()?.withdraw();
+    } catch (error) {
+      this.logger.warn(`Could not withdraw the RTSP stream: ${errorMessage(error)}`);
+    }
+  }
+
+  private onStreamModeChanged(mode: StreamMode): Promise<void> {
+    return this.serialize(async () => {
+      this.logger.log(`Stream mode set to ${mode === 'rtsp' ? 'RTSP' : 'P2P'}`);
+      if (mode === 'rtsp') {
+        await this.stopRelay();
+      } else {
+        await this.withdrawRtsp();
+        if (this.device) await this.ensureRelay();
+      }
+    });
+  }
+
+  private createRelayLogger(context: EufyContext): Logger {
     return {
-      log: (...args) => this.cameraLogger.log(...args),
-      warn: (...args) => this.cameraLogger.warn(...args),
-      error: (...args) => this.cameraLogger.error(...args),
-      debug: (...args) => this.cameraLogger.debug(...args),
+      log: (...args) => this.logger.log(...args),
+      warn: (...args) => this.logger.warn(...args),
+      error: (...args) => this.logger.error(...args),
+      debug: (...args) => {
+        if (context.debug) this.logger.debug(...args);
+      },
     };
   }
 
-  private async getNativeRTSPUrl(): Promise<string> {
-    const rtspUrl = this.eufyDevice.getPropertyValue(PropertyName.DeviceRTSPStreamUrl) as string;
+  private createStorage(device: Device): DeviceStorage<EufyCameraStorage> {
+    if (!device.rtsp?.()) return this.cameraDevice.createStorage<EufyCameraStorage>([]);
 
-    if (rtspUrl && rtspUrl !== '') {
-      return rtspUrl;
-    }
-
-    if (!this.eufyDevice.hasProperty(PropertyName.DeviceRTSPStream)) {
-      throw new Error('This Eufy device does not support native RTSP — enable "Use P2P" for this camera.');
-    }
-
-    if (!this.eufyDevice.getPropertyValue(PropertyName.DeviceRTSPStream)) {
-      await this.eufyClient.setDeviceProperty(this.eufyDevice.getSerial(), PropertyName.DeviceRTSPStream, true);
-    }
-
-    let attempts = 0;
-    while (attempts < 20) {
-      attempts++;
-      const url = this.eufyDevice.getPropertyValue(PropertyName.DeviceRTSPStreamUrl) as string;
-
-      if (url && url !== '') {
-        return url;
-      }
-
-      await new Promise((r) => setTimeout(r, 100));
-    }
-
-    throw new Error('Failed to get RTSP URL from Eufy device');
-  }
-
-  private async onUseP2PChanged(useP2P: boolean): Promise<void> {
-    this.cameraLogger.log(`P2P enabled: ${useP2P}`);
-
-    this.localLivestreamManager.stopLocalLiveStream();
-
-    if (useP2P) {
-      await this.createP2PRTSPServer();
-    } else {
-      if (this.relay) {
-        await this.rtspServer?.shutdown();
-        await this.relay.stop();
-        this.resetTalkback();
-        this.rtspServer = undefined;
-        this.relay = undefined;
-        this.cameraLogger.log('P2P RTSP relay stopped, using direct RTSP');
-      }
-    }
-  }
-
-  private createStorage(): DeviceStorage<EufyCameraStorage> {
     return this.cameraDevice.createStorage<EufyCameraStorage>([
       {
-        type: 'boolean',
-        key: 'useP2P',
-        title: 'Use P2P',
-        description: 'Stream over P2P instead of RTSP. Use this if your camera has no RTSP enabled.',
+        type: 'string',
+        key: 'streamMode',
+        title: 'Stream Mode',
+        description: 'P2P works for every camera. RTSP needs mains power, and a HomeBase serves only one camera over RTSP.',
+        enum: ['p2p', 'rtsp'],
+        enumLabels: { p2p: 'P2P', rtsp: 'RTSP' },
+        defaultValue: 'p2p',
         required: false,
-        defaultValue: true,
         store: true,
-        onSet: async (useP2P: boolean) => {
-          await this.onUseP2PChanged(useP2P);
-        },
+        onSet: async (mode: StreamMode) => this.onStreamModeChanged(mode),
       },
     ]);
   }
+}
+
+function toArrayBuffer(data: Buffer): ArrayBuffer {
+  return Uint8Array.from(data).buffer;
 }

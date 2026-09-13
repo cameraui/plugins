@@ -253,25 +253,11 @@ export const COUNTRIES: Record<string, string> = {
   ZW: 'Zimbabwe',
 };
 
-export const getCountryCode = (country?: string): string => {
+export function getCountryCode(country?: string): string {
   const countryCode = Object.keys(COUNTRIES).find((code) => COUNTRIES[code] === country);
   return countryCode ?? 'US';
-};
+}
 
-export async function PromiseTimeout<T>(promise: Promise<T> | (() => Promise<T>), ms: number, cleanup?: () => void, errorMessage?: string): Promise<T> {
-  let timeoutId: NodeJS.Timeout | undefined;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      cleanup?.();
-      reject(new Error(errorMessage ?? `Operation timed out after ${ms}ms`));
-    }, ms);
-  });
-
-  try {
-    const promiseFn = typeof promise === 'function' ? promise : () => promise;
-    return await Promise.race([promiseFn(), timeoutPromise]);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -1,42 +1,48 @@
 import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
+import { LoginStatus } from '@mega-yfue/eufy-sdk';
 import { installNativeLogging } from '@seydx/rtsp';
-import { Device, EufySecurity, P2PConnectionType } from 'eufy-security-client';
-import { mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
 
-import { Camera } from './camera.js';
-import { COUNTRIES, getCountryCode, PromiseTimeout } from './utils.js';
-
-import type { NativeLoggingHandle } from '@seydx/rtsp';
+import { accountKey, EufyAccount, isCameraRecord } from './account.js';
+import { EufyCamera } from './camera.js';
+import { createStandaloneSensor, discoverStandaloneSensors } from './standalone.js';
+import { COUNTRIES, errorMessage } from './utils.js';
 
 import type {
+  AdoptedSensor,
   CameraConfig,
   CameraDevice,
   DeviceStorage,
   DiscoveredCamera,
+  DiscoveredSensor,
   DiscoveryProvider,
   FormSubmitResponse,
   JsonSchema,
   JsonSchemaWithoutCallbacks,
   LoggerService,
   PluginAPI,
+  Sensor,
+  SensorDiscoveryProvider,
 } from '@camera.ui/sdk';
-import type { Camera as EufyCamera, EufySecurityConfig, Logger, LoginOptions } from 'eufy-security-client';
-import type { DeviceContainer, EufyConnectionResponse, EufyHome, StorageValues } from './types.js';
+import type { AnyDeviceEvent, EufyDevice, LoginResult } from '@mega-yfue/eufy-sdk';
+import type { NativeLoggingHandle } from '@seydx/rtsp';
+import type { AccountCredentials } from './account.js';
+import type { StandaloneSensor } from './standalone.js';
+import type { EufyContext, StorageValues } from './types.js';
 
-function isBestEffortLegacyError(error: Error): boolean {
-  return error?.message?.includes('Invalid passport profile response') ?? false;
-}
+const DEFAULT_MAX_LIVE_STREAM_SECONDS = 86_400;
 
-export default class Eufy extends BasePlugin<StorageValues> implements DiscoveryProvider {
-  private existingCameras = new Map<string, CameraDevice>();
-  private eufyCameras = new Map<string, Camera>();
-  private discoveredEufyDevices = new Map<string, EufyCamera>();
-  private eufyClients = new Map<string, EufySecurity>();
-  private eufyClientCreds = new Map<string, string>();
-  private pendingCameras = new Set<string>();
-
+export default class Eufy extends BasePlugin<StorageValues> implements DiscoveryProvider, SensorDiscoveryProvider {
+  private account?: EufyAccount;
+  private pendingLogin?: EufyAccount;
+  private pendingStep?: 'captcha' | 'twoFactor';
+  private devicesLoaded = false;
+  private ffmpegPath?: string;
   private nativeLogging?: NativeLoggingHandle;
+
+  private readonly records = new Map<string, EufyDevice>();
+  private readonly cameraDevices = new Map<string, CameraDevice>();
+  private readonly cameras = new Map<string, EufyCamera>();
+  private readonly standalone = new Map<string, StandaloneSensor>();
 
   constructor(logger: LoggerService, api: PluginAPI, storage: DeviceStorage<StorageValues>) {
     super(logger, api, storage);
@@ -47,30 +53,22 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     this.api.on(API_EVENT.SHUTDOWN, this.stop.bind(this));
   }
 
-  get storageSchema(): JsonSchema[] {
+  public get storageSchema(): JsonSchema[] {
     return [
       {
         type: 'boolean',
         key: 'debug',
         title: 'Debug',
-        description: 'Enable debug mode',
+        description: 'Log what the Eufy connection and the streams are doing.',
         required: false,
         defaultValue: false,
         store: true,
       },
       {
         type: 'string',
-        key: 'name',
-        title: 'Home Name',
-        description: 'Name of the home',
-        required: true,
-        store: true,
-      },
-      {
-        type: 'string',
         key: 'username',
-        title: 'Login Email',
-        description: 'Email for the login',
+        title: 'Email',
+        description: 'Email of your Eufy account.',
         format: 'email',
         required: true,
         store: true,
@@ -78,8 +76,8 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
       {
         type: 'string',
         key: 'password',
-        title: 'Login Password',
-        description: 'Password for the login',
+        title: 'Password',
+        description: 'Password of your Eufy account.',
         format: 'password',
         required: true,
         store: true,
@@ -88,52 +86,34 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         type: 'string',
         key: 'country',
         title: 'Country',
-        description: 'Country for the login',
+        description: 'Country of your Eufy account.',
         required: true,
         store: true,
         defaultValue: 'United States',
         enum: Object.values(COUNTRIES),
       },
       {
-        type: 'string',
-        key: 'deviceName',
-        title: 'Device Name',
-        description: 'Name of the device',
-        required: false,
-        defaultValue: 'camera.ui',
-        store: true,
-      },
-      {
         type: 'number',
         key: 'maxLiveStreamDuration',
         title: 'Max Live Stream Duration',
-        description: 'Max duration of live stream in seconds',
+        description: 'Battery cameras stop streaming after this many seconds.',
         required: false,
-        defaultValue: 86400,
+        defaultValue: DEFAULT_MAX_LIVE_STREAM_SECONDS,
         minimum: 10,
-        maximum: 86400,
+        maximum: DEFAULT_MAX_LIVE_STREAM_SECONDS,
         step: 10,
-        store: true,
-      },
-      {
-        type: 'boolean',
-        key: 'localOnly',
-        title: 'Local Only',
-        description: 'Connect to cameras only on the local network (lower latency, no cloud relay). Disables remote streaming access.',
-        required: false,
-        defaultValue: false,
         store: true,
       },
       {
         type: 'array',
         key: 'ignoreDevices',
         title: 'Ignore Devices',
-        description: 'List of devices to ignore',
+        description: 'Serial numbers of Eufy devices that should not be offered.',
         required: false,
         items: {
           type: 'string',
-          title: 'Device',
-          description: 'Device to ignore',
+          title: 'Serial Number',
+          description: 'Serial number of the device',
         },
         defaultValue: [],
         store: true,
@@ -141,95 +121,77 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
       {
         type: 'submit',
         key: 'onLogin',
-        title: 'Login',
-        description: 'Login to Eufy',
-        onClick: this.onFormSubmit.bind(this, 'onLogin'),
+        title: 'Log In',
+        description: 'Log in to Eufy',
+        onClick: this.onLogin.bind(this),
+      },
+      {
+        type: 'submit',
+        key: 'onLogout',
+        title: 'Log Out',
+        description: 'End the Eufy session and forget the saved login',
+        onClick: this.onLogout.bind(this),
       },
     ];
   }
 
   public async configureCameras(cameras: CameraDevice[]): Promise<void> {
     for (const camera of cameras) {
-      this.existingCameras.set(camera.id, camera);
+      this.cameraDevices.set(camera.id, camera);
     }
   }
 
   public async onCameraAdded(camera: CameraDevice): Promise<void> {
-    this.existingCameras.set(camera.id, camera);
-
-    const eufyCameraId = camera.nativeId;
-    if (!eufyCameraId) {
-      this.logger.warn(`Camera ${camera.name} has no nativeId, skipping initialization`);
-      return;
-    }
-
-    const eufyDevice = this.discoveredEufyDevices.get(eufyCameraId);
-    if (eufyDevice) {
-      await this.initializeCamera(eufyDevice, camera);
-    } else {
-      this.logger.debug(`Eufy device ${eufyCameraId} not yet discovered, will initialize when available`);
-    }
+    this.cameraDevices.set(camera.id, camera);
+    await this.initializeCamera(camera);
   }
 
   public async onCameraReleased(cameraId: string): Promise<void> {
-    const cameraDevice = this.existingCameras.get(cameraId);
-    if (cameraDevice?.nativeId) {
-      const cameraController = this.eufyCameras.get(cameraDevice.nativeId);
-      if (cameraController) {
-        try {
-          cameraController.eufyDevice.destroy();
-        } catch {
-          // ignore
-        }
-        this.eufyCameras.delete(cameraDevice.nativeId);
-      }
+    const cameraDevice = this.cameraDevices.get(cameraId);
+    this.cameraDevices.delete(cameraId);
 
-      const eufyDevice = this.discoveredEufyDevices.get(cameraDevice.nativeId);
-      if (eufyDevice) {
-        await this.api.deviceManager.pushDiscoveredCameras([
-          {
-            id: `eufy:${cameraDevice.nativeId}`,
-            name: eufyDevice.getName(),
-            manufacturer: 'Eufy',
-            model: eufyDevice.getModel(),
-          },
-        ]);
-      }
-    }
-    this.existingCameras.delete(cameraId);
+    const sn = cameraDevice?.nativeId;
+    if (!sn) return;
+
+    const controller = this.cameras.get(sn);
+    this.cameras.delete(sn);
+    await controller?.release().catch((error: unknown) => this.logger.warn(`Could not release camera ${cameraDevice.name}: ${errorMessage(error)}`));
+
+    await this.pushDiscoveredCameras();
   }
 
   public async onDiscoverCameras(): Promise<DiscoveredCamera[]> {
-    return this.getDiscoveredCameras();
+    return this.discoveredCameras();
   }
 
   public async onGetCameraSettings(_camera: DiscoveredCamera): Promise<JsonSchemaWithoutCallbacks[]> {
     return [];
   }
 
-  public async onAdoptCamera(camera: DiscoveredCamera, _credentials: Record<string, unknown>): Promise<CameraConfig> {
-    const eufyCameraId = camera.id.replace('eufy:', '');
-    const eufyDevice = this.discoveredEufyDevices.get(eufyCameraId);
+  public async onAdoptCamera(camera: DiscoveredCamera, _settings: Record<string, unknown>): Promise<CameraConfig> {
+    const sn = camera.id.replace(/^eufy:/, '');
+    if (!this.account || !this.records.has(sn)) throw new Error(`Eufy camera ${sn} not found`);
 
-    if (!eufyDevice) {
-      throw new Error(`Eufy camera ${eufyCameraId} not found`);
-    }
+    const device = await this.account.getDevice(sn);
+    const info = device.info?.();
 
-    const config: CameraConfig = {
-      name: eufyDevice.getName(),
-      nativeId: eufyDevice.getSerial(),
+    this.logger.log(`Adopted camera ${device.name}`);
+
+    return {
+      name: device.name,
+      nativeId: sn,
       isCloud: true,
       info: {
         manufacturer: 'Eufy',
-        model: eufyDevice.getModel(),
-        hardware: eufyDevice.getHardwareVersion(),
-        serialNumber: eufyDevice.getSerial(),
-        firmwareVersion: eufyDevice.getSoftwareVersion(),
+        model: device.modelName,
+        hardware: info?.hardwareVersion,
+        serialNumber: sn,
+        firmwareVersion: info?.firmwareVersion,
         supportUrl: 'https://support.eufy.com/',
       },
       sources: [
         {
-          name: 'P2P',
+          name: 'Stream',
           role: 'high-resolution',
           useForSnapshot: true,
           hotMode: false,
@@ -237,547 +199,335 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         },
       ],
     };
+  }
 
-    this.logger.log(`Adopted camera: ${eufyDevice.getName()}`);
+  public async onDiscoverSensors(): Promise<DiscoveredSensor[]> {
+    const account = this.account;
+    if (!account || !this.devicesLoaded) return [];
 
-    return config;
+    const discovered: DiscoveredSensor[] = [];
+    for (const record of this.records.values()) {
+      if (isCameraRecord(record) || this.isIgnored(record.sn)) continue;
+      try {
+        discovered.push(...discoverStandaloneSensors(record, await account.getDevice(record.sn)));
+      } catch (error) {
+        this.logger.warn(`Could not read Eufy device ${record.sn}: ${errorMessage(error)}`);
+      }
+    }
+    return discovered;
+  }
+
+  public async configureAdoptedSensors(records: AdoptedSensor[]): Promise<Sensor<any, any, any>[]> {
+    const sensors: Sensor<any, any, any>[] = [];
+    for (const record of records) {
+      const standalone = this.createStandalone(record);
+      if (standalone) sensors.push(standalone.sensor);
+    }
+    return sensors;
+  }
+
+  public async onSensorAdopted(record: AdoptedSensor): Promise<Sensor<any, any, any>> {
+    const standalone = this.createStandalone(record);
+    if (!standalone) throw new Error(`"${record.name}" is not a sensor of this plugin`);
+    return standalone.sensor;
+  }
+
+  public async onSensorUnadopted(nativeId: string): Promise<void> {
+    this.standalone.delete(nativeId);
   }
 
   private async start(): Promise<void> {
-    if (this.storage.values.username && this.storage.values.password && this.storage.values.country && this.storage.values.deviceName) {
-      try {
-        await this.connectHome(this.storage.values);
-      } catch (error: any) {
-        this.logger.error(this.storage.values.name, 'An error occured during connecting to home:', error);
+    try {
+      this.ffmpegPath = await this.api.coreManager.getFFmpegPath();
+    } catch (error) {
+      this.logger.warn(`No ffmpeg available, fresh snapshots are disabled: ${errorMessage(error)}`);
+    }
+
+    const credentials = this.credentials(this.storage.values);
+    if (!credentials) {
+      this.logger.warn('Enter your Eufy login in the plugin settings');
+      return;
+    }
+
+    const account = this.createAccount(credentials);
+    try {
+      const result = await account.login();
+      if (result.status !== LoginStatus.Ok) {
+        this.logger.error('Eufy asks for a captcha or a verification code, log in again in the plugin settings');
+        await account.dispose();
+        return;
       }
+      await this.activate(account);
+    } catch (error) {
+      this.logger.error(`Eufy login failed: ${errorMessage(error)}`);
+      await account.dispose().catch(() => undefined);
     }
   }
 
-  private stop(): void {
-    this.eufyClients.forEach((eufyClient) => {
-      try {
-        if (eufyClient.isConnected()) {
-          eufyClient.close();
-        }
-      } catch {
-        //
-      }
-    });
-
-    this.discoveredEufyDevices.forEach((eufyDevice) => {
-      try {
-        eufyDevice.destroy();
-      } catch {
-        //
-      }
-    });
-
-    this.eufyClients.clear();
-    this.eufyClientCreds.clear();
-    this.discoveredEufyDevices.clear();
-    this.eufyCameras.clear();
+  private async stop(): Promise<void> {
+    await this.deactivate();
+    await this.pendingLogin?.dispose().catch(() => undefined);
+    this.pendingLogin = undefined;
+    this.pendingStep = undefined;
 
     this.nativeLogging?.dispose();
     this.nativeLogging = undefined;
   }
 
-  private closeClient(home: EufyHome): void {
-    const eufyClient = this.eufyClients.get(home.name);
+  private createAccount(credentials: AccountCredentials): EufyAccount {
+    return new EufyAccount(credentials, this.api.storagePath, this.logger, this.storage.values.debug ?? false, this.ffmpegPath);
+  }
 
-    if (eufyClient) {
-      try {
-        if (eufyClient.isConnected()) {
-          eufyClient.close();
-        }
-      } catch {
-        // ignore
-      } finally {
-        this.eufyClients.delete(home.name);
-        this.eufyClientCreds.delete(home.name);
+  private async activate(account: EufyAccount): Promise<void> {
+    await this.deactivate();
+
+    this.account = account;
+    account.client.on('event', (event) => this.routeEvent(account, event));
+    account.client.on('deviceAdded', (record) => this.onDeviceAdded(account, record));
+    account.client.on('deviceRemoved', (record) => this.onDeviceRemoved(account, record));
+    account.client.on('sessionExpired', (error) => this.onSessionExpired(account, error));
+
+    this.logger.log('Connected to Eufy');
+    await this.loadDevices(account);
+  }
+
+  private async deactivate(logout = false): Promise<void> {
+    const account = this.account;
+    this.account = undefined;
+    this.devicesLoaded = false;
+    this.records.clear();
+
+    await Promise.all([...this.cameras.values()].map((camera) => camera.unbind().catch(() => undefined)));
+
+    for (const standalone of this.standalone.values()) standalone.bind(undefined);
+
+    await (logout ? account?.logout() : account?.dispose())?.catch(() => undefined);
+  }
+
+  private async loadDevices(account: EufyAccount): Promise<void> {
+    let records: EufyDevice[];
+    try {
+      records = await account.listDevices();
+    } catch (error) {
+      this.logger.error(`Could not load the Eufy devices: ${errorMessage(error)}`);
+      return;
+    }
+    if (this.account !== account) return;
+
+    this.records.clear();
+    for (const record of records) this.records.set(record.sn, record);
+    this.devicesLoaded = true;
+
+    const cameras = records.filter(isCameraRecord).length;
+    this.logger.log(`Found ${cameras} Eufy camera(s) and ${records.length - cameras} other device(s)`);
+
+    await Promise.all([...this.cameraDevices.values()].map((camera) => this.initializeCamera(camera)));
+    await Promise.all([...this.standalone.values()].map((standalone) => this.bindStandalone(standalone)));
+    await this.pushDiscoveredCameras();
+  }
+
+  private async onDeviceAdded(account: EufyAccount, record: EufyDevice): Promise<void> {
+    if (this.account !== account) return;
+    this.records.set(record.sn, record);
+
+    const camera = [...this.cameraDevices.values()].find((cameraDevice) => cameraDevice.nativeId === record.sn);
+    if (camera) await this.initializeCamera(camera);
+
+    for (const standalone of this.standalone.values()) {
+      if (standalone.sn === record.sn) await this.bindStandalone(standalone);
+    }
+    await this.pushDiscoveredCameras();
+  }
+
+  private onDeviceRemoved(account: EufyAccount, record: EufyDevice): void {
+    if (this.account !== account) return;
+    this.records.delete(record.sn);
+    account.forgetDevice(record.sn);
+    this.logger.log(`${record.name ?? record.sn} was removed from the Eufy account`);
+
+    for (const standalone of this.standalone.values()) {
+      if (standalone.sn === record.sn) standalone.markRemoved();
+    }
+  }
+
+  private async onSessionExpired(account: EufyAccount, error: Error): Promise<void> {
+    if (this.account !== account) return;
+    this.logger.error('The Eufy session ended, log in again in the plugin settings:', error.message);
+    await this.deactivate();
+  }
+
+  private routeEvent(account: EufyAccount, event: AnyDeviceEvent): void {
+    const sn = event.deviceSn ?? event.stationSn;
+    if (this.account !== account || !sn) return;
+    // pushes that name the triggering camera often leave the station out
+    const stationSn = event.stationSn ?? this.records.get(sn)?.stationSn;
+
+    this.cameras.get(sn)?.handleEvent(event);
+    for (const standalone of this.standalone.values()) {
+      if (standalone.sn === sn) {
+        standalone.handleEvent(event, true);
+      } else if (standalone.sn === stationSn) {
+        standalone.handleEvent(event, false);
       }
     }
   }
 
-  private async connectHome(home: EufyHome): Promise<void> {
-    let eufyClient: EufySecurity | undefined;
+  private async initializeCamera(cameraDevice: CameraDevice): Promise<void> {
+    const account = this.account;
+    const sn = cameraDevice.nativeId;
+    if (!account || !sn || !this.records.has(sn)) return;
 
-    const connectPromise = () =>
-      new Promise<void>((resolve, reject) => {
-        if (!eufyClient) {
-          reject(new Error('No client'));
-          return;
-        }
-
-        if (eufyClient.isConnected()) {
-          resolve();
-          return;
-        }
-
-        const client = eufyClient;
-        let settled = false;
-        const settle = (fn: () => void): void => {
-          if (settled) return;
-          settled = true;
-          client.removeListener('connect', onConnect);
-          client.removeListener('connection error', onError);
-          client.removeListener('close', onClose);
-          fn();
-        };
-        const onConnect = (): void => settle(() => resolve());
-        const onError = (error: Error): void => {
-          if (isBestEffortLegacyError(error)) return;
-          settle(() => reject(error));
-        };
-        const onClose = (): void => settle(() => reject(new Error('Connection closed')));
-
-        client.on('connect', onConnect);
-        client.on('connection error', onError);
-        client.on('close', onClose);
-      });
-
-    try {
-      eufyClient = await this.getClient(home);
-      this.eufyClients.set(home.name, eufyClient);
-
-      eufyClient.on('device added', this.deviceAdded.bind(this, home, eufyClient));
-      eufyClient.on('device removed', this.deviceRemoved.bind(this, home));
-
-      eufyClient.on('push connect', () => {
-        this.logger.debug(home.name, 'Push Connected!');
-      });
-
-      eufyClient.on('push close', () => {
-        this.logger.debug(home.name, 'Push Closed!');
-      });
-
-      eufyClient.on('connect', () => {
-        this.logger.debug(home.name, 'Connected!');
-      });
-
-      eufyClient.on('close', () => {
-        this.logger.debug(home.name, 'Closed!');
-      });
-
-      eufyClient.on('connection error', async (error: Error) => {
-        this.logger.debug(home.name, `Error: ${error}`);
-        if (isBestEffortLegacyError(error)) {
-          return;
-        }
-        this.closeClient(home);
-      });
-
-      eufyClient.once('captcha request', async () => {
-        this.logger.error(home.name, 'CAPTCHA Required! Please re-authenticate via UI and restart Plugin!');
-        this.closeClient(home);
-      });
-
-      eufyClient.on('tfa request', async () => {
-        this.logger.error(home.name, 'Two-Factor Authentication (2FA) Requested! Please re-authenticate via UI and restart Plugin!');
-        this.closeClient(home);
-      });
-    } catch (error: any) {
-      this.logger.error(home.name, 'Error while setup:', error);
-      this.logger.error(home.name, 'Not connected cant continue!');
-      return;
+    let controller = this.cameras.get(sn);
+    if (!controller) {
+      controller = new EufyCamera(cameraDevice);
+      this.cameras.set(sn, controller);
     }
 
     try {
-      if (!eufyClient.isConnected()) {
-        await eufyClient.connect();
-      }
-    } catch (e) {
-      this.logger.error(home.name, 'Error authenticating Eufy:', e);
-      return;
-    }
-
-    try {
-      await PromiseTimeout(connectPromise.bind(this), 5000, undefined, 'Connection timed out');
-
-      const devices = await eufyClient.getDevices();
-      for (const device of devices) {
-        await this.deviceAdded(home, eufyClient, device);
-      }
-    } catch (error: any) {
-      this.logger.error(home.name, 'Error while connecting:', error);
-      return;
-    }
-
-    home.maxLiveStreamDuration = home.maxLiveStreamDuration ?? 86400;
-    if (home.maxLiveStreamDuration > 86400) {
-      home.maxLiveStreamDuration = 86400;
-      this.logger.warn(home.name, 'Your maximum livestream duration value is too large. Since this can cause problems it was reset to 86400 seconds (1 day maximum).');
-    } else if (home.maxLiveStreamDuration < 10) {
-      home.maxLiveStreamDuration = 10;
-      this.logger.warn(home.name, 'Your maximum livestream duration value is too small. Since this can cause problems it was reset to 10 seconds (10 seconds minimum).');
-    }
-
-    eufyClient.setCameraMaxLivestreamDuration(home.maxLiveStreamDuration);
-    this.logger.debug(home.name, `maxLiveStreamDuration: ${eufyClient.getCameraMaxLivestreamDuration()}`);
-  }
-
-  private async deviceAdded(home: EufyHome, eufyClient: EufySecurity, device: Device) {
-    try {
-      if ((home.ignoreDevices ?? []).includes(device.getSerial())) {
-        this.logger.debug(home.name, `${device.getName()}: Device ignored`);
-        return;
-      }
-
-      const deviceContainer: DeviceContainer = {
-        deviceIdentifier: {
-          uniqueId: device.getSerial(),
-          displayName: 'DEVICE_' + device.getName(),
-          type: device.getDeviceType(),
-        },
-        eufyDevice: device,
-      };
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      await this.processDiscoveredDevice(home, eufyClient, deviceContainer);
-    } catch (error: any) {
-      this.logger.error(home.name, 'Failed to process device:', error);
+      const device = await account.getDevice(sn);
+      if (this.account !== account) return;
+      await controller.bind(device, this.createContext(account));
+      if (this.account !== account) await controller.unbind();
+      if (this.storage.values.debug) this.logger.debug(`Initialized camera ${device.name}`);
+    } catch (error) {
+      this.logger.error(`Could not set up camera ${cameraDevice.name}: ${errorMessage(error)}`);
     }
   }
 
-  private async processDiscoveredDevice(home: EufyHome, eufyClient: EufySecurity, deviceContainer: DeviceContainer) {
-    const isCamera: boolean = deviceContainer.eufyDevice instanceof Device ? deviceContainer.eufyDevice.isCamera() : false;
+  private createContext(account: EufyAccount): EufyContext {
+    const values = this.storage.values;
+    return {
+      client: account.client,
+      debug: values.debug ?? false,
+      maxLiveStreamDuration: Math.max(10, Math.min(DEFAULT_MAX_LIVE_STREAM_SECONDS, values.maxLiveStreamDuration ?? DEFAULT_MAX_LIVE_STREAM_SECONDS)),
+    };
+  }
 
-    if (!isCamera) {
-      this.logger.debug(home.name, `Device ${deviceContainer.deviceIdentifier.displayName} is not a camera, skipping...`);
+  private createStandalone(record: AdoptedSensor): StandaloneSensor | undefined {
+    const standalone = createStandaloneSensor(record, this.logger);
+    if (!standalone) {
+      this.logger.warn(`Adopted sensor "${record.name}" has no Eufy identity, it stays disconnected`);
+      return undefined;
+    }
+    this.standalone.set(record.nativeId, standalone);
+    this.bindStandalone(standalone);
+    return standalone;
+  }
+
+  private async bindStandalone(standalone: StandaloneSensor): Promise<void> {
+    const account = this.account;
+    if (!account || !this.devicesLoaded) {
+      standalone.bind(undefined);
       return;
     }
-
-    const eufyDevice = deviceContainer.eufyDevice as EufyCamera;
-    const eufyCameraId = eufyDevice.getSerial();
-
-    if (this.discoveredEufyDevices.has(eufyCameraId) || this.pendingCameras.has(eufyCameraId)) {
-      this.logger.debug(home.name, `Camera ${eufyDevice.getName()} already discovered or pending, skipping...`);
+    if (!this.records.has(standalone.sn)) {
+      standalone.markRemoved();
       return;
     }
-
-    // Mark as pending BEFORE any async operation to guard against the concurrent-discovery race.
-    this.pendingCameras.add(eufyCameraId);
-
     try {
-      this.discoveredEufyDevices.set(eufyCameraId, eufyDevice);
-
-      const cameraDevice = Array.from(this.existingCameras.values()).find((camera) => camera.nativeId === eufyCameraId);
-
-      if (cameraDevice) {
-        await this.initializeCamera(eufyDevice, cameraDevice, home, eufyClient);
-      }
-
-      await this.pushDiscoveredCameras();
-    } catch (error: any) {
-      this.logger.error(home.name, 'Error in processDiscoveredDevice', error);
-    } finally {
-      this.pendingCameras.delete(eufyCameraId);
+      const device = await account.getDevice(standalone.sn);
+      if (this.account === account && this.standalone.get(standalone.nativeId) === standalone) standalone.bind(device);
+    } catch (error) {
+      this.logger.warn(`Could not read Eufy device ${standalone.sn}: ${errorMessage(error)}`);
+      standalone.bind(undefined);
     }
-  }
-
-  private async initializeCamera(eufyDevice: EufyCamera, cameraDevice: CameraDevice, home?: EufyHome, eufyClient?: EufySecurity): Promise<void> {
-    const eufyCameraId = eufyDevice.getSerial();
-
-    if (this.eufyCameras.has(eufyCameraId)) {
-      return;
-    }
-
-    if (!home || !eufyClient) {
-      home = this.storage.values;
-      eufyClient = this.eufyClients.get(home.name);
-    }
-
-    if (!eufyClient) {
-      this.logger.warn(`Cannot initialize camera ${cameraDevice.name}: Eufy client not available`);
-      return;
-    }
-
-    const camera = new Camera(this, home, eufyClient, eufyDevice, cameraDevice);
-    await camera.initialize();
-
-    this.eufyCameras.set(eufyCameraId, camera);
-    this.logger.debug(`Initialized camera: ${eufyDevice.getName()}`);
-  }
-
-  private async deviceRemoved(home: EufyHome, device: Device) {
-    const serial = device.getSerial();
-    this.logger.debug(home.name, `A device has been removed: ${device.getName()}`);
-
-    this.discoveredEufyDevices.delete(serial);
-    this.eufyCameras.delete(serial);
-
-    // Camera removal is intentionally left to the UI; we don't call deviceManager.removeCamera() here.
   }
 
   private async pushDiscoveredCameras(): Promise<void> {
-    const discovered = this.getDiscoveredCameras();
-
-    if (discovered.length > 0) {
-      this.logger.debug(`Found ${discovered.length} new camera(s), pushing to discovery...`);
-      await this.api.deviceManager.pushDiscoveredCameras(discovered);
-    }
+    const discovered = this.discoveredCameras();
+    if (discovered.length > 0) await this.api.deviceManager.pushDiscoveredCameras(discovered);
   }
 
-  private getDiscoveredCameras(): DiscoveredCamera[] {
-    const discovered: DiscoveredCamera[] = [];
+  private discoveredCameras(): DiscoveredCamera[] {
+    const adopted = new Set([...this.cameraDevices.values()].map((camera) => camera.nativeId));
+    return [...this.records.values()]
+      .filter((record) => isCameraRecord(record) && !adopted.has(record.sn) && !this.isIgnored(record.sn))
+      .map((record) => ({ id: `eufy:${record.sn}`, name: record.name ?? record.sn, manufacturer: 'Eufy', model: record.model }));
+  }
 
-    for (const [eufyCameraId, eufyDevice] of this.discoveredEufyDevices) {
-      const existingCamera = Array.from(this.existingCameras.values()).find((camera) => camera.nativeId === eufyCameraId);
-      if (existingCamera) {
-        continue;
+  private isIgnored(sn: string): boolean {
+    return (this.storage.values.ignoreDevices ?? []).includes(sn);
+  }
+
+  private credentials(values: StorageValues): AccountCredentials | undefined {
+    if (!values.username || !values.password) return undefined;
+    return { email: values.username.trim(), password: values.password, country: values.country };
+  }
+
+  private async onLogin(values: StorageValues): Promise<FormSubmitResponse> {
+    const credentials = this.credentials(values);
+    if (!credentials) return { toast: { type: 'error', message: 'Enter email and password' } };
+
+    const key = accountKey(credentials);
+    if (this.account?.key === key && this.account.client.loggedIn && !this.pendingStep) {
+      await this.saveConfig(values);
+      return { toast: { type: 'success', message: 'Already logged in' } };
+    }
+
+    let account = this.pendingLogin?.key === key ? this.pendingLogin : undefined;
+    const step = account ? this.pendingStep : undefined;
+    try {
+      let result: LoginResult;
+      if (account && step === 'captcha' && values.captchaCode) {
+        result = await account.solveCaptcha(values.captchaCode.trim());
+      } else if (account && step === 'twoFactor' && values.twoFactorCode) {
+        result = await account.submitVerifyCode(values.twoFactorCode.trim());
+      } else {
+        await this.pendingLogin?.dispose().catch(() => undefined);
+        account = this.createAccount(credentials);
+        result = await account.login();
+      }
+      this.pendingLogin = account;
+
+      if (result.status === LoginStatus.Captcha) {
+        this.pendingStep = 'captcha';
+        return {
+          toast: { type: 'warning', message: result.retry ? 'Wrong captcha, try again' : 'Eufy asks for a captcha' },
+          schema: [
+            { type: 'string', key: 'captcha', title: 'Captcha', description: 'Type the characters from the image', format: 'image', defaultValue: result.image },
+            { type: 'string', key: 'captchaCode', title: 'Captcha Code', description: 'Characters from the image', required: true },
+          ],
+        };
       }
 
-      discovered.push({
-        id: `eufy:${eufyCameraId}`,
-        name: eufyDevice.getName(),
-        manufacturer: 'Eufy',
-        model: eufyDevice.getModel() ?? undefined,
-      });
-    }
-
-    return discovered;
-  }
-
-  private tryLogin(home: EufyHome & { twoFactorCode?: string } & { captchaCode?: string; captchaId: string }): Promise<EufyConnectionResponse> {
-    return new Promise(async (resolve, reject) => {
-      let eufyClient: EufySecurity;
-      try {
-        eufyClient = await this.getClient(home);
-      } catch (error) {
-        return reject(error);
+      if (result.status === LoginStatus.TwoFactor) {
+        this.pendingStep = 'twoFactor';
+        return {
+          toast: { type: 'warning', message: 'Eufy sent a verification code' },
+          schema: [{ type: 'string', key: 'twoFactorCode', title: 'Verification Code', description: 'Code from the Eufy email or SMS', required: true }],
+        };
       }
 
-      if (eufyClient.isConnected()) {
-        this.logger.debug(home.name, 'Already connected');
-        return resolve({ connected: true });
-      }
-
-      let settled = false;
-      const finish = (fn: () => void): void => {
-        if (settled) return;
-        settled = true;
-        eufyClient.removeListener('connect', onConnect);
-        eufyClient.removeListener('tfa request', onTfa);
-        eufyClient.removeListener('captcha request', onCaptcha);
-        eufyClient.removeListener('connection error', onError);
-        fn();
-      };
-
-      const onConnect = (): void => finish(() => resolve({ connected: true }));
-      const onTfa = (): void => finish(() => resolve({ connected: false, is2FA: true }));
-      const onCaptcha = (id: string, captcha: string): void => finish(() => resolve({ connected: false, isCaptcha: { id, captcha } }));
-      const onError = (error: Error): void => {
-        if (isBestEffortLegacyError(error)) return;
-        finish(() => reject(error));
-      };
-
-      eufyClient.once('connect', onConnect);
-      eufyClient.once('tfa request', onTfa);
-      eufyClient.once('captcha request', onCaptcha);
-      eufyClient.once('connection error', onError);
-
-      const hasCaptcha = Boolean(home.captchaCode && home.captchaId);
-      const hasVerifyCode = Boolean(home.twoFactorCode);
-
-      const loginOptions: LoginOptions | undefined =
-        hasCaptcha || hasVerifyCode
-          ? {
-              force: true,
-              verifyCode: home.twoFactorCode,
-              captcha: hasCaptcha ? { captchaId: home.captchaId, captchaCode: home.captchaCode! } : undefined,
-            }
-          : undefined;
-
-      this.logger.debug(home.name, `Login step: ${hasCaptcha ? 'captcha' : hasVerifyCode ? '2FA code' : 'initial'}`);
-
-      try {
-        await eufyClient.connect(loginOptions);
-        if (eufyClient.isConnected()) {
-          finish(() => resolve({ connected: true }));
-        }
-      } catch (error: any) {
-        finish(() => reject(error));
-      }
-    });
+      this.pendingLogin = undefined;
+      this.pendingStep = undefined;
+      await this.saveConfig(values);
+      await this.activate(account);
+      return { toast: { type: 'success', message: 'Logged in to Eufy' } };
+    } catch (error) {
+      await account?.dispose().catch(() => undefined);
+      this.pendingLogin = undefined;
+      this.pendingStep = undefined;
+      const message = `Eufy login failed: ${errorMessage(error)}`;
+      this.logger.error(message);
+      return { toast: { type: 'error', message } };
+    }
   }
 
-  private credentialsKey(home: EufyHome): string {
-    return [home.username, home.password, getCountryCode(home.country), home.deviceName ?? ''].join('\0');
+  private async onLogout(): Promise<FormSubmitResponse> {
+    await this.pendingLogin?.dispose().catch(() => undefined);
+    this.pendingLogin = undefined;
+    this.pendingStep = undefined;
+
+    if (!this.account) return { toast: { type: 'info', message: 'Not logged in' } };
+
+    await this.deactivate(true);
+    this.logger.log('Logged out of Eufy');
+    return { toast: { type: 'success', message: 'Logged out of Eufy' } };
   }
 
-  private async getClient(home: EufyHome): Promise<EufySecurity> {
-    const existing = this.eufyClients.get(home.name);
-    const credentialsChanged = this.eufyClientCreds.get(home.name) !== this.credentialsKey(home);
-
-    // Reuse the same client across the captcha -> 2FA -> success flow; only rebuild when credentials change.
-    if (existing && !credentialsChanged) {
-      return existing;
-    }
-
-    if (existing) {
-      this.closeClient(home);
-    }
-
-    const logger: Logger = {
-      info: (message: any, ...args: any[]) => {
-        this.logger.log(home.name, message, ...args);
-      },
-      warn: (message: any, ...args: any[]) => {
-        this.logger.warn(home.name, message, ...args);
-      },
-      error: (message: any, ...args: any[]) => {
-        this.logger.error(home.name, message, ...args);
-      },
-      fatal: (message: any, ...args: any[]) => {
-        this.logger.error(home.name, message, ...args);
-      },
-      debug: (message: any, ...args: any[]) => {
-        if (home.debug) {
-          this.logger.debug(home.name, message, ...args);
-        }
-      },
-      trace: (message: any, ...args: any[]) => {
-        if (home.debug) {
-          this.logger.debug(home.name, message, ...args);
-        }
-      },
-    };
-
-    const homeKey = home.name?.replace(/[^\w.-]/g, '_') || 'default';
-    const persistentDir = resolve(this.api.storagePath, homeKey);
-    mkdirSync(persistentDir, { recursive: true });
-
-    const eufyConfig: EufySecurityConfig = {
-      username: home.username,
-      password: home.password,
-      country: getCountryCode(home.country),
-      trustedDeviceName: home.deviceName,
-      language: 'en',
-      persistentDir,
-      p2pConnectionSetup: home.localOnly ? P2PConnectionType.ONLY_LOCAL : P2PConnectionType.QUICKEST,
-      pollingIntervalMinutes: 10,
-      eventDurationSeconds: 10,
-      acceptInvitations: true,
-    };
-
-    const eufyClient = await EufySecurity.initialize(eufyConfig, logger);
-    this.eufyClients.set(home.name, eufyClient);
-    this.eufyClientCreds.set(home.name, this.credentialsKey(home));
-
-    return eufyClient;
-  }
-
-  private async refreshConfig(home: EufyHome): Promise<void> {
-    if ('twoFactorCode' in home) {
-      delete home.twoFactorCode;
-    }
-
-    if ('captcha' in home) {
-      delete home.captcha;
-    }
-
-    if ('captchaCode' in home) {
-      delete home.captchaCode;
-    }
-
-    if ('captchaId' in home) {
-      delete home.captchaId;
-    }
-
-    this.storage.values = home;
-
+  private async saveConfig(values: StorageValues): Promise<void> {
+    const { captcha: _captcha, captchaCode: _captchaCode, twoFactorCode: _twoFactorCode, ...config } = values;
+    this.storage.values = config;
     await this.storage.save();
-  }
-
-  private async onFormSubmit(
-    actionId: string,
-    home: EufyHome & { twoFactorCode?: string } & { captchaCode?: string; captchaId: string },
-  ): Promise<FormSubmitResponse | undefined> {
-    switch (actionId) {
-      case 'onLogin':
-        try {
-          const connectionResponse = await this.tryLogin(home);
-
-          if (connectionResponse.connected) {
-            await this.refreshConfig(home);
-            await this.connectHome(home);
-          }
-
-          const formResponse = this.createFormResponse(connectionResponse);
-
-          return formResponse;
-        } catch (error: any) {
-          const message = `Failed to Authenticate. Reason: ${error.message}`;
-          this.logger.error(home.name, message);
-
-          const formResponse: FormSubmitResponse = {
-            toast: {
-              message,
-              type: 'error',
-            },
-          };
-
-          return formResponse;
-        }
-    }
-  }
-
-  private createFormResponse(connectionResponse: EufyConnectionResponse): FormSubmitResponse {
-    const formResponse: FormSubmitResponse = {
-      toast: {
-        type: 'success',
-        message: 'Logged in!',
-      },
-    };
-
-    if (connectionResponse.is2FA) {
-      formResponse.schema = [
-        {
-          type: 'string',
-          key: 'twoFactorCode',
-          title: 'Two-Factor Code',
-          description: 'Enter the two-factor code',
-          required: true,
-        },
-      ];
-
-      formResponse.toast = {
-        message: 'Two-Factor Authentication (2FA) Required!',
-        type: 'warning',
-      };
-    } else if (connectionResponse.isCaptcha) {
-      formResponse.schema = [
-        {
-          type: 'string',
-          key: 'captcha',
-          title: 'Captcha',
-          description: 'Enter the captcha',
-          format: 'image',
-          defaultValue: connectionResponse.isCaptcha.captcha,
-        },
-        {
-          type: 'string',
-          key: 'captchaCode',
-          title: 'Captcha Code',
-          description: 'Enter the captcha code',
-          required: true,
-        },
-        {
-          type: 'string',
-          key: 'captchaId',
-          title: 'Captcha ID',
-          description: 'Enter the captcha ID',
-          hidden: true,
-          defaultValue: connectionResponse.isCaptcha.id,
-        },
-      ];
-
-      formResponse.toast = {
-        message: 'CAPTCHA Required!',
-        type: 'warning',
-      };
-    }
-
-    return formResponse;
   }
 }

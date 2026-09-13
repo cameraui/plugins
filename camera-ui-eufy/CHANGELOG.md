@@ -1,3 +1,13 @@
+## [2.0.0]
+
+- **Rebuilt on the new Eufy SDK.** The plugin now uses the same cloud and P2P protocol as the current Eufy app. Log in again once in the plugin settings, a verification code may be asked for. Needs camera.ui 2.2.3 and Node.js 24.5 or newer, which the desktop app and the Docker image already ship
+- **Eufy sensors come to camera.ui.** Entry sensors, motion sensors, locks, leak, smoke and CO sensors and the guard mode and siren of a HomeBase show up on the Sensors page to adopt
+- **Camera controls.** Spotlight with brightness, siren, pan and tilt with presets, turning the camera on or off and the guard mode of cameras without a HomeBase appear as controls where the camera supports them
+- **More detections.** Unknown people, pets, sounds and crying come in as detections next to motion, people and vehicles
+- **Live view.** A new viewer starts from the last keyframe, and two cameras behind one HomeBase can stream at the same time
+- **Snapshots from the last event.** The picture of the latest Eufy notification is used without waking a battery camera, a fresh picture is taken only when asked for
+- The stream mode is set per camera: P2P for every camera, RTSP where the camera or HomeBase offers it. Home name, device name and the local only option are gone
+
 ## [1.2.4]
 
 - Updated camera.ui engine
