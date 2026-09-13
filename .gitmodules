@@ -13,3 +13,7 @@
 [submodule "externals/reolinkproxy"]
 	path = externals/reolinkproxy
 	url = https://github.com/seydx/reolinkproxy.git
+[submodule "externals/eufy-sdk"]
+	path = externals/eufy-sdk
+	url = https://github.com/seydx/eufy-sdk.git
+	branch = beta-0.2.0
