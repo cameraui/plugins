@@ -20,12 +20,12 @@
     "update": "updates -M npm,pypi,go,cargo,docker,make --update ./"
   },
   "dependencies": {
-    "mailparser": "^3.9.25",
-    "smtp-server": "^3.19.11"
+    "mailparser": "^3.9.26",
+    "smtp-server": "^3.19.12"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.105",
-    "@camera.ui/sdk": "^1.2.37",
+    "@camera.ui/cli": "^0.0.106",
+    "@camera.ui/sdk": "^1.2.38",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/mailparser": "^3.4.6",
     "@types/node": "26.5.1",
