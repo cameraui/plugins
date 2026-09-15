@@ -13,6 +13,6 @@ export interface CameraStorageValues {
   republishId: string;
   useHardwareAcceleration: boolean;
   useHardwareAccelerationForRecording: boolean;
-  adaptiveStreamSource: boolean;
+  forceLegacyPath: boolean;
   advertiser: string;
 }

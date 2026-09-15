@@ -14,7 +14,11 @@ export * from '@homebridge/hap-nodejs/dist/lib/model/ControllerStorage.js';
 
 export * from '@homebridge/hap-nodejs/dist/lib/controller/CameraController.js';
 
+export * from '@homebridge/hap-nodejs/dist/lib/controller/SecureVideoController.js';
+
 export * from '@homebridge/hap-nodejs/dist/lib/datastream/DataStreamServer.js';
+
+export * from '@homebridge/hap-nodejs/dist/lib/datastream/DataStreamManagement.js';
 
 export * from '@homebridge/hap-nodejs/dist/lib/Service.js';
 

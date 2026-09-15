@@ -8,34 +8,49 @@ import {
   AudioStreamingCodecType,
   AudioStreamingSamplerate,
   CameraController,
+  CameraVideoQuality,
   Categories,
   Characteristic,
   ControllerStorage,
   H264Level,
   H264Profile,
   MediaContainerType,
+  SecureVideoController,
   Service,
   SRTPCryptoSuites,
+  StreamTierAudioBitDepth,
+  StreamTierAudioSampleRate,
+  StreamTierVideoCodec,
   uuid,
   VideoCodecType,
 } from '../hap.js';
 
-import { baseAdvertiser } from '../constants.js';
+import { audioPayloadType, baseAdvertiser, secureVideoMaxRemoteSessions, videoPayloadType } from '../constants.js';
 import * as mac from '../utils/mac.js';
+import { captureSnapshot } from '../utils/placeholder.js';
 import { filterBindAddresses, generateValidAccessoryName, Subscribed } from '../utils/utils.js';
+import { CmafRecordingDelegate } from './cmafRecordingDelegate.js';
+import { MultiTierRtpDelegate } from './multiTierRtpDelegate.js';
 import { RecordingDelegate } from './recordingDelegate.js';
 import { CameraServices } from './services.js';
 import { StreamingDelegate } from './streamingDelegate.js';
+import { WebRtcSessions } from './webrtcSessions.js';
 
 import type { CameraDevice, DeviceStorage, LoggerService, PluginAPI, SensorLike } from '@camera.ui/sdk';
-import type { CameraControllerOptions, MacAddress, MDNSAdvertiser, PublishInfo } from '../hap.js';
+import type { CameraControllerOptions, CameraRecordingOptions, MacAddress, MDNSAdvertiser, PublishInfo } from '../hap.js';
 import type HomeKit from '../index.js';
 import type { CameraStorageValues } from '../types.js';
+import type { SecureVideoCodec } from './sframeRtp.js';
+
+const PROBE_TIMEOUT = 5000;
+const SECURE_VIDEO_CMAF_ENABLED = false as boolean;
 
 export class CameraAccessory extends Subscribed {
   public controller?: CameraController;
+  public secureVideoController?: SecureVideoController;
   public cameraStorage: DeviceStorage<CameraStorageValues>;
   public api: PluginAPI;
+  public secureVideoCodec: SecureVideoCodec = 'hevc';
 
   private logger: LoggerService;
   private cameraLogger: LoggerService;
@@ -45,6 +60,8 @@ export class CameraAccessory extends Subscribed {
   private cameraServices?: CameraServices;
 
   private recordingDelegate?: RecordingDelegate;
+  private multiTierRtp?: MultiTierRtpDelegate;
+  private webrtc?: WebRtcSessions;
   private streamingDelegate?: StreamingDelegate;
 
   private published = false;
@@ -75,7 +92,7 @@ export class CameraAccessory extends Subscribed {
       if (connected) {
         await this.publishAccessory(this.cameraSeenOnline);
         this.cameraSeenOnline = true;
-        this.recordingDelegate?.refreshPrebuffer();
+        this.recordingDelegate?.resumePrebuffer();
       } else {
         await this.streamingDelegate?.stopAllSessions();
       }
@@ -148,6 +165,8 @@ export class CameraAccessory extends Subscribed {
           this.cameraLogger.log(`Republishing camera (${this.advertiser})`);
         }
 
+        // the legacy path is H.264 only, forcing it makes an HEVC camera transcode like before secure video
+        this.secureVideoCodec = this.cameraStorage.values.forceLegacyPath ? 'h264' : await this.detectSecureVideoCodec();
         this.setupAccessory();
 
         this.accessory!.on(AccessoryEventTypes.LISTENING, (port: number) => {
@@ -183,7 +202,9 @@ export class CameraAccessory extends Subscribed {
         this.published = true;
       } catch (error) {
         this.cameraLogger.error('Error publishing camera', error);
-        await this.unpublishAccessory(true);
+        // keep the pairing, destroying the accessory here would delete it
+        await this.accessory?.unpublish();
+        await this.unpublishAccessory();
       }
     }
   }
@@ -214,6 +235,12 @@ export class CameraAccessory extends Subscribed {
     this.streamingDelegate = undefined;
     this.cameraServices?.cleanup();
     this.cameraServices = undefined;
+    await this.multiTierRtp?.stopAll();
+    this.multiTierRtp = undefined;
+    this.webrtc?.closeAll();
+    this.webrtc = undefined;
+    this.secureVideoController?.removeAllListeners();
+    this.secureVideoController = undefined;
     this.accessory?.removeAllListeners();
     this.accessory = undefined;
     this.unsubscribe();
@@ -267,9 +294,19 @@ export class CameraAccessory extends Subscribed {
     );
 
     this.cameraServices = new CameraServices(this.accessory, this.cameraDevice, this.attachedSensors.values());
-    this.controller = new CameraController(this.createControllerOptions(this.accessory));
+    this.recordingDelegate = new RecordingDelegate(this, this.accessory, this.cameraDevice);
 
-    this.accessory.configureController(this.controller);
+    // the main stream codec decides the path without transcoding: HKSV3 remote (WebRTC) is HEVC only, the classic
+    // path is H.264 only. So secure video is used for HEVC cameras, H.264 cameras stay on the legacy controller.
+    if (this.secureVideoCodec === 'hevc') {
+      this.cameraLogger.log('HEVC main stream, using Secure Video (HKSV3)');
+      this.secureVideoController = this.createSecureVideoController(this.cameraServices.motionService);
+      this.accessory.configureController(this.secureVideoController);
+    } else {
+      this.cameraLogger.log(this.cameraStorage.values.forceLegacyPath ? 'Legacy path forced by setting' : 'H.264 main stream, using the legacy path');
+      this.controller = new CameraController(this.createControllerOptions());
+      this.accessory.configureController(this.controller);
+    }
   }
 
   private createCameraStorage(): DeviceStorage<CameraStorageValues> {
@@ -380,6 +417,19 @@ export class CameraAccessory extends Subscribed {
       },
       {
         type: 'boolean',
+        key: 'forceLegacyPath',
+        title: 'Force legacy path',
+        description: 'Always use the classic HomeKit camera services instead of Secure Video (HKSV3). For homes that stay on iOS 26 or older.',
+        group: 'Advanced',
+        defaultValue: false,
+        store: true,
+        onSet: async (state: boolean) => {
+          this.cameraLogger.log('Force legacy path:', state);
+          await this.republishAccessory();
+        },
+      },
+      {
+        type: 'boolean',
         key: 'useHardwareAcceleration',
         title: 'Use Hardware Acceleration',
         description: 'Use the GPU to transcode streams.',
@@ -388,18 +438,6 @@ export class CameraAccessory extends Subscribed {
         store: true,
         onSet: async (state: boolean) => {
           this.cameraLogger.log('Use hardware acceleration:', state);
-        },
-      },
-      {
-        type: 'boolean',
-        key: 'adaptiveStreamSource',
-        title: 'Adaptive Stream Source',
-        description: 'When viewing remotely, match the source resolution to what HomeKit requests; off uses the primary source.',
-        group: 'Advanced',
-        defaultValue: true,
-        store: true,
-        onSet: async (state: boolean) => {
-          this.cameraLogger.log('Adaptive stream source:', state);
         },
       },
       {
@@ -418,9 +456,92 @@ export class CameraAccessory extends Subscribed {
     ]);
   }
 
-  private createControllerOptions(accessory: Accessory): CameraControllerOptions {
+  private async detectSecureVideoCodec(): Promise<SecureVideoCodec> {
+    const source = this.cameraDevice.streamSource;
+    let codec = source.videoCodec;
+    if (!codec) {
+      try {
+        const timeout = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), PROBE_TIMEOUT));
+        const probe = await Promise.race([source.probeStream({ video: true, audio: false }), timeout]);
+        codec = probe?.video[0]?.codec;
+      } catch (error) {
+        this.cameraLogger.warn('[Secure Video] Stream probe failed', error);
+      }
+    }
+    this.cameraLogger.log(`[Secure Video] Source video codec ${codec ?? 'unknown, assuming HEVC'}`);
+    return codec === 'H264' ? 'h264' : 'hevc';
+  }
+
+  private createSecureVideoController(motionService: Service): SecureVideoController {
+    const recordingDelegate = this.recordingDelegate!;
+    // iOS reads the real dimensions from the stream SPS and accepts the native HEVC copy regardless of
+    // the tier it picks, so we advertise a broad set across resolutions, frame rates and aspect ratios
+    // and always pass the native stream through without transcoding.
+    const videoTiers = [
+      { identifier: 1, quality: CameraVideoQuality.HIGHEST, width: 3840, height: 2160, frameRate: 30, targetAverageBitrate: 4500, peakBitrate: 5000 },
+      { identifier: 2, quality: CameraVideoQuality.HIGHEST, width: 3840, height: 2160, frameRate: 24, targetAverageBitrate: 4500, peakBitrate: 5000 },
+      { identifier: 3, quality: CameraVideoQuality.HIGH, width: 2560, height: 1440, frameRate: 30, targetAverageBitrate: 2800, peakBitrate: 3000 },
+      { identifier: 4, quality: CameraVideoQuality.HIGH, width: 1920, height: 1080, frameRate: 30, targetAverageBitrate: 1700, peakBitrate: 1800 },
+      { identifier: 5, quality: CameraVideoQuality.MEDIUM, width: 1920, height: 1080, frameRate: 30, targetAverageBitrate: 1700, peakBitrate: 1800 },
+      { identifier: 6, quality: CameraVideoQuality.MEDIUM, width: 1280, height: 720, frameRate: 30, targetAverageBitrate: 768, peakBitrate: 800 },
+      { identifier: 7, quality: CameraVideoQuality.LOW, width: 640, height: 360, frameRate: 30, targetAverageBitrate: 180, peakBitrate: 190 },
+      { identifier: 8, quality: CameraVideoQuality.LOW, width: 640, height: 360, frameRate: 15, targetAverageBitrate: 180, peakBitrate: 190 },
+      { identifier: 9, quality: CameraVideoQuality.LOW, width: 320, height: 240, frameRate: 30, targetAverageBitrate: 180, peakBitrate: 190 },
+      { identifier: 10, quality: CameraVideoQuality.HIGH, width: 1600, height: 1200, frameRate: 30, targetAverageBitrate: 2800, peakBitrate: 3000 },
+      { identifier: 11, quality: CameraVideoQuality.MEDIUM, width: 1440, height: 1080, frameRate: 30, targetAverageBitrate: 1700, peakBitrate: 1800 },
+      { identifier: 12, quality: CameraVideoQuality.LOW, width: 640, height: 480, frameRate: 30, targetAverageBitrate: 180, peakBitrate: 190 },
+      { identifier: 13, quality: CameraVideoQuality.HIGH, width: 1080, height: 1920, frameRate: 30, targetAverageBitrate: 1700, peakBitrate: 1800 },
+      { identifier: 14, quality: CameraVideoQuality.LOW, width: 360, height: 640, frameRate: 30, targetAverageBitrate: 180, peakBitrate: 190 },
+      { identifier: 15, quality: CameraVideoQuality.HIGH, width: 1440, height: 1440, frameRate: 30, targetAverageBitrate: 2800, peakBitrate: 3000 },
+      { identifier: 16, quality: CameraVideoQuality.LOW, width: 480, height: 480, frameRate: 30, targetAverageBitrate: 180, peakBitrate: 190 },
+    ];
+
+    const audioTier = {
+      identifier: 1,
+      targetAverageBitrate: 24000,
+      sampleRate: StreamTierAudioSampleRate.KHZ_16,
+      bitDepth: StreamTierAudioBitDepth.BITS_16,
+      packetTime: 20,
+      channels: 1,
+    };
+
+    const codec = this.secureVideoCodec;
+    this.multiTierRtp = new MultiTierRtpDelegate(this, this.cameraDevice, { codec, videoTiers, audioTier, videoPayloadType, audioPayloadType });
+    const remoteActive = (): boolean => !this.cameraDevice.disabled && (this.secureVideoController?.homeKitCameraActive ?? true);
+    this.webrtc = new WebRtcSessions(this, this.cameraDevice, videoTiers, remoteActive);
+
+    const sensorUUID = uuid.generate(`${this.cameraDevice.id}-sensor`);
+    const cmafDelegate = SECURE_VIDEO_CMAF_ENABLED ? new CmafRecordingDelegate(this.cameraDevice, recordingDelegate) : undefined;
+
+    const controller = new SecureVideoController({
+      sensor: {
+        uuid: sensorUUID,
+        width: 3840,
+        height: 2160,
+      },
+      video: {
+        codec: codec === 'h264' ? StreamTierVideoCodec.H264 : StreamTierVideoCodec.H265,
+        payloadType: videoPayloadType,
+        tiers: videoTiers,
+      },
+      audio: {
+        payloadType: audioPayloadType,
+        tier: audioTier,
+        twoWayAudio: true,
+      },
+      webrtc: { delegate: this.webrtc, maxSessions: secureVideoMaxRemoteSessions },
+      rtp: { delegate: this.multiTierRtp },
+      recording: { options: this.createRecordingOptions(), delegate: recordingDelegate },
+      ...(cmafDelegate ? { ingest: { delegate: cmafDelegate } } : {}),
+      motionService,
+      snapshot: () => captureSnapshot(this.cameraDevice),
+    });
+
+    return controller;
+  }
+
+  private createControllerOptions(): CameraControllerOptions {
     this.streamingDelegate = new StreamingDelegate(this, this.cameraDevice);
-    this.recordingDelegate = new RecordingDelegate(this, accessory, this.cameraDevice);
 
     return {
       cameraStreamCount: 10,
@@ -465,37 +586,41 @@ export class CameraAccessory extends Subscribed {
         },
       },
       recording: {
-        options: {
-          prebufferLength: 8000,
-          mediaContainerConfiguration: [
-            {
-              type: MediaContainerType.FRAGMENTED_MP4,
-              fragmentLength: 4000,
-            },
-          ],
-          video: {
-            type: VideoCodecType.H264,
-            parameters: {
-              levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
-              profiles: [H264Profile.MAIN],
-            },
-            resolutions: [
-              [1280, 720, 30],
-              [1920, 1080, 30],
-            ],
-          },
-          audio: {
-            codecs: [
-              {
-                type: AudioRecordingCodecType.AAC_LC,
-                bitrateMode: AudioBitrate.VARIABLE,
-                samplerate: AudioRecordingSamplerate.KHZ_32,
-                audioChannels: 1,
-              },
-            ],
-          },
+        options: this.createRecordingOptions(),
+        delegate: this.recordingDelegate!,
+      },
+    };
+  }
+
+  private createRecordingOptions(): CameraRecordingOptions {
+    return {
+      prebufferLength: 8000,
+      mediaContainerConfiguration: [
+        {
+          type: MediaContainerType.FRAGMENTED_MP4,
+          fragmentLength: 4000,
         },
-        delegate: this.recordingDelegate,
+      ],
+      video: {
+        type: VideoCodecType.H264,
+        parameters: {
+          levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
+          profiles: [H264Profile.MAIN],
+        },
+        resolutions: [
+          [1280, 720, 30],
+          [1920, 1080, 30],
+        ],
+      },
+      audio: {
+        codecs: [
+          {
+            type: AudioRecordingCodecType.AAC_LC,
+            bitrateMode: AudioBitrate.VARIABLE,
+            samplerate: AudioRecordingSamplerate.KHZ_32,
+            audioChannels: 1,
+          },
+        ],
       },
     };
   }

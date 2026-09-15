@@ -5,6 +5,7 @@ import { RecordingSession } from './recordingSession.js';
 import type { CameraDevice, LoggerService } from '@camera.ui/sdk';
 import type { Accessory, CameraRecordingConfiguration, CameraRecordingDelegate, RecordingPacket } from '../hap.js';
 import type { CameraAccessory } from './accessory.js';
+import type { ClipPart, ClipStreamOptions } from './recordingSession.js';
 
 export class RecordingDelegate implements CameraRecordingDelegate {
   private readonly logPrefix = '[HKSV]';
@@ -36,6 +37,14 @@ export class RecordingDelegate implements CameraRecordingDelegate {
 
   public refreshPrebuffer(): void {
     this.recordingSession.refreshPrebuffer();
+  }
+
+  public resumePrebuffer(): void {
+    this.recordingSession.resumePrebuffer();
+  }
+
+  public getClipStream(options: ClipStreamOptions): AsyncGenerator<ClipPart, void> {
+    return this.recordingSession.getClipStream(options);
   }
 
   public async *handleRecordingStreamRequest(streamId: number, signal?: AbortSignal): AsyncGenerator<RecordingPacket> {

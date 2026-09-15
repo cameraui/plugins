@@ -1,10 +1,26 @@
 import { EventEmitter } from 'node:events';
 
-import { normalizeFragmentTfdt } from '../utils/fmp4.js';
+import { normalizeFragmentTfdt, ntpToMilliseconds, prependProducerReferenceTime } from '../utils/fmp4.js';
 
-import type { CameraDevice, Fmp4Session, LoggerService } from '@camera.ui/sdk';
+import type { CameraDevice, Fmp4Session, Fmp4VideoInfo, LoggerService } from '@camera.ui/sdk';
 import type { CameraRecordingConfiguration } from '../hap.js';
 import type { CameraAccessory } from './accessory.js';
+
+interface LiveConsumer {
+  queue: Buffer[];
+  resolve: ((box: Buffer | null) => void) | null;
+  error?: Error;
+  closed?: boolean;
+}
+
+export interface ClipStreamOptions {
+  start?: bigint;
+  stop?: bigint;
+  signal?: AbortSignal;
+}
+
+export type ClipPart =
+  { type: 'init'; data: Buffer; startedAt: number; videoInfo: Fmp4VideoInfo | undefined } | { type: 'fragment'; data: Buffer; duration: number; last: boolean };
 
 export class RecordingSession extends EventEmitter {
   private static readonly maxLiveQueueFragments = 8;
@@ -19,17 +35,18 @@ export class RecordingSession extends EventEmitter {
 
   private recordingActive = false;
   private stopped = false;
+  private deferred = false;
   private lifecycle = Promise.resolve();
   private lifecycleRevision = 0;
 
   private prebuffer: Buffer[] = [];
+  private receivedAt = new WeakMap<Buffer, number>();
   private prebufferMaxFragments = 2;
   private collectAbort?: AbortController;
   private restartTimeout?: NodeJS.Timeout;
 
-  private liveQueue: Buffer[] | null = null;
-  private liveResolve: ((box: Buffer | null) => void) | null = null;
-  private liveError?: Error;
+  private consumers = new Set<LiveConsumer>();
+  private hdsConsumer?: LiveConsumer;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -55,6 +72,12 @@ export class RecordingSession extends EventEmitter {
 
   public refreshPrebuffer(): void {
     if (this.recordingActive && !this.stopped) {
+      this.restartPrebuffer();
+    }
+  }
+
+  public resumePrebuffer(): void {
+    if (this.recordingActive && !this.stopped && this.deferred) {
       this.restartPrebuffer();
     }
   }
@@ -86,14 +109,14 @@ export class RecordingSession extends EventEmitter {
 
     const tfdtOffsets = new Map<number, bigint>();
     const buffered = [...this.prebuffer];
-    const queue: Buffer[] = [];
-    this.liveQueue = queue;
-    this.liveResolve = null;
-    this.liveError = undefined;
+    const consumer = this.addConsumer();
+    this.hdsConsumer = consumer;
 
     try {
       this.logger.debug(this.logPrefix, 'Yielding init segment');
       const initSegment = await this.waitForRecording(session.initSegment, signal, 'Init segment timeout');
+      const sampleEntry = ['hvc1', 'hev1', 'avc1', 'avc3'].find((tag) => initSegment.includes(tag)) ?? 'unknown';
+      this.logger.debug(this.logPrefix, `Init segment ${initSegment.length} bytes, sample entry ${sampleEntry}`);
       yield initSegment;
 
       if (buffered.length > 0) {
@@ -102,35 +125,13 @@ export class RecordingSession extends EventEmitter {
           if (signal?.aborted) {
             return;
           }
-          yield normalizeFragmentTfdt(fragment, tfdtOffsets);
+          yield this.prepareFragment(fragment, tfdtOffsets);
         }
       }
 
       this.logger.debug(this.logPrefix, 'Yielding live fragments');
-      while (!signal?.aborted) {
-        if (this.liveError) {
-          const liveError = this.liveError as Error;
-          throw new Error(liveError.message, { cause: liveError });
-        }
-
-        let box: Buffer | null;
-        if (queue.length > 0) {
-          box = queue.shift()!;
-        } else {
-          box = await this.waitForRecording(
-            new Promise<Buffer | null>((resolve) => {
-              this.liveResolve = resolve;
-            }),
-            signal,
-            'Fragment timeout',
-          );
-        }
-
-        if (box === null) {
-          break;
-        }
-
-        yield normalizeFragmentTfdt(box, tfdtOffsets);
+      for await (const box of this.liveFragments(consumer, signal)) {
+        yield this.prepareFragment(box, tfdtOffsets);
       }
     } catch (error) {
       if (signal?.aborted) {
@@ -141,19 +142,65 @@ export class RecordingSession extends EventEmitter {
       this.logger.error(this.logPrefix, 'Error in recording stream:', error);
       throw error;
     } finally {
-      if (this.liveQueue === queue) {
-        this.liveQueue = null;
-        this.liveResolve = null;
-        this.liveError = undefined;
+      this.removeConsumer(consumer);
+      if (this.hdsConsumer === consumer) {
+        this.hdsConsumer = undefined;
       }
     }
   }
 
+  public async *getClipStream(options: ClipStreamOptions): AsyncGenerator<ClipPart, void> {
+    const session = this.session;
+    if (!session) {
+      throw new Error('FMP4 session unavailable');
+    }
+
+    const { signal } = options;
+    const fragmentLength = this.fragmentLength();
+    const startMs = options.start === undefined ? 0 : ntpToMilliseconds(options.start);
+    const stopMs = options.stop === undefined ? Infinity : ntpToMilliseconds(options.stop);
+    const tfdtOffsets = new Map<number, bigint>();
+    const buffered = this.prebuffer.filter((fragment) => this.fragmentEnd(fragment) > startMs);
+    const consumer = this.addConsumer();
+
+    try {
+      const initSegment = await this.waitForRecording(session.initSegment, signal, 'Init segment timeout');
+      const firstStart = (buffered.length > 0 ? this.fragmentEnd(buffered[0]) : Date.now()) - fragmentLength;
+      yield { type: 'init', data: initSegment, startedAt: Math.max(startMs, firstStart), videoInfo: session.videoInfo };
+
+      for (const fragment of buffered) {
+        if (signal?.aborted) {
+          return;
+        }
+        const last = this.fragmentEnd(fragment) >= stopMs;
+        yield { type: 'fragment', data: normalizeFragmentTfdt(fragment, tfdtOffsets), duration: fragmentLength / 1000, last };
+        if (last) {
+          return;
+        }
+      }
+
+      for await (const box of this.liveFragments(consumer, signal)) {
+        const end = this.fragmentEnd(box);
+        if (end - fragmentLength >= stopMs) {
+          return;
+        }
+        const last = end >= stopMs;
+        yield { type: 'fragment', data: normalizeFragmentTfdt(box, tfdtOffsets), duration: fragmentLength / 1000, last };
+        if (last) {
+          return;
+        }
+      }
+    } finally {
+      this.removeConsumer(consumer);
+    }
+  }
+
   public closeCurrentRecording(): void {
-    const resolve = this.liveResolve;
-    this.liveResolve = null;
-    this.liveQueue = null;
-    resolve?.(null);
+    const consumer = this.hdsConsumer;
+    this.hdsConsumer = undefined;
+    if (consumer) {
+      this.closeConsumer(consumer);
+    }
   }
 
   public async stop(): Promise<void> {
@@ -164,8 +211,9 @@ export class RecordingSession extends EventEmitter {
 
   private stopPrebuffer(): Promise<void> {
     ++this.lifecycleRevision;
+    this.deferred = false;
     this.clearRestart();
-    this.closeCurrentRecording();
+    this.closeConsumers();
     this.collectAbort?.abort();
     this.prebuffer = [];
 
@@ -175,7 +223,7 @@ export class RecordingSession extends EventEmitter {
   private restartPrebuffer(): void {
     const revision = ++this.lifecycleRevision;
     this.clearRestart();
-    this.closeCurrentRecording();
+    this.closeConsumers();
     this.collectAbort?.abort();
     this.prebuffer = [];
 
@@ -188,6 +236,7 @@ export class RecordingSession extends EventEmitter {
 
       if (this.cameraDevice.disabled || !this.cameraDevice.connected) {
         this.logger.debug(this.logPrefix, 'Camera unavailable, prebuffer deferred');
+        this.deferred = true;
         return;
       }
 
@@ -198,8 +247,10 @@ export class RecordingSession extends EventEmitter {
           return;
         }
         this.startCollector(session);
+        this.deferred = false;
       } catch (error) {
         this.logger.error(this.logPrefix, 'Failed to start prebuffer session:', error);
+        this.deferred = true;
         await this.stopSession();
         this.scheduleRestart();
       }
@@ -236,7 +287,7 @@ export class RecordingSession extends EventEmitter {
     ];
 
     await session.startStream({
-      supportedVideoCodecs: ['h264'],
+      supportedVideoCodecs: this.cameraAccessory.secureVideoCodec === 'hevc' ? ['h264', 'hevc'] : ['h264'],
       supportedAudioCodecs: ['aac'],
       boxMode: true,
       fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,
@@ -272,6 +323,9 @@ export class RecordingSession extends EventEmitter {
           await this.enqueueLifecycle(async () => {
             if (this.session === session) {
               await this.stopSession(session);
+              if (this.recordingActive && !this.stopped) {
+                this.deferred = true;
+              }
               this.scheduleRestart();
             }
           });
@@ -319,22 +373,91 @@ export class RecordingSession extends EventEmitter {
     }
   }
 
+  private prepareFragment(fragment: Buffer, tfdtOffsets: Map<number, bigint>): Buffer {
+    const normalized = normalizeFragmentTfdt(fragment, tfdtOffsets);
+    if (this.cameraAccessory.secureVideoCodec !== 'hevc') {
+      return normalized;
+    }
+
+    return prependProducerReferenceTime(normalized, this.fragmentEnd(fragment) - this.fragmentLength());
+  }
+
+  private fragmentLength(): number {
+    return this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000;
+  }
+
+  private fragmentEnd(fragment: Buffer): number {
+    return this.receivedAt.get(fragment) ?? Date.now();
+  }
+
+  private async *liveFragments(consumer: LiveConsumer, signal?: AbortSignal): AsyncGenerator<Buffer, void> {
+    while (!signal?.aborted && !consumer.closed) {
+      if (consumer.error) {
+        throw new Error(consumer.error.message, { cause: consumer.error });
+      }
+
+      let box: Buffer | null;
+      if (consumer.queue.length > 0) {
+        box = consumer.queue.shift()!;
+      } else {
+        box = await this.waitForRecording(
+          new Promise<Buffer | null>((resolve) => {
+            consumer.resolve = resolve;
+          }),
+          signal,
+          'Fragment timeout',
+        );
+      }
+
+      if (box === null) {
+        return;
+      }
+      yield box;
+    }
+  }
+
+  private addConsumer(): LiveConsumer {
+    const consumer: LiveConsumer = { queue: [], resolve: null };
+    this.consumers.add(consumer);
+    return consumer;
+  }
+
+  private removeConsumer(consumer: LiveConsumer): void {
+    this.consumers.delete(consumer);
+  }
+
+  private closeConsumer(consumer: LiveConsumer): void {
+    this.consumers.delete(consumer);
+    consumer.closed = true;
+    const resolve = consumer.resolve;
+    consumer.resolve = null;
+    resolve?.(null);
+  }
+
+  private closeConsumers(): void {
+    this.hdsConsumer = undefined;
+    for (const consumer of [...this.consumers]) {
+      this.closeConsumer(consumer);
+    }
+  }
+
   private pushBox(box: Buffer): void {
+    this.receivedAt.set(box, Date.now());
     this.prebuffer.push(box);
     while (this.prebuffer.length > this.prebufferMaxFragments) {
       this.prebuffer.shift();
     }
 
-    if (this.liveQueue) {
-      if (this.liveResolve) {
-        const resolve = this.liveResolve;
-        this.liveResolve = null;
+    for (const consumer of this.consumers) {
+      if (consumer.resolve) {
+        const resolve = consumer.resolve;
+        consumer.resolve = null;
         resolve(box);
-      } else if (this.liveQueue.length >= RecordingSession.maxLiveQueueFragments) {
-        this.liveError = new Error(`HKSV consumer too slow: recording ended after ${RecordingSession.maxLiveQueueFragments} queued fragments`);
-        this.liveQueue.length = 0;
+      } else if (consumer.queue.length >= RecordingSession.maxLiveQueueFragments) {
+        consumer.error = new Error(`HKSV consumer too slow: recording ended after ${RecordingSession.maxLiveQueueFragments} queued fragments`);
+        consumer.queue.length = 0;
       } else {
-        this.liveQueue.push(box);
+        consumer.queue.push(box);
       }
     }
   }

@@ -208,7 +208,7 @@ export default class HomeKit extends BasePlugin<PluginStorageValues> {
     this.assignmentSubscriptions.set(
       sensor.id,
       sensor.onAssignmentChanged.subscribe(() => {
-        void this.routeSensor(sensor);
+        this.routeSensor(sensor);
       }),
     );
 

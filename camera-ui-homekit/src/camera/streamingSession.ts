@@ -21,7 +21,7 @@ import { createReceiverStats, ntpMiddle32, ntpTimestamp, recordRtpPacket, summar
 import { generateSrtpOptions, generateSsrc, getSessionConfig } from '../utils/srtp.js';
 import { getDurationSeconds } from '../utils/utils.js';
 
-import type { CameraDevice, CameraDeviceSource, LoggerService, RtpSession } from '@camera.ui/sdk';
+import type { CameraDevice, LoggerService, RtpSession } from '@camera.ui/sdk';
 import type { ChildProcess } from 'node:child_process';
 import type { RtpPacket } from 'werift';
 import type { PrepareStreamRequest, StartStreamRequest } from '../hap.js';
@@ -66,7 +66,13 @@ export class StreamingSession {
   private audioNegotiated = '';
   private audioPacketsPerSecond = 50;
 
-  constructor(cameraAccessory: CameraAccessory, cameraDevice: CameraDevice, prepareStreamRequest: PrepareStreamRequest, start: number) {
+  constructor(
+    cameraAccessory: CameraAccessory,
+    cameraDevice: CameraDevice,
+    prepareStreamRequest: PrepareStreamRequest,
+    start: number,
+    private videoCodec: 'h264' | 'hevc' = 'h264',
+  ) {
     this.cameraAccessory = cameraAccessory;
     this.cameraDevice = cameraDevice;
     this.prepareStreamRequest = prepareStreamRequest;
@@ -197,14 +203,7 @@ export class StreamingSession {
       return;
     }
 
-    const allowAuto = this.cameraAccessory.cameraStorage.values.adaptiveStreamSource;
-    const remote = this.isLowBandwidth(startStreamRequest);
-    if (remote && allowAuto) {
-      this.cameraLogger.attention('Low bandwidth detected, using adaptive stream source if available');
-    }
-
-    const source = this.selectStreamSource(startStreamRequest, remote);
-    const session = source.createRtpSession({
+    const session = this.cameraDevice.streamSource.createRtpSession({
       audio: true,
       video: true,
       backchannel: true,
@@ -344,32 +343,6 @@ export class StreamingSession {
     }
   }
 
-  private selectStreamSource(startStreamRequest: StartStreamRequest, remote: boolean): CameraDeviceSource {
-    const { streamSource, highResolutionSource: high, midResolutionSource: mid, lowResolutionSource: low } = this.cameraDevice;
-
-    if (!remote || !this.cameraAccessory.cameraStorage.values.adaptiveStreamSource) {
-      return streamSource;
-    }
-
-    const width = startStreamRequest.video.width;
-    let preference: (CameraDeviceSource | undefined)[];
-    if (width >= 1920) {
-      preference = [high, mid, low];
-    } else if (width >= 1280) {
-      preference = [mid, low, high];
-    } else {
-      preference = [low, mid, high];
-    }
-
-    const selected = preference.find((candidate): candidate is CameraDeviceSource => candidate !== undefined) ?? streamSource;
-
-    if (selected !== streamSource) {
-      this.cameraLogger.debug(`Adaptive source: HomeKit requested ${width}px width, using "${selected.name}" (${selected.role})`);
-    }
-
-    return selected;
-  }
-
   private async run(session: RtpSession, startStreamRequest: StartStreamRequest): Promise<void> {
     this.audioClockRate = startStreamRequest.audio.sample_rate * 1000;
     this.audioNegotiated = `${startStreamRequest.audio.codec.toLowerCase()} ${startStreamRequest.audio.sample_rate}k/${startStreamRequest.audio.packet_time}ms`;
@@ -381,7 +354,7 @@ export class StreamingSession {
     await session.startStream({
       hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
       video: {
-        codec: 'h264',
+        codec: this.videoCodec,
         mtu: startStreamRequest.video.mtu,
         ssrc: this.videoSsrc,
         payloadType: startStreamRequest.video.pt,
@@ -559,10 +532,6 @@ export class StreamingSession {
     this.cameraLogger.debug('Session setup:', { sessionID, sourceAddress, targetAddress, addressVersion });
 
     return { socketType, sessionID, sourceAddress, targetAddress, addressVersion };
-  }
-
-  private isLowBandwidth(startStreamRequest: StartStreamRequest): boolean {
-    return startStreamRequest.audio.packet_time >= 60;
   }
 
   private logStreamSummary(): void {

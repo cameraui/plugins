@@ -228,11 +228,11 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     this.client = new HaClient(target, this.logger, {
       onStateChanged: (entityId, state) => this.handleStateChanged(entityId, state),
       onRegistryUpdated: (event) => this.handleRegistryUpdated(event),
-      onConnected: () => void this.syncEntities(),
+      onConnected: () => this.syncEntities(),
       onDisconnected: () => this.markAllUnavailable(),
     });
     this.client.connect();
-    this.resyncInterval = setInterval(() => void this.syncEntities(), RESYNC_INTERVAL_MS);
+    this.resyncInterval = setInterval(() => this.syncEntities(), RESYNC_INTERVAL_MS);
   }
 
   private async stop(): Promise<void> {
