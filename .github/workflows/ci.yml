@@ -63,7 +63,7 @@ jobs:
             camera-ui-ncnn: ['camera-ui-ncnn/**']
             camera-ui-onnx: ['camera-ui-onnx/**']
             camera-ui-onnx-legacy: ['camera-ui-onnx-legacy/**', 'camera-ui-onnx/src/**', 'camera-ui-onnx/contract.ts']
-            camera-ui-eufy: ['camera-ui-eufy/**']
+            camera-ui-eufy: ['camera-ui-eufy/**', 'externals/eufy-sdk', 'externals/eufy-sdk/**']
             camera-ui-opencl: ['camera-ui-opencl/**']
             camera-ui-opencv: ['camera-ui-opencv/**']
             camera-ui-openvino: ['camera-ui-openvino/**']

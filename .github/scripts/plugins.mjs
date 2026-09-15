@@ -2,7 +2,7 @@ export const NODE = {
   'camera-ui-homekit': 'externals/hap',
   'camera-ui-onvif': 'externals/onvif',
   'camera-ui-ring': 'externals/ring',
-  'camera-ui-eufy': 'externals/eufy-security-client',
+  'camera-ui-eufy': 'externals/eufy-sdk',
   'camera-ui-homeassistant': '',
   'camera-ui-pamdiff': '',
   'camera-ui-rust-motion': '',
