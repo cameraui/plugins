@@ -1,3 +1,9 @@
+## [1.3.0]
+
+- **HomeKit Secure Video for iOS 27.** Cameras with an HEVC main stream use Apple's new secure video services: local and remote live view, recording and two-way audio run on the camera's native HEVC stream without transcoding, so 4K cameras no longer cost a CPU core each. Needs iOS 27 / tvOS 27 on the viewer and the home hub. Remote view is HEVC only on Apple's side, H.264 cameras stay on the classic path.
+- **Force legacy path.** A per-camera switch in the advanced settings keeps a camera on the classic HomeKit services, for homes that stay on iOS 26 or older.
+- A failed publish no longer drops the camera's pairing. Before, a startup error during publishing removed the accessory including its pairing, so the camera had to be added to Home again.
+
 ## [1.2.11]
 
 - Updated camera.ui engine
