@@ -1,3 +1,7 @@
+## [1.2.23]
+
+- A camera added by IP no longer stays on the slow UID connection after a hiccup. If the direct connection failed once, the camera switched to its UID and kept using it for hours, with choppy video and dropped frames. When it reconnects, it now tries the direct connection again, at most every five minutes.
+
 ## [1.2.22]
 
 - Updated camera.ui engine
