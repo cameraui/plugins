@@ -14,7 +14,7 @@ import {
 } from './sensors.js';
 import { EufyLiveSource } from './stream.js';
 import { EufyTalkback, TALKBACK_ADVERTISE } from './talkback.js';
-import { errorMessage } from './utils.js';
+import { errorMessage, isBatteryPowered } from './utils.js';
 
 import type { CameraDevice, DeviceStorage, LoggerService, Sensor, SnapshotInterface, StreamingInterface } from '@camera.ui/sdk';
 import type { AnyDeviceEvent, Device } from '@mega-yfue/eufy-sdk';
@@ -120,7 +120,7 @@ export class EufyCamera {
     }
 
     // a fresh still wakes a battery camera, only an explicit request may pay for that
-    if (!camera.snapshotLive || (!forceNew && device.has('battery'))) return undefined;
+    if (!camera.snapshotLive || (!forceNew && isBatteryPowered(device))) return undefined;
 
     try {
       const shot = await camera.snapshotLive();
@@ -205,7 +205,7 @@ export class EufyCamera {
       this.audioSensor = await this.add(new EufyAudioSensor('Eufy Audio'));
     }
 
-    if (!this.batteryInfo && device.battery?.()?.level !== undefined) {
+    if (!this.batteryInfo && isBatteryPowered(device)) {
       this.batteryInfo = await this.addBindable(new EufyBatteryInfo(device));
     }
 
@@ -260,7 +260,7 @@ export class EufyCamera {
     const talkback = new EufyTalkback(device, logger);
     const relay = new Relay({
       source: new EufyLiveSource(device, context.maxLiveStreamDuration * 1000, logger),
-      idleTimeout: device.has('battery') ? 10_000 : 30_000,
+      idleTimeout: isBatteryPowered(device) ? 10_000 : 30_000,
       stallTimeout: 8_000,
       logger,
     });

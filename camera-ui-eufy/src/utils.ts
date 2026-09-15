@@ -1,3 +1,5 @@
+import type { Device } from '@mega-yfue/eufy-sdk';
+
 export const COUNTRIES: Record<string, string> = {
   AF: 'Afghanistan',
   AX: 'Aland Islands',
@@ -260,4 +262,9 @@ export function getCountryCode(country?: string): string {
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// mains cameras keep the battery capability for their working mode, only a real cell reports a level
+export function isBatteryPowered(device: Device): boolean {
+  return device.battery?.()?.level !== undefined;
 }

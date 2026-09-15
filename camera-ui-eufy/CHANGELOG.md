@@ -1,3 +1,9 @@
+## [2.0.1]
+
+- Cameras on a power supply, like the Floodlight Cam and Indoor Cam, no longer show a battery stuck at 100%
+- Cameras behind one HomeBase stream at the same time without taking turns, and a snapshot no longer holds up the live view
+- The Wired Doorbell 2K is recognized as a doorbell
+
 ## [2.0.0]
 
 - **Rebuilt on the new Eufy SDK.** The plugin now uses the same cloud and P2P protocol as the current Eufy app. Log in again once in the plugin settings, a verification code may be asked for. Needs camera.ui 2.2.3 and Node.js 24.5 or newer, which the desktop app and the Docker image already ship

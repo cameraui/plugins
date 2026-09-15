@@ -22,7 +22,7 @@ import {
 } from '@camera.ui/sdk';
 import { ArmingMode, PtzDirection } from '@mega-yfue/eufy-sdk';
 
-import { errorMessage } from './utils.js';
+import { errorMessage, isBatteryPowered } from './utils.js';
 
 import type { LoggerService, ObjectDetectionLabel, PTZDirection, PTZPosition, PTZRelativeMove, SensorOptions, TrackedDetection } from '@camera.ui/sdk';
 import type { AnyDeviceEvent, Device } from '@mega-yfue/eufy-sdk';
@@ -465,7 +465,7 @@ export class EufyPtzControl extends PTZControl implements BindableSensor {
 
   public sync(): void {
     // the preset query opens P2P, a battery camera would wake on every start
-    if (this.presetsRequested || !this.device || this.device.has('battery')) return;
+    if (this.presetsRequested || !this.device || isBatteryPowered(this.device)) return;
     this.presetsRequested = true;
     this.loadPresets();
   }
