@@ -521,7 +521,7 @@ export class CameraAccessory extends Subscribed {
     const audioTier = {
       identifier: 1,
       targetAverageBitrate: 24000,
-      sampleRate: StreamTierAudioSampleRate.KHZ_16,
+      sampleRate: StreamTierAudioSampleRate.KHZ_48,
       bitDepth: StreamTierAudioBitDepth.BITS_16,
       packetTime: 20,
       channels: 1,

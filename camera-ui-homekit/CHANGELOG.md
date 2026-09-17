@@ -1,6 +1,7 @@
 ## [1.3.1]
 
 - **A camera that changes its encoder is picked up again.** Switching a camera's main stream from H.264 to H.265 while camera.ui was running left HomeKit recording an H.265 stream labelled as H.264, which Apple dropped after three fragments. The accessory now follows the change.
+- **Clean audio in local live view on iOS 27.** HEVC cameras on the Secure Video path could sound distorted when watched at home. Audio now uses the sample rate Apple expects there, remote view was not affected.
 
 ## [1.3.0]
 

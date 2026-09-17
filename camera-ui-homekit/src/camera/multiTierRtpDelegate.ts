@@ -68,7 +68,8 @@ export class MultiTierRtpDelegate implements MultiTierRTPStreamingDelegate {
       },
     };
 
-    const session = new StreamingSession(this.cameraAccessory, this.cameraDevice, prepareStreamRequest, Date.now(), this.config.codec);
+    // secure video streams Opus on the fixed 48 kHz clock of RFC 7587, not the legacy negotiated rate
+    const session = new StreamingSession(this.cameraAccessory, this.cameraDevice, prepareStreamRequest, Date.now(), this.config.codec, 'fixed');
     await session.prepare();
     this.sessions.set(request.sessionIdentifier, session);
 
@@ -118,7 +119,7 @@ export class MultiTierRtpDelegate implements MultiTierRTPStreamingDelegate {
         codec: AudioStreamingCodecType.OPUS,
         channel: this.config.audioTier.channels,
         bit_rate: bitrate,
-        sample_rate: sampleRateToKHz(this.config.audioTier.sampleRate),
+        sample_rate: captureSampleRate(this.config.audioTier.sampleRate),
         packet_time: this.config.audioTier.packetTime,
         pt: this.config.audioPayloadType,
         ssrc: session.audioSsrc,
@@ -151,11 +152,12 @@ export class MultiTierRtpDelegate implements MultiTierRTPStreamingDelegate {
   }
 }
 
-function sampleRateToKHz(sampleRate: StreamTierAudioSampleRate): AudioStreamingSamplerate {
+// the tier reports the Opus transmission rate, which is always 48 kHz, the capture runs at 16 or 24 kHz
+function captureSampleRate(sampleRate: StreamTierAudioSampleRate): AudioStreamingSamplerate {
   switch (sampleRate) {
-    case StreamTierAudioSampleRate.KHZ_24:
-      return AudioStreamingSamplerate.KHZ_24;
-    default:
+    case StreamTierAudioSampleRate.KHZ_16:
       return AudioStreamingSamplerate.KHZ_16;
+    default:
+      return AudioStreamingSamplerate.KHZ_24;
   }
 }

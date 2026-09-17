@@ -72,6 +72,7 @@ export class StreamingSession {
     prepareStreamRequest: PrepareStreamRequest,
     start: number,
     private videoCodec: 'h264' | 'hevc' = 'h264',
+    private opusClock: 'negotiated' | 'fixed' = 'negotiated',
   ) {
     this.cameraAccessory = cameraAccessory;
     this.cameraDevice = cameraDevice;
@@ -344,7 +345,8 @@ export class StreamingSession {
   }
 
   private async run(session: RtpSession, startStreamRequest: StartStreamRequest): Promise<void> {
-    this.audioClockRate = startStreamRequest.audio.sample_rate * 1000;
+    const fixedOpusClock = this.opusClock === 'fixed' && startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS;
+    this.audioClockRate = fixedOpusClock ? 48000 : startStreamRequest.audio.sample_rate * 1000;
     this.audioNegotiated = `${startStreamRequest.audio.codec.toLowerCase()} ${startStreamRequest.audio.sample_rate}k/${startStreamRequest.audio.packet_time}ms`;
     this.audioPacketsPerSecond = Math.round(1000 / startStreamRequest.audio.packet_time);
 
@@ -376,7 +378,7 @@ export class StreamingSession {
     await session.startBackchannel({
       decoderCodec: startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS ? 'libopus' : 'libfdk_aac',
       payloadType: startStreamRequest.audio.pt,
-      clockRate: startStreamRequest.audio.sample_rate * 1000,
+      clockRate: this.audioClockRate,
       channels: startStreamRequest.audio.channel,
       fmtp:
         startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS
@@ -438,7 +440,7 @@ export class StreamingSession {
     // real time for HomeKit, and the receiver drags the lip-synced video ever
     // further behind. The deltas are rescaled rather than counted, so a gap
     // in the source audio stays a gap instead of stitching the timeline shut.
-    const rewriteTimestamps = startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS;
+    const rewriteTimestamps = startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS && this.opusClock === 'negotiated';
     const clockScale = (startStreamRequest.audio.sample_rate * 1000) / 48000;
     let sourceBase: number | undefined;
     let targetBase: number | undefined;
