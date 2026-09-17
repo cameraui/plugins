@@ -87,8 +87,17 @@ function isBumpSpec(spec: string): spec is BumpSpec {
 }
 
 function bump(current: string, spec: BumpSpec): string {
-  const [major, minor, patch] = current.split('-')[0].split('.').map(Number);
+  const [base, prerelease] = current.split('-');
+  const [major, minor, patch] = base.split('.').map(Number);
   if ([major, minor, patch].some(Number.isNaN)) fail(`Cannot bump non-numeric version '${current}'.`);
+
+  // a prerelease of the bumped version is released as that version, like npm version does
+  if (prerelease) {
+    if (spec === 'patch') return base;
+    if (spec === 'minor' && patch === 0) return base;
+    if (spec === 'major' && minor === 0 && patch === 0) return base;
+  }
+
   if (spec === 'major') return `${major + 1}.0.0`;
   if (spec === 'minor') return `${major}.${minor + 1}.0`;
   return `${major}.${minor}.${patch + 1}`;
