@@ -24,6 +24,7 @@
     "@homebridge/hap-nodejs": "file:../externals/hap",
     "chacha": "^2.1.0",
     "pick-port": "^2.2.1",
+    "save": "^2.9.0",
     "werift": "^0.24.4"
   },
   "devDependencies": {
@@ -47,7 +48,7 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.2.3",
+    "camera.ui": ">=2.2.5",
     "node": ">=22.18.0"
   },
   "os": [],

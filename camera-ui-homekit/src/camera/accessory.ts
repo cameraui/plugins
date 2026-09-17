@@ -68,6 +68,8 @@ export class CameraAccessory extends Subscribed {
   private publishing?: Promise<void>;
   private cameraSeenOnline = false;
 
+  private sourceCodec: SecureVideoCodec = 'hevc';
+
   private attachedSensors = new Map<string, SensorLike>();
 
   private publishedExternalAccessories: Map<MacAddress, Accessory>;
@@ -101,6 +103,10 @@ export class CameraAccessory extends Subscribed {
     this.cameraDevice.onPropertyChange('disabled').subscribe(() => {
       this.streamingDelegate?.stopAllSessions();
       this.recordingDelegate?.refreshPrebuffer();
+    });
+
+    this.cameraDevice.onPropertyChange('sources').subscribe(() => {
+      this.followSourceCodec();
     });
 
     this.publishAccessory();
@@ -166,7 +172,8 @@ export class CameraAccessory extends Subscribed {
         }
 
         // the legacy path is H.264 only, forcing it makes an HEVC camera transcode like before secure video
-        this.secureVideoCodec = this.cameraStorage.values.forceLegacyPath ? 'h264' : await this.detectSecureVideoCodec();
+        this.sourceCodec = await this.detectSecureVideoCodec();
+        this.secureVideoCodec = this.cameraStorage.values.forceLegacyPath ? 'h264' : this.sourceCodec;
         this.setupAccessory();
 
         this.accessory!.on(AccessoryEventTypes.LISTENING, (port: number) => {
@@ -454,6 +461,21 @@ export class CameraAccessory extends Subscribed {
         },
       },
     ]);
+  }
+
+  private async followSourceCodec(): Promise<void> {
+    const codec = this.cameraDevice.streamSource.videoCodec;
+    if (!this.published || this.publishing || !codec) {
+      return;
+    }
+
+    const changed: SecureVideoCodec = codec === 'H264' ? 'h264' : 'hevc';
+    if (changed === this.sourceCodec) {
+      return;
+    }
+
+    this.cameraLogger.log(`Main stream codec changed to ${codec}, republishing`);
+    await this.republishAccessory();
   }
 
   private async detectSecureVideoCodec(): Promise<SecureVideoCodec> {

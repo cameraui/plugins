@@ -1,3 +1,7 @@
+## [1.3.1]
+
+- **A camera that changes its encoder is picked up again.** Switching a camera's main stream from H.264 to H.265 while camera.ui was running left HomeKit recording an H.265 stream labelled as H.264, which Apple dropped after three fragments. The accessory now follows the change.
+
 ## [1.3.0]
 
 - **HomeKit Secure Video for iOS 27.** Cameras with an HEVC main stream use Apple's new secure video services: local and remote live view, recording and two-way audio run on the camera's native HEVC stream without transcoding, so 4K cameras no longer cost a CPU core each. Needs iOS 27 / tvOS 27 on the viewer and the home hub. Remote view is HEVC only on Apple's side, H.264 cameras stay on the classic path.
