@@ -611,6 +611,9 @@ export class CameraAccessory extends Subscribed {
         options: this.createRecordingOptions(),
         delegate: this.recordingDelegate!,
       },
+      sensors: {
+        motion: this.cameraServices!.motionService,
+      },
     };
   }
 
