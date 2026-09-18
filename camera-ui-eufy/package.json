@@ -39,7 +39,7 @@
     "tsx": "^4.23.13",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.70.0",
-    "updates": "^18.1.0"
+    "updates": "^18.1.1"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
