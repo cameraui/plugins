@@ -1,5 +1,7 @@
 ## [2.0.2]
 
+- **Log in again once.** The update brings a fix for a login that eufy's gateway rejected, and the stored session does not carry what that fix needs. A verification code may be asked for. Go to Plugins > Eufy and Log in again.
+- Snapshots from an event need a fraction of the memory they used to
 - No light control on cameras that have none. A battery doorbell reports the spotlight setting without having a lamp, so camera.ui showed a light switch that answered every press with an error. Cameras whose spotlight this plugin cannot switch no longer offer one.
 
 ## [2.0.1]
