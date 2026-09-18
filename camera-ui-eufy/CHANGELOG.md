@@ -1,3 +1,7 @@
+## [2.0.2]
+
+- No light control on cameras that have none. A battery doorbell reports the spotlight setting without having a lamp, so camera.ui showed a light switch that answered every press with an error. Cameras whose spotlight this plugin cannot switch no longer offer one.
+
 ## [2.0.1]
 
 - Cameras on a power supply, like the Floodlight Cam and Indoor Cam, no longer show a battery stuck at 100%
