@@ -88,6 +88,7 @@ function deriveCategory(dir: string): Category {
   const interfaces = [...src.matchAll(/PluginInterface\.(\w+)/g)].map((m) => m[1]);
 
   if (role === 'CameraController' || role === 'CameraAndSensorProvider') return 'camera-source';
+  if (interfaces.includes('AssistantModels')) return 'ai-model';
   if (interfaces.some((name) => name.endsWith('Detection'))) return 'detection';
   if (role === 'SensorProvider') return 'utility';
   return 'other';

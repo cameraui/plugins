@@ -39,6 +39,7 @@ function runCommandsInDirectories(directories: string[]) {
 }
 
 const directories = [
+  '../camera-ui-apple-llm',
   '../camera-ui-audio-yamnet',
   '../camera-ui-coral',
   '../camera-ui-coreml',

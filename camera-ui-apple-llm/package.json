@@ -1,0 +1,65 @@
+{
+  "displayName": "Apple LLM",
+  "name": "@camera.ui/camera-ui-apple-llm",
+  "version": "1.0.0",
+  "description": "Apple's on-device foundation model as an assistant model for camera.ui. Runs through the fm command line tool of macOS 27, no key and no cloud.",
+  "author": "seydx (https://github.com/cameraui/plugins)",
+  "main": "./bundle/dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "rimraf dist && tsc",
+    "bundle": "npm run format && npm run lint && npm run build && cui bundle",
+    "bundle:dev": "npm run format && npm run lint && npm run build && cross-env MODE=development cui bundle",
+    "format": "prettier --write \"src/\" --ignore-unknown --no-error-on-unmatched-pattern",
+    "install-updates": "npm i --save --force",
+    "lint": "eslint --fix .",
+    "prepublishOnly": "node -e \"if(!process.env.SAFE_PUBLISH){console.error('Error: Please use @camera.ui/cli to publish the plugin:\\n  npm run publish:alpha\\n  npm run publish:beta\\n  npm run publish:latest\\n');process.exit(1)}\"",
+    "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
+    "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
+    "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
+    "update": "updates -M npm,pypi,go,cargo,docker,make --update ./"
+  },
+  "devDependencies": {
+    "@camera.ui/cli": "^0.0.108",
+    "@camera.ui/sdk": "^1.2.39",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "26.6.1",
+    "@typescript-eslint/parser": "^8.70.0",
+    "cross-env": "^10.1.0",
+    "eslint": "9.39.2",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.8",
+    "rimraf": "^6.1.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "updates": "^18.1.1"
+  },
+  "bugs": {
+    "url": "https://github.com/cameraui/plugins/issues"
+  },
+  "engines": {
+    "camera.ui": ">=2.2.4",
+    "node": ">=22.0.0"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-apple-llm#readme",
+  "keywords": [
+    "camera-ui-plugin",
+    "assistant",
+    "llm",
+    "apple",
+    "foundation-models",
+    "on-device"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cameraui/plugins.git",
+    "directory": "camera-ui-apple-llm"
+  }
+}
