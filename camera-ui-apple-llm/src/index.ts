@@ -9,6 +9,7 @@ import type {
   AssistantModelProvider,
   AssistantModelRequest,
   AssistantModelSpec,
+  AssistantModelStatus,
   DeviceStorage,
   JsonSchema,
   LoggerService,
@@ -85,6 +86,13 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
     ];
   }
 
+  public async assistantModelStatus(): Promise<AssistantModelStatus> {
+    if (await this.usable()) return { ready: true };
+
+    const result = await available().catch(() => ({ available: false, reason: 'unknown' }));
+    return { ready: false, message: capitalize(unavailableReason(result.reason)) };
+  }
+
   public async *assistantGenerate(request: AssistantModelRequest, ctx: AssistantModelContext): AsyncGenerator<AssistantModelChunk> {
     if (!(await this.usable())) {
       yield { type: 'done', finish: 'error', message: 'The Apple on-device model is not available on this Mac' };
@@ -152,6 +160,10 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
     }
     this.logger.warn('The on-device model is not usable yet, camera.ui offers it as soon as macOS reports it ready');
   }
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function conversation(request: AssistantModelRequest): string {
