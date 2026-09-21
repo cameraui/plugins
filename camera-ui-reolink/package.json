@@ -21,13 +21,13 @@
     "update": "updates -M npm,pypi,go,cargo,docker,make --update ./"
   },
   "devDependencies": {
-    "@camera.ui/cli": "~0.0.111",
-    "@camera.ui/sdk": "~1.3.2",
+    "@camera.ui/cli": "~0.0.112",
+    "@camera.ui/sdk": "~1.3.3",
     "@types/node": "^26.6.2",
     "cross-env": "^10.1.0",
     "rimraf": "^6.1.3",
     "typescript": "5.9.3",
-    "updates": "^18.1.1"
+    "updates": "^19.0.0"
   },
   "license": "MIT",
   "bugs": {
