@@ -201,7 +201,7 @@ func run(_ setup: Setup, _ request: WireRequest, session: LanguageModelSession, 
     do {
       var answer = ""
       if let schema {
-        answer = try await session.respond(to: question, schema: schema, includeSchemaInPrompt: request.schemaInPrompt ?? true, options: options).content.jsonString
+        answer = try await session.respond(to: question, schema: schema, options: options).content.jsonString
         turn.text(answer)
       } else {
         for try await snapshot in session.streamResponse(to: question, options: options) {

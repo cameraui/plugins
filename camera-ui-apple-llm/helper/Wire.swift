@@ -35,7 +35,6 @@ struct WireRequest: Decodable {
   let outputSchema: JSONValue?
   let maxOutputTokens: Int?
   let permissive: Bool?
-  let schemaInPrompt: Bool?
 }
 
 enum JSONValue: Codable, Sendable {
