@@ -48,11 +48,17 @@ def to_tensor(rgb: NDArray, spec: InputSpec) -> NDArray:
         arr = resized.astype(np.float32) / 255.0
     elif spec.normalize == "facenet":
         arr = (resized.astype(np.float32) - 127.5) / 128.0
+    elif spec.normalize == "arcface":
+        arr = (resized.astype(np.float32) - 127.5) / 127.5
     else:
         arr = resized.astype(np.uint8 if spec.dtype == "uint8" else np.float32)
 
     if spec.layout == "nchw":
         arr = arr.transpose(2, 0, 1)
+        if spec.channels == "bgr":
+            arr = arr[::-1]
+    elif spec.channels == "bgr":
+        arr = arr[..., ::-1]
 
     return np.ascontiguousarray(np.expand_dims(arr, axis=0))
 

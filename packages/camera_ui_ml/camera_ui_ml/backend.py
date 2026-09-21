@@ -12,7 +12,8 @@ from .pipeline import run_prepare
 NDArray = np.ndarray[Any, Any]
 
 Layout = Literal["nchw", "nhwc"]
-Normalize = Literal["unit", "facenet", "none"]
+Normalize = Literal["unit", "facenet", "arcface", "none"]
+Channels = Literal["rgb", "bgr"]
 DType = Literal["float32", "uint8"]
 
 Outputs = Sequence[NDArray]
@@ -24,6 +25,7 @@ class InputSpec:
     height: int
     layout: Layout = "nchw"
     normalize: Normalize = "unit"
+    channels: Channels = "rgb"
     dtype: DType = "float32"
 
 

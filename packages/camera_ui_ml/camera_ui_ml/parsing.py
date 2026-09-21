@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -8,6 +10,14 @@ from .geometry import Box, cxcywh_to_xyxy
 
 NDArray = np.ndarray[Any, Any]
 RawDetection = tuple[int, float, Box]
+
+
+@dataclass(frozen=True)
+class FaceLandmarks:
+    score: float
+    box: Box
+    #: right eye, left eye, nose, right mouth corner, left mouth corner
+    points: NDArray
 
 
 def channels_first(output: NDArray) -> NDArray:
@@ -45,6 +55,39 @@ def parse_end2end(rows: NDArray, threshold: float) -> list[RawDetection]:
             )
         )
     return detections
+
+
+YUNET_STRIDES = (8, 16, 32)
+
+
+def parse_yunet(outputs: Sequence[NDArray], size: int, threshold: float) -> list[FaceLandmarks]:
+    if len(outputs) < 12:
+        return []
+    candidates: list[FaceLandmarks] = []
+    for index, stride in enumerate(YUNET_STRIDES):
+        cls = outputs[index].reshape(-1)
+        obj = outputs[3 + index].reshape(-1)
+        bbox = outputs[6 + index].reshape(-1, 4)
+        kps = outputs[9 + index].reshape(-1, 10)
+        cols = size // stride
+        score = np.sqrt(np.clip(cls, 0.0, 1.0) * np.clip(obj, 0.0, 1.0))
+        for i in np.where(score >= threshold)[0]:
+            col, row = int(i) % cols, int(i) // cols
+            cx = (col + bbox[i, 0]) * stride
+            cy = (row + bbox[i, 1]) * stride
+            w = float(np.exp(bbox[i, 2]) * stride)
+            h = float(np.exp(bbox[i, 3]) * stride)
+            points = np.stack([(col + kps[i, 0::2]) * stride, (row + kps[i, 1::2]) * stride], axis=1).astype(
+                np.float32
+            )
+            candidates.append(
+                FaceLandmarks(
+                    score=float(score[i]),
+                    box=(float(cx - w / 2), float(cy - h / 2), float(cx + w / 2), float(cy + h / 2)),
+                    points=points,
+                )
+            )
+    return candidates
 
 
 def decode_ocr(logits: NDArray, alphabet: str, pad_char: str = "_") -> tuple[str, float]:
