@@ -32,3 +32,6 @@ binary
 *.sln
 *.sw?
 .venv
+
+# built by scripts/build-helper.mjs
+helper/bin

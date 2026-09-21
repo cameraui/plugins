@@ -3,4 +3,5 @@ export interface PluginStorageValues {
   permissiveGuardrails: boolean;
   contextTokens: number;
   sendImages: boolean;
+  useTools: boolean;
 }

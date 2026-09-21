@@ -22,6 +22,7 @@ jobs:
       externals: ${{ steps.resolve.outputs.externals }}
       dist_tag: ${{ steps.resolve.outputs.dist_tag }}
       python_version: ${{ steps.resolve.outputs.python_version }}
+      runner: ${{ steps.resolve.outputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - id: resolve
@@ -29,7 +30,7 @@ jobs:
 
   publish:
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.resolve.outputs.runner }}
     environment: release
     permissions:
       contents: read
@@ -78,6 +79,16 @@ jobs:
           echo "tag=$VERSION package.json=$PKG"
           if [ "$VERSION" != "$PKG" ]; then
             echo "::error::tag version $VERSION does not match $PLUGIN/package.json version $PKG"
+            exit 1
+          fi
+
+      - name: Check the macOS SDK
+        if: needs.resolve.outputs.runner != 'ubuntu-latest'
+        run: |
+          xcodebuild -version
+          SDK="$(xcrun --sdk macosx --show-sdk-version)"
+          if [ "${SDK%%.*}" -lt 27 ]; then
+            echo "::error::macOS SDK $SDK on this runner, the Swift helper needs 27 or newer"
             exit 1
           fi
 

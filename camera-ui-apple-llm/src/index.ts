@@ -1,11 +1,12 @@
 import { API_EVENT, ServicePlugin } from '@camera.ui/sdk';
 
-import { available, respond } from './cli.js';
+import { generate, status, stop } from './helper.js';
 import { ANSWER_SCHEMA, CONTEXT_TOKENS, MODEL_ID, MODEL_NAME, RECHECK_MS, unavailableReason } from './model.js';
 
 import type {
   AssistantModelChunk,
   AssistantModelContext,
+  AssistantModelMessage,
   AssistantModelProvider,
   AssistantModelRequest,
   AssistantModelSpec,
@@ -15,17 +16,21 @@ import type {
   LoggerService,
   PluginAPI,
 } from '@camera.ui/sdk';
-import type { FmImage } from './cli.js';
+import type { HelperStatus } from './helper.js';
 import type { PluginStorageValues } from './types.js';
 
 export default class AppleLLM extends ServicePlugin<PluginStorageValues> implements AssistantModelProvider {
   private ready = false;
   private checkedAt = 0;
+  private reason = '';
+  private contextSize = 0;
+  private variant = '';
 
   constructor(logger: LoggerService, api: PluginAPI, storage: DeviceStorage<PluginStorageValues>) {
     super(logger, api, storage);
 
     this.api.on(API_EVENT.FINISH_LAUNCHING, this.start.bind(this));
+    this.api.on(API_EVENT.SHUTDOWN, stop);
   }
 
   public get storageSchema(): JsonSchema[] {
@@ -61,6 +66,16 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
       },
       {
         type: 'boolean',
+        key: 'useTools',
+        title: 'Let the model use tools',
+        description:
+          'The assistant can look at events, cameras and sensors through this model. camera.ui fits the tool list to the small context window. ' +
+          'Off makes it a plain chat model.',
+        store: true,
+        defaultValue: true,
+      },
+      {
+        type: 'boolean',
         key: 'sendImages',
         title: 'Send pictures to the model',
         description: 'The model looks at event pictures instead of reading only the text around them.',
@@ -76,11 +91,12 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
     return [
       {
         id: MODEL_ID,
-        name: MODEL_NAME,
+        name: this.variant || MODEL_NAME,
         contextTokens: await this.contextTokens(),
         vision: await this.storage.getValue('sendImages', true),
-        toolCalling: false,
+        toolCalling: await this.storage.getValue('useTools', true),
         structuredOutput: true,
+        toolRouting: true,
         note: 'Runs on this Mac, nothing leaves it.',
       },
     ];
@@ -88,9 +104,7 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
 
   public async assistantModelStatus(): Promise<AssistantModelStatus> {
     if (await this.usable()) return { ready: true };
-
-    const result = await available().catch(() => ({ available: false, reason: 'unknown' }));
-    return { ready: false, message: capitalize(unavailableReason(result.reason)) };
+    return { ready: false, message: capitalize(unavailableReason(this.reason)) };
   }
 
   public async *assistantGenerate(request: AssistantModelRequest, ctx: AssistantModelContext): AsyncGenerator<AssistantModelChunk> {
@@ -99,36 +113,29 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
       return;
     }
 
-    const wrap = request.outputSchema === undefined && (await this.storage.getValue('wrapAnswers', true));
-    const schema = request.outputSchema ?? (wrap ? ANSWER_SCHEMA : undefined);
-
-    try {
-      const answer = await respond({
-        instructions: request.system.join('\n\n'),
-        prompt: conversation(request),
-        ...(schema ? { schema: schema } : {}),
-        images: await this.images(request),
-        timeoutMs: ctx.timeoutMs,
+    const tools = (await this.storage.getValue('useTools', true)) ? request.tools : [];
+    const wrap = request.outputSchema === undefined && tools.length === 0 && (await this.storage.getValue('wrapAnswers', true));
+    const chunks = generate(
+      {
+        system: request.system,
+        messages: (await this.storage.getValue('sendImages', true)) ? request.messages : request.messages.map(withoutImages),
+        tools,
+        outputSchema: request.outputSchema ?? (wrap ? ANSWER_SCHEMA : undefined),
+        maxOutputTokens: request.maxOutputTokens,
         permissive: await this.storage.getValue('permissiveGuardrails', true),
-      });
-      const text = wrap ? unwrap(answer) : answer;
-      if (text) yield { type: 'text', delta: text };
-      yield { type: 'done', finish: 'stop' };
-    } catch (error: any) {
-      yield { type: 'done', finish: 'error', message: error?.message ?? String(error) };
-    }
-  }
+      },
+      ctx.timeoutMs,
+    );
 
-  private async images(request: AssistantModelRequest): Promise<FmImage[]> {
-    if (!(await this.storage.getValue('sendImages', true))) return [];
-
-    const images: FmImage[] = [];
-    for (const message of request.messages) {
-      for (const part of message.content) {
-        if (part.type === 'image') images.push({ data: part.data });
+    let wrapped = '';
+    for await (const chunk of chunks) {
+      if (wrap && chunk.type === 'text') {
+        wrapped += chunk.delta;
+        continue;
       }
+      if (wrap && chunk.type === 'done' && wrapped) yield { type: 'text', delta: unwrap(wrapped) };
+      yield chunk;
     }
-    return images;
   }
 
   private async usable(): Promise<boolean> {
@@ -136,8 +143,11 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
     if (Date.now() - this.checkedAt < RECHECK_MS) return false;
 
     this.checkedAt = Date.now();
-    const result = await available().catch(() => ({ available: false, reason: 'unknown' }));
+    const result = await status().catch((error: Error): HelperStatus => ({ available: false, reason: error.message }));
     this.ready = result.available;
+    this.reason = result.reason;
+    this.contextSize = result.contextSize ?? this.contextSize;
+    this.variant = result.variant ?? this.variant;
     if (this.ready) this.logger.log('Apple on-device model is ready');
     else this.logger.debug(`The on-device model is not usable: ${unavailableReason(result.reason)}`);
     return this.ready;
@@ -145,7 +155,7 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
 
   private async contextTokens(): Promise<number> {
     const stored = await this.storage.getValue('contextTokens', CONTEXT_TOKENS);
-    return typeof stored === 'number' && stored >= 1024 ? stored : CONTEXT_TOKENS;
+    return Math.max(typeof stored === 'number' && stored >= 1024 ? stored : CONTEXT_TOKENS, this.contextSize);
   }
 
   private async start(): Promise<void> {
@@ -166,16 +176,8 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function conversation(request: AssistantModelRequest): string {
-  const lines: string[] = [];
-  for (const message of request.messages) {
-    const text = message.content.flatMap((part) => (part.type === 'text' ? [part.text] : []));
-    const calls = (message.toolCalls ?? []).map((call) => `called ${call.name}(${JSON.stringify(call.arguments)})`);
-    const body = [...text, ...calls].join('\n');
-    if (!body) continue;
-    lines.push(message.role === 'assistant' ? `Assistant: ${body}` : message.role === 'tool' ? `Tool result: ${body}` : `User: ${body}`);
-  }
-  return lines.join('\n\n');
+function withoutImages(message: AssistantModelMessage): AssistantModelMessage {
+  return { ...message, content: message.content.filter((part) => part.type !== 'image') };
 }
 
 function unwrap(answer: string): string {

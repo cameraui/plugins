@@ -16,6 +16,10 @@ export const GO = {
   'camera-ui-reolink': 'externals/reolinkproxy',
 };
 
+export const RUNNERS = {
+  'camera-ui-apple-llm': 'xcode-27',
+};
+
 // CI/publish python; plugins absent here use the default 3.13
 // (openvino 2024.6 ships no cp313 wheels)
 export const PYTHON_VERSIONS = {
