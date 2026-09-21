@@ -7,9 +7,11 @@ from typing import Any
 from camera_ui_ml import (
     BoxDetector,
     Embedder,
+    LandmarkDetector,
     PlateOcr,
     crop_rgb,
     decode_image,
+    embed_face_images,
     normalize_box,
     reset_stored_settings,
     scale_box,
@@ -23,6 +25,8 @@ from camera_ui_sdk import (
     FaceDetection,
     FaceDetectionInterface,
     FaceDetectionPluginResponse,
+    FaceEmbeddingInterface,
+    FaceEmbeddingPluginResponse,
     ImageMetadata,
     JsonSchema,
     LicensePlateDetection,
@@ -32,6 +36,7 @@ from camera_ui_sdk import (
     ObjectDetectionInterface,
     ObjectDetectionPluginResponse,
     PluginAPI,
+    Point,
     VideoFrameData,
 )
 
@@ -44,8 +49,9 @@ from defaults import (
     DEFAULT_OPTION,
     DEFAULT_USE_VULKAN,
     FACE_DETECTOR_MODELS,
-    FACE_EMBEDDER_INPUT_SIZE,
     FACE_EMBEDDER_MODELS,
+    FACE_EMBEDDERS,
+    FACE_LANDMARK_MODEL,
     LPD_DETECTOR_MODELS,
     OBJECT_LABELS,
     OBJECT_MODELS,
@@ -58,6 +64,7 @@ from defaults import (
     resolve_model,
 )
 from model_manager import NcnnModelManager
+from sensors.face_embedder_sensor import NCNNFaceEmbedderSensor
 from sensors.face_sensor import NCNNFaceSensor
 from sensors.lpd_sensor import NCNNLPDSensor
 from sensors.object_sensor import NCNNObjectSensor
@@ -68,6 +75,7 @@ class NCNNPlugin(
     BasePlugin,
     ObjectDetectionInterface,
     FaceDetectionInterface,
+    FaceEmbeddingInterface,
     LicensePlateDetectionInterface,
 ):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
@@ -84,6 +92,7 @@ class NCNNPlugin(
         self.object_detectors: dict[str, BoxDetector] = {}
         self.face_detectors: dict[str, BoxDetector] = {}
         self.face_embedders: dict[str, Embedder] = {}
+        self.face_landmarkers: dict[str, LandmarkDetector] = {}
         self.plate_detectors: dict[str, BoxDetector] = {}
         self.ocr_models: dict[str, PlateOcr] = {}
 
@@ -94,6 +103,17 @@ class NCNNPlugin(
     @property
     def storage_schema(self) -> list[JsonSchema]:
         return [
+            {
+                "type": "string",
+                "key": "face_embedder_model",
+                "title": "Face Embedding Model",
+                "description": "Model that turns a face into a vector, shared by every camera. Changing it means the enrolled faces are embedded again.",
+                "enum": [DEFAULT_OPTION, *FACE_EMBEDDER_MODELS],
+                "store": True,
+                "defaultValue": DEFAULT_OPTION,
+                "required": True,
+                "onSet": self._on_face_embedder_change,
+            },
             {
                 "type": "boolean",
                 "key": "use_vulkan",
@@ -187,20 +207,40 @@ class NCNNPlugin(
             await detector.initialize(model_name)
         return detector
 
-    async def get_face_embedder(self, model_name: str) -> Embedder:
-        embedder = self.face_embedders.get(model_name)
+    async def get_face_embedder(self, space: str) -> Embedder:
+        spec = FACE_EMBEDDERS.get(space, FACE_EMBEDDERS[DEFAULT_FACE_EMBEDDER])
+        embedder = self.face_embedders.get(space)
         if not embedder:
-            size = FACE_EMBEDDER_MODELS.get(model_name, FACE_EMBEDDER_INPUT_SIZE)
-            embedder = Embedder(self.model_manager, self.logger, size=size)
-            self.face_embedders[model_name] = embedder
+            embedder = Embedder(
+                self.model_manager,
+                self.logger,
+                size=spec.size,
+                normalize=spec.normalize,
+                aligned=spec.aligned,
+            )
+            self.face_embedders[space] = embedder
             try:
-                await embedder.initialize(model_name)
+                await embedder.initialize(spec.model)
             except Exception:
-                self.face_embedders.pop(model_name, None)
+                self.face_embedders.pop(space, None)
                 raise
         else:
-            await embedder.initialize(model_name)
+            await embedder.initialize(spec.model)
         return embedder
+
+    async def get_face_landmarker(self) -> LandmarkDetector:
+        landmarker = self.face_landmarkers.get(FACE_LANDMARK_MODEL)
+        if not landmarker:
+            landmarker = LandmarkDetector(self.model_manager, self.logger)
+            self.face_landmarkers[FACE_LANDMARK_MODEL] = landmarker
+            try:
+                await landmarker.initialize(FACE_LANDMARK_MODEL)
+            except Exception:
+                self.face_landmarkers.pop(FACE_LANDMARK_MODEL, None)
+                raise
+        else:
+            await landmarker.initialize(FACE_LANDMARK_MODEL)
+        return landmarker
 
     async def get_plate_detector(self, model_name: str) -> BoxDetector:
         detector = self.plate_detectors.get(model_name)
@@ -311,27 +351,15 @@ class NCNNPlugin(
                 "enum": [DEFAULT_OPTION, *FACE_DETECTOR_MODELS],
                 "store": False,
             },
-            {
-                "type": "string",
-                "key": "embedder_model",
-                "title": "Embedding Model",
-                "description": "Face embedding model for testing",
-                "required": True,
-                "defaultValue": DEFAULT_OPTION,
-                "enum": [DEFAULT_OPTION, *FACE_EMBEDDER_MODELS],
-                "store": False,
-            },
         ]
 
     async def testFaceDetection(
         self, image_data: bytes, metadata: ImageMetadata, config: dict[str, Any]
     ) -> FaceDetectionPluginResponse | None:
         detector_name: str = resolve_model(config.get("detector_model"), DEFAULT_FACE_DETECTOR)
-        embedder_name: str = resolve_model(config.get("embedder_model"), DEFAULT_FACE_EMBEDDER)
 
         detector = await self.get_face_detector(detector_name)
-        embedder = await self.get_face_embedder(embedder_name)
-        if not detector.initialized or not embedder.initialized:
+        if not detector.initialized:
             return None
 
         rgb = decode_image(image_data)
@@ -346,14 +374,12 @@ class NCNNPlugin(
         detections: list[FaceDetection] = []
         for _cid, conf, box in raw:
             image_box = scale_box(box, scale_x, scale_y)
-            embedding = await embedder.embed(crop_rgb(rgb, image_box))
             detections.append(
                 {
                     "label": "person",
                     "attribute": "face",
                     "confidence": conf,
                     "box": normalize_box(image_box, width, height),
-                    "embedding": embedding,
                 }
             )
 
@@ -364,11 +390,9 @@ class NCNNPlugin(
     ) -> FaceDetectionPluginResponse | None:
         cfg = config or {}
         detector_name = resolve_model(cfg.get("detector_model"), DEFAULT_FACE_DETECTOR)
-        embedder_name = resolve_model(cfg.get("embedder_model"), DEFAULT_FACE_EMBEDDER)
 
         detector = await self.get_face_detector(detector_name)
-        embedder = await self.get_face_embedder(embedder_name)
-        if not detector.initialized or not embedder.initialized:
+        if not detector.initialized:
             return None
 
         raw = await detector.detect_frame(frame)
@@ -376,18 +400,15 @@ class NCNNPlugin(
             return {"detected": False, "detections": []}
 
         width, height = frame["width"], frame["height"]
-        rgb_bytes = bytes(frame["data"])
 
         detections: list[FaceDetection] = []
         for _cid, conf, box in raw:
-            embedding = await embedder.embed_from_crop(rgb_bytes, width, height, box)
             detections.append(
                 {
                     "label": "person",
                     "attribute": "face",
                     "confidence": conf,
                     "box": normalize_box(box, width, height),
-                    "embedding": embedding,
                 }
             )
 
@@ -487,6 +508,51 @@ class NCNNPlugin(
 
         return {"detected": len(detections) > 0, "detections": detections}
 
+    def face_embedder_space(self) -> str:
+        return resolve_model(self.storage.values.get("face_embedder_model"), DEFAULT_FACE_EMBEDDER)
+
+    async def _on_face_embedder_change(self, new_model: str, _old_model: str) -> None:
+        if new_model == _old_model:
+            return
+        resolved = resolve_model(new_model, DEFAULT_FACE_EMBEDDER)
+        await self.get_face_embedder(resolved)
+        await self.get_face_landmarker()
+        for sensors in self._sensors.values():
+            if (embedder := sensors.get("faceEmbedder")) is not None:
+                embedder.updateModelSpec()
+        self.logger.log(f"Face embedding model changed to {resolved}")
+
+    async def faceEmbeddingSettings(self) -> list[JsonSchema] | None:
+        return [
+            {
+                "type": "string",
+                "key": "embedder_model",
+                "title": "Recognition Model",
+                "description": "Face recognition model for testing",
+                "required": True,
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *FACE_EMBEDDER_MODELS],
+                "store": False,
+            },
+        ]
+
+    async def embedFaceImages(
+        self,
+        images: list[bytes],
+        config: dict[str, Any] | None = None,
+        landmarks: list[list[Point] | None] | None = None,
+    ) -> list[FaceEmbeddingPluginResponse | None]:
+        space = resolve_model((config or {}).get("embedder_model"), self.face_embedder_space())
+        embedder = await self.get_face_embedder(space)
+        landmarker = await self.get_face_landmarker()
+        if not embedder.initialized or not landmarker.initialized:
+            return [None for _ in images]
+
+        # an empty vector says the picture holds no face the model can use, None
+        # is reserved for a plugin that could not run: the caller drops the first
+        results = await embed_face_images(landmarker, embedder, images, space, landmarks)
+        return [result for result in results]
+
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
@@ -502,6 +568,10 @@ class NCNNPlugin(
         await camera.addSensor(lpd)
         sensors["lpd"] = lpd
 
+        embedder = NCNNFaceEmbedderSensor(self, self.logger)
+        await camera.addSensor(embedder)
+        sensors["faceEmbedder"] = embedder
+
         self._sensors[camera.id] = sensors
 
     def _active_hardware(self) -> str:
@@ -512,6 +582,7 @@ class NCNNPlugin(
                 *self.face_detectors.values(),
                 *self.plate_detectors.values(),
                 *self.face_embedders.values(),
+                *self.face_landmarkers.values(),
                 *self.ocr_models.values(),
             )
             if detector.backend is not None

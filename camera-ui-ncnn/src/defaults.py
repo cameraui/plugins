@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from camera_ui_ml import Normalize
 from camera_ui_sdk import DetectionLabel
 
 model_version = "v1"
@@ -33,11 +36,36 @@ LPD_DETECTOR_MODELS: dict[str, int] = {
     "yolo-v9-s-608-license-plates": 608,
 }
 
-# value = model input size in px
-FACE_EMBEDDER_MODELS: dict[str, int] = {
-    "facenet-inceptionresnetv1-512": 160,
-    "arcface-r100-512": 112,
+
+@dataclass(frozen=True)
+class FaceEmbedderSpec:
+    """How a recognition head wants its crop. The key it is stored under names
+    the vector space, which is what the NVR keys enrolled faces by, so it
+    changes whenever the preprocessing changes, not only the weights."""
+
+    model: str
+    size: int
+    normalize: Normalize
+    aligned: bool
+
+
+FACE_EMBEDDERS: dict[str, FaceEmbedderSpec] = {
+    # the suffixes name the crop, not the weights: both heads see a padded face
+    # box now, where they used to get the detector's tight box, and that alone
+    # makes the vectors incomparable to the ones already stored
+    "facenet-inceptionresnetv1-512-padded": FaceEmbedderSpec(
+        "facenet-inceptionresnetv1-512", 160, "facenet", False
+    ),
+    "arcface-r100-512-aligned": FaceEmbedderSpec("arcface-r100-512", 112, "arcface", True),
 }
+
+FACE_EMBEDDER_MODELS: list[str] = list(FACE_EMBEDDERS)
+
+FACE_LANDMARK_MODEL = "yunet-256-face-landmarks"
+FACE_LANDMARK_INPUT_SIZE = 256
+
+# the padded face crop the server sends; the landmark model takes it from there
+FACE_EMBEDDER_CROP_SIZE = 256
 
 OCR_MODELS: list[str] = [
     "cct-xs-v2-global",
@@ -47,12 +75,10 @@ OCR_MODELS: list[str] = [
 DEFAULT_OBJECT_MODEL = "yolo-v9-s-320"
 
 DEFAULT_FACE_DETECTOR = "yolo-v9-s-320-faces"
-DEFAULT_FACE_EMBEDDER = "facenet-inceptionresnetv1-512"
+DEFAULT_FACE_EMBEDDER = "arcface-r100-512-aligned"
 
 DEFAULT_LPD_DETECTOR = "yolo-v9-t-384-license-plates"
 DEFAULT_OCR = "cct-xs-v2-global"
-
-FACE_EMBEDDER_INPUT_SIZE = 160
 
 OCR_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 OCR_PAD_CHAR = "_"

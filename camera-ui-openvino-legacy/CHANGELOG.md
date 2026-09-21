@@ -1,5 +1,6 @@
 ## [1.2.16]
 
+- **Face recognition is a sensor of its own and lines the face up before it recognizes it.** Assign it per camera under Plugins, next to face detection. It recognizes far more people, and a face seen from the side or steeply from above gets no name instead of a wrong one. The recognition model is set once for the plugin, the NVR embeds the enrolled pictures again by itself.
 - Updated camera.ui engine
 
 ## [1.2.15]
