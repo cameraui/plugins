@@ -15,12 +15,24 @@ import { fileURLToPath } from 'node:url';
 //
 // Several plugins can be released in one go by listing them before the spec;
 // ALL releases every camera-ui-* plugin in this monorepo. With more than one
-// plugin (or ALL) only the bump specs major/minor/patch are allowed, since an
+// plugin (or ALL) only the bump specs are allowed, since an
 // explicit version rarely fits plugins with divergent version histories:
 //
 //   tsx scripts/release.ts camera-ui-homekit camera-ui-eufy patch
 //   tsx scripts/release.ts ALL patch
 //   tsx scripts/release.ts ALL minor --yes --skip-checks
+//
+// beta moves a plugin one beta further: a stable version gets the next patch as
+// beta.0, a running beta counts up, an alpha switches to beta.0 of its version:
+//
+//   tsx scripts/release.ts camera-ui-reolink beta     1.2.24-beta.0 -> 1.2.24-beta.1
+//   tsx scripts/release.ts ALL beta                   1.2.4 -> 1.2.5-beta.0
+//
+// minor-beta and major-beta start the beta of the next minor or major instead; a
+// beta already heading there counts up like beta does:
+//
+//   tsx scripts/release.ts camera-ui-eufy minor-beta  2.0.2-beta.0 -> 2.1.0-beta.0
+//   tsx scripts/release.ts camera-ui-eufy minor-beta  2.1.0-beta.0 -> 2.1.0-beta.1
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,7 +40,9 @@ const ROOT = resolve(__dirname, '..');
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?$/;
 
-type BumpSpec = 'major' | 'minor' | 'patch';
+const BUMP_SPECS = ['major', 'minor', 'patch', 'beta', 'minor-beta', 'major-beta'] as const;
+
+type BumpSpec = (typeof BUMP_SPECS)[number];
 
 interface PluginPlan {
   name: string;
@@ -49,7 +63,7 @@ function usage(): never {
   console.log(
     [
       '',
-      chalk.bold('Usage:') + ' tsx scripts/release.ts <plugin...|ALL> <version|major|minor|patch> [--yes] [--skip-checks]',
+      chalk.bold('Usage:') + ` tsx scripts/release.ts <plugin...|ALL> <version|${BUMP_SPECS.join('|')}> [--yes] [--skip-checks]`,
       '',
       'Examples:',
       '  tsx scripts/release.ts camera-ui-homekit patch',
@@ -58,6 +72,9 @@ function usage(): never {
       '  tsx scripts/release.ts camera-ui-homekit camera-ui-eufy camera-ui-ring patch',
       '  tsx scripts/release.ts ALL patch',
       '  tsx scripts/release.ts ALL minor --yes',
+      '  tsx scripts/release.ts camera-ui-reolink beta',
+      '  tsx scripts/release.ts ALL beta',
+      '  tsx scripts/release.ts camera-ui-eufy minor-beta',
       '',
       'Options:',
       '  --yes, -y       Push without the confirmation prompt.',
@@ -65,7 +82,9 @@ function usage(): never {
       '',
       'Notes:',
       '  ALL releases every camera-ui-* plugin.',
-      '  More than one plugin (or ALL) only accepts major/minor/patch.',
+      `  More than one plugin (or ALL) only accepts ${BUMP_SPECS.join('/')}.`,
+      '  beta: stable X.Y.Z becomes X.Y.(Z+1)-beta.0, X.Y.Z-beta.N becomes X.Y.Z-beta.(N+1).',
+      '  minor-beta / major-beta: beta.0 of the next minor / major, or the next beta if one already heads there.',
       '',
     ].join('\r\n'),
   );
@@ -83,13 +102,22 @@ function git(cmd: string, opts: { capture?: boolean } = {}): string {
 }
 
 function isBumpSpec(spec: string): spec is BumpSpec {
-  return spec === 'major' || spec === 'minor' || spec === 'patch';
+  return (BUMP_SPECS as readonly string[]).includes(spec);
 }
 
 function bump(current: string, spec: BumpSpec): string {
   const [base, prerelease] = current.split('-');
   const [major, minor, patch] = base.split('.').map(Number);
   if ([major, minor, patch].some(Number.isNaN)) fail(`Cannot bump non-numeric version '${current}'.`);
+
+  if (spec === 'beta' || spec === 'minor-beta' || spec === 'major-beta') {
+    const [label, count] = prerelease?.split('.') ?? [];
+    const target = spec === 'major-beta' ? `${major + 1}.0.0` : spec === 'minor-beta' ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+    // a prerelease already heading to that level keeps its version and counts up
+    const heading = prerelease !== undefined && (spec === 'beta' || (spec === 'minor-beta' && patch === 0) || (spec === 'major-beta' && minor === 0 && patch === 0));
+    if (!heading) return `${target}-beta.0`;
+    return label === 'beta' ? `${base}-beta.${Number(count) + 1}` : `${base}-beta.0`;
+  }
 
   // a prerelease of the bumped version is released as that version, like npm version does
   if (prerelease) {
@@ -177,7 +205,7 @@ async function main(): Promise<void> {
     fail('ALL cannot be combined with plugin names.');
   }
   if ((all || targets.length > 1) && !isBumpSpec(spec)) {
-    fail(`Multiple plugins (or ALL) only accept major/minor/patch (got '${spec}').`);
+    fail(`Multiple plugins (or ALL) only accept ${BUMP_SPECS.join('/')} (got '${spec}').`);
   }
 
   // Safety: clean tree, on main, not behind origin.
