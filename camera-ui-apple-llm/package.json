@@ -1,7 +1,7 @@
 {
   "displayName": "Apple LLM",
   "name": "@camera.ui/camera-ui-apple-llm",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Apple's on-device foundation model as an assistant model for camera.ui, with tools and pictures. Runs on the Mac itself, no key and no cloud.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
