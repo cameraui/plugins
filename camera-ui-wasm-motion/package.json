@@ -35,7 +35,7 @@
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
-    "fs-extra": "^11.4.0",
+    "fs-extra": "^11.4.1",
     "globals": "^17.12.0",
     "prettier": "^3.9.8",
     "rimraf": "^6.1.3",
