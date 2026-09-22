@@ -188,6 +188,7 @@ func run(_ setup: Setup, _ request: WireRequest, session: LanguageModelSession, 
   let messages = request.messages ?? []
   var options = GenerationOptions()
   options.maximumResponseTokens = request.maxOutputTokens
+  if request.outputSchema != nil { options.samplingMode = .greedy }
   var builder = SchemaBuilder()
   let schema = request.outputSchema.flatMap { try? builder.root(name: "answer", schema: $0) }
   let model = setup.model

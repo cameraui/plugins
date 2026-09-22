@@ -117,7 +117,7 @@ export default class AppleLLM extends ServicePlugin<PluginStorageValues> impleme
     const wrap = request.outputSchema === undefined && tools.length === 0 && (await this.storage.getValue('wrapAnswers', true));
     const chunks = generate(
       {
-        system: request.system,
+        system: [...localeInstructions(ctx.language), ...request.system],
         messages: (await this.storage.getValue('sendImages', true)) ? request.messages : request.messages.map(withoutImages),
         tools,
         outputSchema: request.outputSchema ?? (wrap ? ANSWER_SCHEMA : undefined),
@@ -186,5 +186,16 @@ function unwrap(answer: string): string {
     return typeof parsed?.answer === 'string' ? parsed.answer : answer;
   } catch {
     return answer;
+  }
+}
+
+function localeInstructions(language: string): string[] {
+  try {
+    const locale = new Intl.Locale(language).maximize();
+    if (locale.language === 'en' || !locale.region) return [];
+    const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(locale.language);
+    return [`The person's locale is ${locale.language}_${locale.region}.${name ? `\nYou MUST respond in ${name}.` : ''}`];
+  } catch {
+    return [];
   }
 }
