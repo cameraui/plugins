@@ -19,6 +19,8 @@ export interface OnvifStorageValues {
   url: string;
 }
 
+const RETRY_INTERVAL_MS = 10_000;
+
 interface OnvifCapabilities {
   hasPTZ: boolean;
   hasEvents: boolean;
@@ -43,6 +45,9 @@ export class OnvifCamera {
 
   private reconnectInFlight?: Promise<void>;
   private suppressReconnect = false;
+  private retryTimer?: NodeJS.Timeout;
+  private retrying = false;
+  private destroyed = false;
 
   private readonly logger: LoggerService;
 
@@ -75,12 +80,32 @@ export class OnvifCamera {
   }
 
   private async connect(url: string, username: string, password: string): Promise<void> {
+    this.clearRetry();
+
+    let device: Onvif;
     try {
-      this.device = await this.connectToDevice(url, username, password);
-      this.camera.logger.log('Connected to ONVIF device');
+      device = await this.connectToDevice(url, username, password);
+    } catch (error) {
+      if (this.destroyed) return;
+      if (this.retrying) {
+        this.camera.logger.debug('ONVIF device still unreachable:', error instanceof Error ? error.message : error);
+      } else {
+        this.camera.logger.error(`Failed to connect to ONVIF device, retrying every ${RETRY_INTERVAL_MS / 1000}s:`, error);
+      }
+      this.retrying = true;
+      this.scheduleRetry();
+      return;
+    }
 
-      this.camera.connect();
+    if (this.destroyed) return;
 
+    this.retrying = false;
+    this.device = device;
+    this.camera.logger.log('Connected to ONVIF device');
+
+    this.camera.connect();
+
+    try {
       this.capabilities = await this.detectCapabilities();
       this.camera.logger.debug(
         'ONVIF capabilities:',
@@ -99,8 +124,20 @@ export class OnvifCamera {
         this.updateEventLoop();
       }
     } catch (error) {
-      this.camera.logger.error('Failed to connect to ONVIF device:', error);
+      this.camera.logger.error('Failed to set up ONVIF device:', error);
     }
+  }
+
+  private scheduleRetry(): void {
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      this.connectOnce();
+    }, RETRY_INTERVAL_MS);
+  }
+
+  private clearRetry(): void {
+    clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
   }
 
   private async setupPTZSensor(device: Onvif): Promise<void> {
@@ -121,9 +158,14 @@ export class OnvifCamera {
 
   async reconnect(): Promise<void> {
     if (this.suppressReconnect) return;
-    if (this.reconnectInFlight) return this.reconnectInFlight;
+    if (!this.reconnectInFlight) {
+      this.camera.logger.log('Reconnecting to ONVIF device...');
+    }
+    return this.connectOnce();
+  }
 
-    this.reconnectInFlight = this.doReconnect().finally(() => {
+  private connectOnce(): Promise<void> {
+    this.reconnectInFlight ??= this.doReconnect().finally(() => {
       this.reconnectInFlight = undefined;
     });
     return this.reconnectInFlight;
@@ -141,11 +183,12 @@ export class OnvifCamera {
       this.device.events.stopEventLoop();
     }
 
-    this.camera.logger.log('Reconnecting to ONVIF device...');
     await this.connect(values.url, values.username, values.password);
   }
 
   destroy(): void {
+    this.destroyed = true;
+    this.clearRetry();
     this.stopEventLoop();
     this.logger.log('Camera removed, cleaning up:', this.camera.name);
   }
