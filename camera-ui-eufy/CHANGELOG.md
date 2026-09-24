@@ -1,3 +1,7 @@
+## [2.0.3]
+
+- The HomeBase T9000 is recognized as a HomeBase. It showed up as a camera before, without guard mode, and the cameras behind it did not find their station
+
 ## [2.0.2]
 
 - **Log in again once.** The update brings a fix for a login that eufy's gateway rejected, and the stored session does not carry what that fix needs. A verification code may be asked for. Go to Plugins > Eufy and Log in again.
