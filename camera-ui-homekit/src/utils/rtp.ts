@@ -1,3 +1,8 @@
+/** Budget the clear RTP packet before SRTP adds its authentication tag. */
+export function getVideoRtpMtu(negotiatedMtu: number): number {
+  return Math.min(negotiatedMtu - 10, 1200);
+}
+
 export function getPayloadType(message: Buffer): number {
   return message.readUInt8(1) & 0x7f;
 }

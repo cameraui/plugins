@@ -17,6 +17,7 @@ import { AudioStreamingCodecType, SRTPCryptoSuites } from '../hap.js';
 
 import { placeholderImageFor } from '../utils/placeholder.js';
 import { RtpSplitter } from '../utils/rtp-splitter.js';
+import { getVideoRtpMtu } from '../utils/rtp.js';
 import { createReceiverStats, ntpMiddle32, ntpTimestamp, recordRtpPacket, summarizeReceiverStats } from '../utils/rtp-stats.js';
 import { generateSrtpOptions, generateSsrc, getSessionConfig } from '../utils/srtp.js';
 import { getDurationSeconds } from '../utils/utils.js';
@@ -357,7 +358,9 @@ export class StreamingSession {
       hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
       video: {
         codec: this.videoCodec,
-        mtu: startStreamRequest.video.mtu,
+        // node-av packetizes clear RTP; SRTP adds a 10-byte authentication tag
+        // afterwards. Leave headroom for that tag and tunneled remote viewing.
+        mtu: getVideoRtpMtu(startStreamRequest.video.mtu),
         ssrc: this.videoSsrc,
         payloadType: startStreamRequest.video.pt,
         fps: startStreamRequest.video.fps,

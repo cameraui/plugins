@@ -104,6 +104,10 @@ jobs:
       - name: Lint
         run: npm --prefix ${{ matrix.plugin }} run lint
 
+      - name: Test HomeKit SRTP packet budget
+        if: matrix.plugin == 'camera-ui-homekit'
+        run: node --experimental-strip-types --test camera-ui-homekit/tests/rtp-mtu.test.mjs
+
   go-plugins:
     needs: changes
     if: needs.changes.outputs.go != '[]'
