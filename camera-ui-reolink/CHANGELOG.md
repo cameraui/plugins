@@ -1,3 +1,7 @@
+## [1.2.25]
+
+- Update SDK
+
 ## [1.2.24]
 
 - Update SDK
