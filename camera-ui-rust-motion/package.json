@@ -23,8 +23,8 @@
     "@camera.ui/rust-detector": "~0.0.12"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.112",
-    "@camera.ui/sdk": "^1.3.3",
+    "@camera.ui/cli": "^0.0.113",
+    "@camera.ui/sdk": "^1.3.4",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.2",
     "@typescript-eslint/parser": "^8.70.1",
