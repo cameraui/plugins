@@ -35,6 +35,10 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.recordingSession.updateRecordingConfiguration(configuration);
   }
 
+  public refreshBatteryState(): void {
+    this.recordingSession.refreshBatteryState();
+  }
+
   public refreshPrebuffer(): void {
     this.recordingSession.refreshPrebuffer();
   }
