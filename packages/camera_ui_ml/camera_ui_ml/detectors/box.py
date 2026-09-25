@@ -30,7 +30,7 @@ class BoxDetector(BaseDetector):
         size: tuple[int, int] = (320, 320),
         normalize: Normalize = "unit",
         multiclass: bool = False,
-        apply_nms: bool = False,
+        apply_nms: bool = True,
         threshold: float = 0.5,
     ) -> None:
         super().__init__(manager, logger)

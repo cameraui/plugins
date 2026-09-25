@@ -42,6 +42,7 @@ from .parsing import (
 )
 from .pipeline import prepare_executor, run_prepare
 from .pipelines import (
+    DETECTION_FLOOR,
     detect_clip,
     detect_faces,
     detect_objects,
@@ -107,6 +108,7 @@ __all__ = [
     "decode_image",
     "run_prepare",
     "prepare_executor",
+    "DETECTION_FLOOR",
     "detect_objects",
     "detect_faces",
     "detect_plates",

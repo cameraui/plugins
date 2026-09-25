@@ -115,6 +115,7 @@ def nms(detections: list[RawDetection], iou_threshold: float = 0.45) -> list[Raw
 
     boxes = np.array([d[2] for d in detections], dtype=np.float32)
     scores = np.array([d[1] for d in detections], dtype=np.float32)
+    classes = np.array([d[0] for d in detections])
     order = scores.argsort()[::-1]
 
     keep: list[int] = []
@@ -124,7 +125,8 @@ def nms(detections: list[RawDetection], iou_threshold: float = 0.45) -> list[Raw
         if order.size == 1:
             break
         rest = order[1:]
-        order = rest[_iou(boxes[best], boxes[rest]) <= iou_threshold]
+        same = (_iou(boxes[best], boxes[rest]) > iou_threshold) & (classes[rest] == classes[best])
+        order = rest[~same]
 
     return [detections[i] for i in keep]
 

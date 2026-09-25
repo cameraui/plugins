@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
@@ -43,14 +42,15 @@ if TYPE_CHECKING:
     from .detectors.clip import ClipEncoder
 
 
+DETECTION_FLOOR = 0.25
+
+
 async def detect_objects(
     detector: BoxDetector,
     frame: VideoFrameData,
-    threshold: float | Mapping[str, float] | None = None,
+    threshold: float = DETECTION_FLOOR,
 ) -> ObjectResult:
-    per_label = threshold if isinstance(threshold, Mapping) else None
-    floor = min(per_label.values()) if per_label else cast("float | None", threshold)
-    raw = await detector.detect_frame(frame, floor)
+    raw = await detector.detect_frame(frame, threshold)
     width, height = frame["width"], frame["height"]
     detections: list[TrackedDetection] = [
         {
@@ -60,16 +60,13 @@ async def detect_objects(
         }
         for cid, conf, box in raw
     ]
-    if per_label:
-        min_conf = floor if floor is not None else 0.0
-        detections = [d for d in detections if d["confidence"] >= per_label.get(d["label"], min_conf)]
     return {"detected": len(detections) > 0, "detections": detections}
 
 
 async def detect_faces(
     detector: BoxDetector,
     frames: list[VideoFrameData],
-    threshold: float | None = None,
+    threshold: float = DETECTION_FLOOR,
 ) -> list[FaceResult]:
     tasks = [_detect_faces_one(detector, frame, threshold) for frame in frames]
     return list(await asyncio.gather(*tasks))
@@ -101,7 +98,7 @@ async def detect_plates(
     detector: BoxDetector,
     ocr: PlateOcr,
     frames: list[VideoFrameData],
-    threshold: float | None = None,
+    threshold: float = DETECTION_FLOOR,
 ) -> list[LicensePlateResult]:
     tasks = [_detect_plates_one(detector, ocr, frame, threshold) for frame in frames]
     return list(await asyncio.gather(*tasks))
