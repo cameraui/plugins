@@ -17,7 +17,9 @@ from .detectors import (
     NormalizedDetection,
     OcrResult,
     ParseKind,
+    PersonEmbedder,
     PlateOcr,
+    Segmenter,
 )
 from .geometry import (
     Box,
@@ -46,6 +48,10 @@ from .pipelines import (
     detect_plates,
     embed_face_images,
     embed_faces,
+    embed_person_images,
+    embed_persons,
+    segment_images,
+    segment_objects,
 )
 from .preprocess import (
     crop_rgb,
@@ -75,6 +81,8 @@ __all__ = [
     "ParseKind",
     "Embedder",
     "LandmarkDetector",
+    "PersonEmbedder",
+    "Segmenter",
     "PlateOcr",
     "OcrResult",
     "Box",
@@ -106,4 +114,8 @@ __all__ = [
     "detect_clip",
     "embed_faces",
     "embed_face_images",
+    "embed_persons",
+    "embed_person_images",
+    "segment_objects",
+    "segment_images",
 ]

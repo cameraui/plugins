@@ -25,11 +25,21 @@ from .detectors.box import BoxDetector
 from .detectors.embedder import Embedder
 from .detectors.landmarks import LandmarkDetector
 from .detectors.ocr import PlateOcr
+from .detectors.person import PersonEmbedder
+from .detectors.segmenter import Segmenter
 from .geometry import normalize_box
 from .parsing import FaceLandmarks
 from .preprocess import decode_image, frame_to_rgb
 
 if TYPE_CHECKING:
+    from camera_ui_sdk import (
+        ObjectMask,
+        PersonEmbeddingResult,
+        SegmentationFrame,
+        SegmentationImage,
+        SegmentationResult,
+    )
+
     from .detectors.clip import ClipEncoder
 
 
@@ -178,6 +188,57 @@ async def _embed_crops(
                 result["quality"] = face.score
         results.append(result)
     return results
+
+
+async def embed_persons(
+    embedder: PersonEmbedder,
+    frames: list[VideoFrameData],
+    space: str,
+) -> list[PersonEmbeddingResult]:
+    crops = [
+        frame_to_rgb(bytes(frame["data"]), frame["width"], frame["height"], frame.get("format", "rgb"))
+        for frame in frames
+    ]
+    return [{"embedding": await embedder.embed(crop), "embeddingModel": space} for crop in crops]
+
+
+async def embed_person_images(
+    embedder: PersonEmbedder,
+    images: list[bytes],
+    space: str,
+) -> list[PersonEmbeddingResult]:
+    results: list[PersonEmbeddingResult] = []
+    for data in images:
+        try:
+            crop = decode_image(data)
+        except Exception:
+            crop = np.zeros((0, 0, 3), dtype=np.uint8)
+        results.append({"embedding": await embedder.embed(crop), "embeddingModel": space})
+    return results
+
+
+async def segment_objects(segmenter: Segmenter, frames: list[SegmentationFrame]) -> list[SegmentationResult]:
+    results: list[SegmentationResult] = []
+    for frame in frames:
+        rgb = frame_to_rgb(bytes(frame["data"]), frame["width"], frame["height"], frame.get("format", "rgb"))
+        results.append(_segmentation(await segmenter.segment(rgb, frame["box"])))
+    return results
+
+
+async def segment_images(segmenter: Segmenter, images: list[SegmentationImage]) -> list[SegmentationResult]:
+    results: list[SegmentationResult] = []
+    for item in images:
+        try:
+            rgb = decode_image(bytes(item["image"]))
+        except Exception:
+            results.append({})
+            continue
+        results.append(_segmentation(await segmenter.segment(rgb, item["box"])))
+    return results
+
+
+def _segmentation(mask: ObjectMask | None) -> SegmentationResult:
+    return {"mask": mask} if mask is not None else {}
 
 
 def _stored_face(crop: NDArray, points: list[Point]) -> FaceLandmarks | None:
