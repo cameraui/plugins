@@ -2,19 +2,33 @@ import { Disposable, Subject } from '@camera.ui/sdk';
 import { spawn } from 'node:child_process';
 import { isIPv6 } from 'node:net';
 import { networkInterfaces } from 'node:os';
-import { isRtcp, RtcpPacketConverter, RtcpRrPacket, RtcpSenderInfo, RtcpSrPacket, SrtcpSession, SrtpSession } from 'werift';
+import {
+  isRtcp,
+  PictureLossIndication,
+  RtcpPacketConverter,
+  RtcpPayloadSpecificFeedback,
+  RtcpRrPacket,
+  RtcpSenderInfo,
+  RtcpSrPacket,
+  SrtcpSession,
+  SrtpSession,
+} from 'werift';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../hap.js';
 
 import { placeholderImageFor } from '../utils/placeholder.js';
 import { RtpSplitter } from '../utils/rtp-splitter.js';
+import { createReceiverStats, ntpMiddle32, ntpTimestamp, recordRtpPacket, summarizeReceiverStats } from '../utils/rtp-stats.js';
 import { generateSrtpOptions, generateSsrc, getSessionConfig } from '../utils/srtp.js';
 import { getDurationSeconds } from '../utils/utils.js';
 
-import type { CameraDevice, CameraDeviceSource, LoggerService, RtpSession } from '@camera.ui/sdk';
+import type { CameraDevice, LoggerService, RtpSession } from '@camera.ui/sdk';
 import type { ChildProcess } from 'node:child_process';
 import type { RtpPacket } from 'werift';
 import type { PrepareStreamRequest, StartStreamRequest } from '../hap.js';
+import type { RtpSenderState } from '../utils/rtp-stats.js';
 import type { CameraAccessory } from './accessory.js';
+
+const SRTP_AUTH_TAG_LENGTH = 10;
 
 export class StreamingSession {
   public start: number;
@@ -27,8 +41,12 @@ export class StreamingSession {
   public audioSplitter = new RtpSplitter();
   public videoSplitter = new RtpSplitter();
 
+  public sourceAddress?: string;
+
   private videoSrtcpSession: SrtcpSession;
+  private audioSrtcpSession: SrtcpSession;
   private homekitSrtcpSession: SrtcpSession;
+  private homekitAudioSrtcpSession: SrtcpSession;
 
   private cameraAccessory: CameraAccessory;
   private cameraDevice: CameraDevice;
@@ -42,7 +60,22 @@ export class StreamingSession {
   private lastPacketLoss = 0;
   private packetReceivedSubject = new Subject<void>();
 
-  constructor(cameraAccessory: CameraAccessory, cameraDevice: CameraDevice, prepareStreamRequest: PrepareStreamRequest, start: number) {
+  private videoSenderState?: RtpSenderState;
+  private audioSenderState?: RtpSenderState;
+  private videoReceiverStats = createReceiverStats();
+  private audioReceiverStats = createReceiverStats();
+  private audioClockRate = 48000;
+  private audioNegotiated = '';
+  private audioPacketsPerSecond = 50;
+
+  constructor(
+    cameraAccessory: CameraAccessory,
+    cameraDevice: CameraDevice,
+    prepareStreamRequest: PrepareStreamRequest,
+    start: number,
+    private videoCodec: 'h264' | 'hevc' = 'h264',
+    private opusClock: 'negotiated' | 'fixed' = 'negotiated',
+  ) {
     this.cameraAccessory = cameraAccessory;
     this.cameraDevice = cameraDevice;
     this.prepareStreamRequest = prepareStreamRequest;
@@ -50,11 +83,14 @@ export class StreamingSession {
     this.cameraLogger = cameraDevice.logger;
 
     this.videoSrtcpSession = new SrtcpSession(getSessionConfig(this.videoSrtp));
+    this.audioSrtcpSession = new SrtcpSession(getSessionConfig(this.audioSrtp));
     this.homekitSrtcpSession = new SrtcpSession(getSessionConfig(prepareStreamRequest.video));
+    this.homekitAudioSrtcpSession = new SrtcpSession(getSessionConfig(prepareStreamRequest.audio));
   }
 
   public async prepare(): Promise<void> {
     const { socketType, sourceAddress } = await this.setupAddress();
+    this.sourceAddress = sourceAddress;
 
     await Promise.all([this.audioSplitter.prepare(socketType, sourceAddress), this.videoSplitter.prepare(socketType, sourceAddress)]);
 
@@ -77,19 +113,24 @@ export class StreamingSession {
       this.packetReceivedSubject.next();
 
       if (!isRtpMessage) {
-        this.analyzeRtcpPacket(message);
+        this.analyzeRtcpPacket(message, 'video');
       }
 
       return null;
     });
 
-    this.audioSplitter.addMessageHandler(() => {
+    this.audioSplitter.addMessageHandler(({ message, isRtpMessage }) => {
       if (!firstRtcp) {
         firstRtcp = true;
         logFirstRtcp();
       }
 
       this.packetReceivedSubject.next();
+
+      if (!isRtpMessage) {
+        this.analyzeRtcpPacket(message, 'audio');
+      }
+
       return null;
     });
   }
@@ -115,32 +156,44 @@ export class StreamingSession {
     );
   }
 
-  private setupRtcpSenderReports(session: RtpSession): void {
-    const rtcpInterval = setInterval(async () => {
-      const senderInfo = new RtcpSenderInfo({
-        ntpTimestamp: BigInt(0),
-        packetCount: 0,
-        octetCount: 0,
-        rtpTimestamp: 0,
-      });
+  private setupRtcpSenderReports(session: RtpSession, startStreamRequest: StartStreamRequest): void {
+    const sendSenderReport = async (state: RtpSenderState | undefined, ssrc: number, srtcp: SrtcpSession, splitter: RtpSplitter, port: number): Promise<void> => {
+      if (!state) return;
 
       const senderReport = new RtcpSrPacket({
-        ssrc: this.videoSsrc,
-        senderInfo: senderInfo,
+        ssrc,
+        senderInfo: new RtcpSenderInfo({
+          ntpTimestamp: ntpTimestamp(state.wallclock),
+          rtpTimestamp: state.timestamp,
+          packetCount: state.packets >>> 0,
+          octetCount: state.octets >>> 0,
+        }),
       });
 
-      const encryptedPacket = this.videoSrtcpSession.encrypt(senderReport.serialize());
-
       try {
-        await this.videoSplitter.send(encryptedPacket, {
-          port: this.prepareStreamRequest.video.port,
+        await splitter.send(srtcp.encrypt(senderReport.serialize()), {
+          port,
           address: this.prepareStreamRequest.targetAddress,
         });
       } catch {
         //
       }
-    }, 500);
-    session.addSubscriptions(new Disposable(() => clearInterval(rtcpInterval)));
+    };
+
+    const videoInterval = setInterval(
+      () => sendSenderReport(this.videoSenderState, this.videoSsrc, this.videoSrtcpSession, this.videoSplitter, this.prepareStreamRequest.video.port),
+      Math.max(500, (startStreamRequest.video.rtcp_interval || 0.5) * 1000),
+    );
+    const audioInterval = setInterval(
+      () => sendSenderReport(this.audioSenderState, this.audioSsrc, this.audioSrtcpSession, this.audioSplitter, this.prepareStreamRequest.audio.port),
+      Math.max(500, (startStreamRequest.audio.rtcp_interval || 5) * 1000),
+    );
+    session.addSubscriptions(
+      new Disposable(() => {
+        clearInterval(videoInterval);
+        clearInterval(audioInterval);
+      }),
+    );
   }
 
   public async activate(startStreamRequest: StartStreamRequest): Promise<void> {
@@ -153,14 +206,7 @@ export class StreamingSession {
       return;
     }
 
-    const allowAuto = this.cameraAccessory.cameraStorage.values.adaptiveStreamSource;
-    const remote = this.isLowBandwidth(startStreamRequest);
-    if (remote && allowAuto) {
-      this.cameraLogger.attention('Low bandwidth detected, using adaptive stream source if available');
-    }
-
-    const source = this.selectStreamSource(startStreamRequest, remote);
-    const session = source.createRtpSession({
+    const session = this.cameraDevice.streamSource.createRtpSession({
       audio: true,
       video: true,
       backchannel: true,
@@ -172,7 +218,7 @@ export class StreamingSession {
     });
 
     this.setupInactivityDetection(session);
-    this.setupRtcpSenderReports(session);
+    this.setupRtcpSenderReports(session, startStreamRequest);
 
     // if (remote) {
     //   await PromiseTimeout(firstValueFrom(this.packetReceivedSubject), 3000, undefined, 'Failed to receive initial RTCP packet');
@@ -197,6 +243,7 @@ export class StreamingSession {
       this.stopPlaceholderProcess();
       this.audioSplitter.close();
       this.videoSplitter.close();
+      this.logStreamSummary();
       this.cameraLogger.debug('Stream stopped');
     }
   }
@@ -299,41 +346,21 @@ export class StreamingSession {
     }
   }
 
-  private selectStreamSource(startStreamRequest: StartStreamRequest, remote: boolean): CameraDeviceSource {
-    const { streamSource, highResolutionSource: high, midResolutionSource: mid, lowResolutionSource: low } = this.cameraDevice;
-
-    if (!remote || !this.cameraAccessory.cameraStorage.values.adaptiveStreamSource) {
-      return streamSource;
-    }
-
-    const width = startStreamRequest.video.width;
-    let preference: (CameraDeviceSource | undefined)[];
-    if (width >= 1920) {
-      preference = [high, mid, low];
-    } else if (width >= 1280) {
-      preference = [mid, low, high];
-    } else {
-      preference = [low, mid, high];
-    }
-
-    const selected = preference.find((candidate): candidate is CameraDeviceSource => candidate !== undefined) ?? streamSource;
-
-    if (selected !== streamSource) {
-      this.cameraLogger.debug(`Adaptive source: HomeKit requested ${width}px width, using "${selected.name}" (${selected.role})`);
-    }
-
-    return selected;
-  }
-
   private async run(session: RtpSession, startStreamRequest: StartStreamRequest): Promise<void> {
-    this.listenForAudioPackets(session);
+    const fixedOpusClock = this.opusClock === 'fixed' && startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS;
+    this.audioClockRate = fixedOpusClock ? 48000 : startStreamRequest.audio.sample_rate * 1000;
+    this.audioNegotiated = `${startStreamRequest.audio.codec.toLowerCase()} ${startStreamRequest.audio.sample_rate}k/${startStreamRequest.audio.packet_time}ms`;
+    this.audioPacketsPerSecond = Math.round(1000 / startStreamRequest.audio.packet_time);
+
+    this.listenForAudioPackets(session, startStreamRequest);
     this.listenForVideoPackets(session);
 
     await session.startStream({
       hardware: this.cameraAccessory.cameraStorage.values.useHardwareAcceleration ? 'auto' : undefined,
       video: {
-        codec: 'h264',
-        mtu: startStreamRequest.video.mtu,
+        codec: this.videoCodec,
+        // the muxer sizes clear RTP, SRTP appends its tag afterwards
+        mtu: startStreamRequest.video.mtu - SRTP_AUTH_TAG_LENGTH,
         ssrc: this.videoSsrc,
         payloadType: startStreamRequest.video.pt,
         fps: startStreamRequest.video.fps,
@@ -354,7 +381,7 @@ export class StreamingSession {
     await session.startBackchannel({
       decoderCodec: startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS ? 'libopus' : 'libfdk_aac',
       payloadType: startStreamRequest.audio.pt,
-      clockRate: startStreamRequest.audio.sample_rate * 1000,
+      clockRate: this.audioClockRate,
       channels: startStreamRequest.audio.channel,
       fmtp:
         startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS
@@ -391,6 +418,7 @@ export class StreamingSession {
 
         try {
           const encryptedPacket = videoSrtpSession.encrypt(rtp.payload, rtp.header);
+          this.videoSenderState = recordRtpPacket(this.videoSenderState, rtp, 90000);
           this.videoSplitter.send(encryptedPacket, { port, address }).catch(() => {});
         } catch {
           // Ignore deserialization errors
@@ -399,7 +427,7 @@ export class StreamingSession {
     );
   }
 
-  private listenForAudioPackets(session: RtpSession): void {
+  private listenForAudioPackets(session: RtpSession, startStreamRequest: StartStreamRequest): void {
     let sentAudio = false;
 
     const {
@@ -409,6 +437,17 @@ export class StreamingSession {
 
     const audioSrtpSession = new SrtpSession(getSessionConfig(this.audioSrtp));
 
+    // HAP wants Opus timestamps on an RFC 3550 clock built from the negotiated
+    // sample rate, as an exception to the fixed 48 kHz clock of RFC 7587 that
+    // ffmpeg stamps. Left at 48 kHz the audio timeline runs twice as fast as
+    // real time for HomeKit, and the receiver drags the lip-synced video ever
+    // further behind. The deltas are rescaled rather than counted, so a gap
+    // in the source audio stays a gap instead of stitching the timeline shut.
+    const rewriteTimestamps = startStreamRequest.audio.codec === AudioStreamingCodecType.OPUS && this.opusClock === 'negotiated';
+    const clockScale = (startStreamRequest.audio.sample_rate * 1000) / 48000;
+    let sourceBase: number | undefined;
+    let targetBase: number | undefined;
+
     session.addSubscriptions(
       session.onAudioRtp.subscribe(async (rtp: RtpPacket) => {
         if (!sentAudio) {
@@ -417,7 +456,15 @@ export class StreamingSession {
         }
 
         try {
+          if (rewriteTimestamps) {
+            sourceBase ??= rtp.header.timestamp;
+            targetBase ??= rtp.header.timestamp;
+            const elapsed = (rtp.header.timestamp - sourceBase) >>> 0;
+            rtp.header.timestamp = (targetBase + Math.round(elapsed * clockScale)) >>> 0;
+          }
+
           const encryptedPacket = audioSrtpSession.encrypt(rtp.payload, rtp.header);
+          this.audioSenderState = recordRtpPacket(this.audioSenderState, rtp, this.audioClockRate);
           this.audioSplitter.send(encryptedPacket, { port, address }).catch(() => {});
         } catch {
           // Ignore deserialization errors
@@ -492,28 +539,65 @@ export class StreamingSession {
     return { socketType, sessionID, sourceAddress, targetAddress, addressVersion };
   }
 
-  private isLowBandwidth(startStreamRequest: StartStreamRequest): boolean {
-    return startStreamRequest.audio.packet_time >= 60;
+  private logStreamSummary(): void {
+    if (!this.videoSenderState && !this.audioSenderState) return;
+
+    if (this.videoReceiverStats.rrCount === 0 && this.audioReceiverStats.rrCount === 0) {
+      this.cameraLogger.debug(`Live stream summary (${getDurationSeconds(this.start)}s): no RTCP received from the device, return path may be blocked`);
+      return;
+    }
+
+    const video = summarizeReceiverStats('video', this.videoReceiverStats, this.videoSenderState, 90000, { fps: true });
+    const audio = summarizeReceiverStats(`audio (${this.audioNegotiated})`, this.audioReceiverStats, this.audioSenderState, this.audioClockRate, {
+      expectedPacketsPerSecond: this.audioPacketsPerSecond,
+    });
+    this.cameraLogger.debug(`Live stream summary (${getDurationSeconds(this.start)}s): ${video}; ${audio}`);
   }
 
-  private analyzeRtcpPacket(message: Buffer): void {
-    if (isRtcp(message)) {
-      try {
-        const decryptedRtcp = this.homekitSrtcpSession.decrypt(message);
-        const decryptedRtcpPackets = RtcpPacketConverter.deSerialize(decryptedRtcp);
-        const rrPacket = decryptedRtcpPackets[0];
+  private analyzeRtcpPacket(message: Buffer, kind: 'video' | 'audio'): void {
+    if (!isRtcp(message)) return;
 
-        if (rrPacket instanceof RtcpRrPacket) {
-          for (const report of rrPacket.reports) {
-            if (report.packetsLost > this.lastPacketLoss) {
+    const stats = kind === 'video' ? this.videoReceiverStats : this.audioReceiverStats;
+    const clockRate = kind === 'video' ? 90000 : this.audioClockRate;
+
+    try {
+      const srtcp = kind === 'video' ? this.homekitSrtcpSession : this.homekitAudioSrtcpSession;
+      const packets = RtcpPacketConverter.deSerialize(srtcp.decrypt(message));
+
+      for (const packet of packets) {
+        if (packet instanceof RtcpRrPacket) {
+          for (const report of packet.reports) {
+            stats.rrCount++;
+            stats.packetsLost = Math.max(stats.packetsLost, report.packetsLost);
+            stats.fractionLostMax = Math.max(stats.fractionLostMax, report.fractionLost);
+            stats.jitterSum += report.jitter;
+            stats.jitterCount++;
+            stats.jitterMax = Math.max(stats.jitterMax, report.jitter);
+
+            if (report.lsr > 0) {
+              const rttMs = (((ntpMiddle32(Date.now()) - report.lsr - report.dlsr) >>> 0) / 65536) * 1000;
+              if (rttMs >= 0 && rttMs < 10_000) {
+                stats.rttSumMs += rttMs;
+                stats.rttCount++;
+                stats.rttMaxMs = Math.max(stats.rttMaxMs, rttMs);
+              }
+            }
+
+            if (kind === 'video' && report.packetsLost > this.lastPacketLoss) {
               this.lastPacketLoss = report.packetsLost;
-              this.cameraLogger.debug(`Increased packet loss detected: Total Lost=${report.packetsLost}, Highest Seq=${report.highestSequence}, Jitter=${report.jitter}`);
+              const jitterMs = Math.round((report.jitter / clockRate) * 1000);
+              this.cameraLogger.debug(`Increased packet loss detected: Total Lost=${report.packetsLost}, Highest Seq=${report.highestSequence}, Jitter=${jitterMs}ms`);
             }
           }
+        } else if (packet instanceof RtcpPayloadSpecificFeedback) {
+          if (packet.feedback instanceof PictureLossIndication) {
+            stats.pliCount++;
+            // this.cameraLogger.debug(`Device requested a keyframe (PLI) on the ${kind} stream`);
+          }
         }
-      } catch {
-        // Ignore deserialization errors
       }
+    } catch {
+      // Ignore deserialization errors
     }
   }
 }

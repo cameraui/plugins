@@ -2,7 +2,8 @@ export const NODE = {
   'camera-ui-homekit': 'externals/hap',
   'camera-ui-onvif': 'externals/onvif',
   'camera-ui-ring': 'externals/ring',
-  'camera-ui-eufy': 'externals/eufy-security-client',
+  'camera-ui-eufy': 'externals/eufy-sdk',
+  'camera-ui-apple-llm': '',
   'camera-ui-homeassistant': '',
   'camera-ui-pamdiff': '',
   'camera-ui-rust-motion': '',
@@ -13,6 +14,10 @@ export const NODE = {
 
 export const GO = {
   'camera-ui-reolink': 'externals/reolinkproxy',
+};
+
+export const RUNNERS = {
+  'camera-ui-apple-llm': 'xcode-27',
 };
 
 // CI/publish python; plugins absent here use the default 3.13

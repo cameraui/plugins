@@ -1,10 +1,10 @@
-import { DoorbellTrigger, MotionSensor, Sensor } from '@camera.ui/sdk';
+import { DoorbellTrigger, MotionSensor, Sensor, SensorType, sensorMeta } from '@camera.ui/sdk';
 
 import { applyControlState, controlKindForEntity, createControl } from './controls.js';
-import { entityDisplayName, mapEntity } from './mapping.js';
+import { mapEntity } from './mapping.js';
 import { importOptions } from './types.js';
 
-import type { SensorCategory, SensorMeta, SensorType } from '@camera.ui/sdk';
+import type { SensorCategory, SensorMeta } from '@camera.ui/sdk';
 import type { CommandFn, ControlKind, HaControl } from './controls.js';
 import type { HaState } from './types.js';
 
@@ -37,45 +37,79 @@ export type ImportedSensor =
   | { kind: 'doorbell'; sensor: DoorbellTrigger; lastEventState?: string }
   | { kind: 'control'; controlKind: ControlKind; sensor: HaControl };
 
-export function isImportableEntity(state: HaState): boolean {
-  return controlKindForEntity(state) !== undefined || mapEntity(state) !== undefined;
+export interface ImportSpec {
+  type: SensorType;
+  name: string;
+  nativeId: string;
+  address?: string;
 }
 
-export function createImportedSensor(state: HaState, commandFor: (kind: ControlKind) => CommandFn): ImportedSensor | undefined {
-  const name = entityDisplayName(state);
-  const nativeId = state.entity_id;
+const CONTROL_SENSOR_TYPES: Record<ControlKind, SensorType> = {
+  lock: SensorType.Lock,
+  garage: SensorType.Garage,
+  securitySystem: SensorType.SecuritySystem,
+  switch: SensorType.Switch,
+  light: SensorType.Light,
+  siren: SensorType.Siren,
+};
 
+const CONTROL_KINDS = new Map(Object.entries(CONTROL_SENSOR_TYPES).map(([kind, type]) => [type, kind as ControlKind]));
+
+export function importableSensorType(state: HaState): SensorType | undefined {
   const controlKind = controlKindForEntity(state);
+  if (controlKind) return CONTROL_SENSOR_TYPES[controlKind];
+  const mapping = mapEntity(state);
+  if (!mapping) return undefined;
+  if (mapping.kind === 'motion') return SensorType.Motion;
+  if (mapping.kind === 'doorbell') return SensorType.Doorbell;
+  return mapping.meta.type;
+}
+
+export function createImportedSensor(spec: ImportSpec, commandFor: (kind: ControlKind) => CommandFn): ImportedSensor | undefined {
+  const imported = buildImportedSensor(spec, commandFor);
+  if (imported && spec.address) imported.sensor.setAddress(spec.address);
+  return imported;
+}
+
+function buildImportedSensor({ type, name, nativeId }: ImportSpec, commandFor: (kind: ControlKind) => CommandFn): ImportedSensor | undefined {
+  const controlKind = CONTROL_KINDS.get(type);
   if (controlKind) {
     return { kind: 'control', controlKind, sensor: createControl(controlKind, name, nativeId, commandFor(controlKind)) };
   }
-
-  const mapping = mapEntity(state);
-  if (!mapping) return undefined;
-
-  if (mapping.kind === 'motion') {
+  if (type === SensorType.Motion) {
     return { kind: 'motion', sensor: new MotionSensor(name, importOptions(nativeId)) };
   }
-  if (mapping.kind === 'doorbell') {
+  if (type === SensorType.Doorbell) {
     return { kind: 'doorbell', sensor: new DoorbellTrigger(name, importOptions(nativeId)) };
   }
-  return { kind: mapping.kind, sensor: new ImportedStateSensor(mapping.meta, name, nativeId) };
+
+  const meta = sensorMeta(type);
+  const stateProperty = meta?.semantics?.stateProperty;
+  if (!meta || !stateProperty) return undefined;
+  const kind = meta.properties[stateProperty]?.type === 'number' ? 'measurement' : 'binary';
+  return { kind, sensor: new ImportedStateSensor(meta, name, nativeId) };
+}
+
+export function entityUnavailable(imported: ImportedSensor, state: HaState): boolean {
+  if (state.state === 'unavailable') return true;
+  return state.state === 'unknown' && imported.kind !== 'doorbell';
 }
 
 export function applyEntityState(imported: ImportedSensor, state: HaState, live: boolean): void {
-  if (state.state === 'unavailable' || state.state === 'unknown') return;
-
-  if (imported.kind === 'control') {
-    applyControlState(imported.controlKind, imported.sensor, state);
-    return;
-  }
-
   if (imported.kind === 'doorbell') {
+    if (state.state === 'unavailable') return;
     // an event entity's state is the last-trigger timestamp: only a live change
     // is a press, syncs and reconnect replays just seed the baseline
     const changed = imported.lastEventState !== undefined && imported.lastEventState !== state.state;
     imported.lastEventState = state.state;
-    if (live && changed) imported.sensor.trigger();
+    if (live && changed && state.state !== 'unknown') imported.sensor.trigger();
+    return;
+  }
+
+  if (state.state === 'unavailable' || state.state === 'unknown') return;
+
+  if (imported.kind === 'control') {
+    applyControlState(imported.controlKind, imported.sensor, state);
     return;
   }
 

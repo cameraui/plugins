@@ -55,3 +55,10 @@ def pad_box(box: Box, width: float, height: float, padding: float, min_size: int
     pad_y = h * padding + extra_y
 
     return clamp_box((x1 - pad_x, y1 - pad_y, x2 + pad_x, y2 + pad_y), width, height)
+
+
+def square_box(box: Box, width: float, height: float, padding: float) -> Box:
+    x1, y1, x2, y2 = box
+    side = max(x2 - x1, y2 - y1) * (1.0 + 2.0 * padding)
+    cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+    return clamp_box((cx - side / 2.0, cy - side / 2.0, cx + side / 2.0, cy + side / 2.0), width, height)

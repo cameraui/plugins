@@ -2,31 +2,57 @@ import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 
 import { commandToService } from './controls.js';
 import { HaClient, resolveTarget } from './ha.js';
+import { entityDisplayName } from './mapping.js';
 import { HaNotifier } from './notifier.js';
-import { applyEntityState, createImportedSensor, isImportableEntity } from './sensors.js';
+import { applyEntityState, createImportedSensor, entityUnavailable, importableSensorType } from './sensors.js';
 
-import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice, NotifierInterface, PluginAPI } from '@camera.ui/sdk';
+import type {
+  AdoptedSensor,
+  DeviceStorage,
+  DiscoveredSensor,
+  JsonSchema,
+  LoggerService,
+  Notification,
+  NotifierDevice,
+  NotifierInterface,
+  PluginAPI,
+  Sensor,
+  SensorDiscoveryProvider,
+} from '@camera.ui/sdk';
+import type { CommandFn, ControlKind } from './controls.js';
 import type { ImportedSensor } from './sensors.js';
-import type { HaState, StorageValues } from './types.js';
+import type { HaDevice, HaRegistryEntry, HaRegistryEvent, HaState, StorageValues } from './types.js';
 
-const OWN_ENTITIES_TEMPLATE = `
-{%- set ns = namespace(ids=[]) -%}
-{%- for s in states -%}
-{%- set d = device_id(s.entity_id) -%}
-{%- if d and device_attr(d, 'manufacturer') == 'camera.ui' -%}
-{%- set ns.ids = ns.ids + [s.entity_id] -%}
-{%- endif -%}
-{%- endfor -%}
-{{ ns.ids | tojson }}`;
+const OWN_MANUFACTURER = 'camera.ui';
+const OWN_PLATFORM = 'cameraui';
+const OWN_ID_PREFIX = 'cameraui_';
+const RESYNC_INTERVAL_MS = 15 * 60_000;
 
-export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface {
+type RuntimeSensor = Sensor<any, any, any>;
+
+interface BoundSensor {
+  nativeId: string;
+  imported: ImportedSensor;
+  entityId?: string;
+}
+
+interface Registry {
+  byId: Map<string, HaRegistryEntry>;
+  byEntityId: Map<string, HaRegistryEntry>;
+  areas: Map<string, string>;
+  devices: Map<string, HaDevice>;
+}
+
+type Resolution = 'connected' | 'unavailable' | 'removed' | 'legacy';
+
+export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface, SensorDiscoveryProvider {
   private client?: HaClient;
-  private imported = new Map<string, ImportedSensor>();
-  private skippedLogged = new Set<string>();
-  private ownEntities = new Set<string>();
-  private guardLoaded = false;
-  private syncLogged = false;
-  private resyncTimer?: NodeJS.Timeout;
+  private bound = new Map<string, BoundSensor>();
+  private byEntityId = new Map<string, BoundSensor>();
+  private registry?: Registry;
+  private lastStates = new Map<string, HaState>();
+  private legacyLogged = false;
+  private lastSummary?: string;
   private resyncInterval?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
   private notifier = new HaNotifier(this.storage, this.logger, () => this.client);
@@ -72,10 +98,9 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
         type: 'string',
         key: 'excludeEntities',
         title: 'Excluded Entities',
-        description: 'Comma-separated entity ids that should not be imported.',
+        description: 'Comma-separated entity ids that should not be offered for adoption.',
         required: false,
         store: true,
-        onSet: async () => this.reconnectSoon(),
       },
     ];
   }
@@ -114,6 +139,85 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   async onCameraReleased(): Promise<void> {}
 
+  async onDiscoverSensors(): Promise<DiscoveredSensor[]> {
+    const client = this.client;
+    if (!client?.connected) return [];
+
+    let registry: Registry;
+    try {
+      registry = await this.loadRegistry(client);
+    } catch (error) {
+      this.logger.warn('Could not load the Home Assistant registry, discovery is paused:', error);
+      return [];
+    }
+    const states = await client.fetchStates();
+    this.rememberStates(states);
+
+    const result: DiscoveredSensor[] = [];
+    for (const state of states) {
+      const entityId = state.entity_id;
+      if (this.isOwnEntity(registry, entityId) || this.isExcluded(entityId)) continue;
+      const type = importableSensorType(state);
+      if (!type) continue;
+      const entry = registry.byEntityId.get(entityId);
+      result.push({ id: entry?.id ?? entityId, address: entityId, name: entityDisplayName(state), type, room: areaName(registry, entry) });
+    }
+    return result;
+  }
+
+  async configureAdoptedSensors(records: AdoptedSensor[]): Promise<RuntimeSensor[]> {
+    const sensors: RuntimeSensor[] = [];
+    for (const record of records) {
+      const bound = this.bind(record);
+      if (bound) sensors.push(bound.imported.sensor);
+    }
+    if (this.registry && this.client?.connected) this.resolveAll(this.registry);
+    return sensors;
+  }
+
+  async onSensorAdopted(record: AdoptedSensor): Promise<RuntimeSensor> {
+    const bound = this.bind(record);
+    if (!bound) throw new Error(`No sensor type for "${record.name}" (${record.type})`);
+    if (this.registry && this.client?.connected) this.resolve(bound, this.registry);
+    return bound.imported.sensor;
+  }
+
+  async onSensorUnadopted(nativeId: string): Promise<void> {
+    const bound = this.bound.get(nativeId);
+    if (!bound) return;
+    this.detach(bound);
+    this.bound.delete(nativeId);
+  }
+
+  private bind(record: AdoptedSensor): BoundSensor | undefined {
+    const imported = createImportedSensor({ type: record.type, name: record.name, nativeId: record.nativeId, address: record.address }, (kind) =>
+      this.commandFor(record.nativeId, kind),
+    );
+    if (!imported) {
+      this.logger.warn(`No sensor type for adopted "${record.name}" (${record.type}), it stays disconnected`);
+      return undefined;
+    }
+    imported.sensor.setSourceState('unavailable');
+    const bound: BoundSensor = { nativeId: record.nativeId, imported };
+    this.bound.set(record.nativeId, bound);
+    if (this.storage.values.debug) this.logger.log(`Adopted ${record.address ?? record.nativeId} as ${record.type} sensor`);
+    return bound;
+  }
+
+  private commandFor(nativeId: string, kind: ControlKind): CommandFn {
+    return async (property, value) => {
+      const entityId = this.bound.get(nativeId)?.entityId;
+      if (!entityId || !this.client) return;
+      const call = commandToService(kind, entityId, property, value);
+      if (!call) return;
+      try {
+        await this.client.callService(call.domain, call.service, call.data ?? {});
+      } catch (error) {
+        this.logger.error(`Command for ${entityId} failed:`, error);
+      }
+    };
+  }
+
   private async start(): Promise<void> {
     const target = resolveTarget({ host: this.storage.values.host, token: this.storage.values.token });
     if (!target) {
@@ -121,19 +225,17 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       return;
     }
 
-    this.client = new HaClient(
-      target,
-      this.logger,
-      (_entityId, state) => this.handleStateChanged(state),
-      () => this.syncEntities(),
-    );
+    this.client = new HaClient(target, this.logger, {
+      onStateChanged: (entityId, state) => this.handleStateChanged(entityId, state),
+      onRegistryUpdated: (event) => this.handleRegistryUpdated(event),
+      onConnected: () => this.syncEntities(),
+      onDisconnected: () => this.markAllUnavailable(),
+    });
     this.client.connect();
-    this.resyncInterval = setInterval(() => this.syncEntities(), 15 * 60_000);
+    this.resyncInterval = setInterval(() => this.syncEntities(), RESYNC_INTERVAL_MS);
   }
 
   private async stop(): Promise<void> {
-    if (this.resyncTimer) clearTimeout(this.resyncTimer);
-    this.resyncTimer = undefined;
     if (this.resyncInterval) clearInterval(this.resyncInterval);
     this.resyncInterval = undefined;
     this.client?.stop();
@@ -151,118 +253,182 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   private async syncEntities(): Promise<void> {
     const client = this.client;
-    if (!client) return;
+    if (!client?.connected) return;
 
+    let states: HaState[];
     try {
-      await this.loadOwnEntities(client);
-      const states = await client.fetchStates();
-      await this.notifier.refreshTargets(states);
-
-      const before = new Set(this.imported.keys());
-
-      for (const [entityId, imported] of this.imported) {
-        if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) {
-          this.imported.delete(entityId);
-          this.api.sensorManager.removeSensor(imported.sensor);
-        }
-      }
-
-      for (const state of states) {
-        if (!this.guardLoaded && !this.imported.has(state.entity_id)) continue;
-        this.applyOrImport(state, false);
-      }
-
-      const added = [...this.imported.keys()].filter((entityId) => !before.has(entityId)).length;
-      const removed = [...before].filter((entityId) => !this.imported.has(entityId)).length;
-      if (!this.syncLogged || added > 0 || removed > 0) {
-        this.syncLogged = true;
-        const changes = [added > 0 ? `${added} added` : '', removed > 0 ? `${removed} removed` : ''].filter(Boolean).join(', ');
-        this.logger.log(`Home Assistant sync: ${this.imported.size} entities imported as sensors${changes ? ` (${changes})` : ''}`);
-      }
+      states = await client.fetchStates();
     } catch (error) {
+      this.markAllUnavailable();
       this.logger.error('Home Assistant sync failed:', error);
+      return;
     }
-  }
+    this.rememberStates(states);
+    await this.notifier.refreshTargets(states);
 
-  private async loadOwnEntities(client: HaClient): Promise<void> {
+    let registry: Registry;
     try {
-      const rendered = await client.renderTemplate(OWN_ENTITIES_TEMPLATE);
-      this.ownEntities = new Set(JSON.parse(rendered) as string[]);
-      this.guardLoaded = true;
+      registry = await this.loadRegistry(client);
     } catch (error) {
-      this.guardLoaded = false;
-      this.logger.warn('Could not resolve camera.ui-owned entities, imports are paused:', error);
+      this.markAllUnavailable();
+      this.logger.warn('Could not load the Home Assistant entity registry, adopted entities stay unavailable until the next sync:', error);
+      return;
+    }
+    this.resolveAll(registry);
+  }
+
+  private async loadRegistry(client: HaClient): Promise<Registry> {
+    const [entries, areas, devices] = await Promise.all([client.fetchEntityRegistry(), client.fetchAreaRegistry(), client.fetchDeviceRegistry()]);
+    const registry: Registry = {
+      byId: new Map(entries.map((entry) => [entry.id, entry])),
+      byEntityId: new Map(entries.map((entry) => [entry.entity_id, entry])),
+      areas: new Map(areas.map((area) => [area.area_id, area.name])),
+      devices: new Map(devices.map((device) => [device.id, device])),
+    };
+    this.registry = registry;
+    return registry;
+  }
+
+  private resolveAll(registry: Registry): void {
+    const counts: Record<Resolution, number> = { connected: 0, unavailable: 0, removed: 0, legacy: 0 };
+    for (const bound of this.bound.values()) counts[this.resolve(bound, registry)]++;
+
+    if (counts.legacy > 0 && !this.legacyLogged) {
+      this.legacyLogged = true;
+      // prettier-ignore
+      this.logger.warn(
+        `${counts.legacy} adopted entities still carry the identity from plugin 1.0.11 and are marked as removed. ` +
+        'Delete them on the sensors page and adopt the entities again.',
+      );
+    }
+
+    const summary = `${this.bound.size} adopted entities: ${counts.connected} connected, ${counts.unavailable} unavailable, ${counts.removed + counts.legacy} removed`;
+    if (summary !== this.lastSummary) {
+      this.lastSummary = summary;
+      this.logger.log(`Home Assistant sync: ${summary}`);
     }
   }
 
-  private handleStateChanged(state: HaState | null): void {
-    if (!state) return;
-    const existing = this.imported.get(state.entity_id);
-    if (existing) {
-      if (!this.ownEntities.has(state.entity_id) && !this.isExcluded(state.entity_id)) {
-        applyEntityState(existing, state, true);
+  private resolve(bound: BoundSensor, registry: Registry): Resolution {
+    const sensor = bound.imported.sensor;
+    const entry = registry.byId.get(bound.nativeId);
+    let entityId = entry?.entity_id;
+
+    if (!entry && bound.nativeId.includes('.')) {
+      if (registry.byEntityId.has(bound.nativeId)) {
+        this.detach(bound);
+        sensor.setSourceState('removed');
+        return 'legacy';
       }
+      if (this.lastStates.has(bound.nativeId)) entityId = bound.nativeId;
+    }
+
+    if (!entityId) {
+      this.detach(bound);
+      sensor.setSourceState('removed');
+      return 'removed';
+    }
+
+    this.attach(bound, entityId);
+    const state = this.lastStates.get(entityId);
+    if (!state) {
+      sensor.setSourceState('unavailable');
+      return 'unavailable';
+    }
+    return this.applyState(bound, state, false);
+  }
+
+  private applyState(bound: BoundSensor, state: HaState, live: boolean): 'connected' | 'unavailable' {
+    if (entityUnavailable(bound.imported, state)) {
+      bound.imported.sensor.setSourceState('unavailable');
+      return 'unavailable';
+    }
+    applyEntityState(bound.imported, state, live);
+    bound.imported.sensor.setSourceState('connected');
+    return 'connected';
+  }
+
+  private attach(bound: BoundSensor, entityId: string): void {
+    if (bound.entityId === entityId) return;
+    this.detach(bound);
+    bound.entityId = entityId;
+    this.byEntityId.set(entityId, bound);
+    bound.imported.sensor.setAddress(entityId);
+  }
+
+  private detach(bound: BoundSensor): void {
+    if (bound.entityId && this.byEntityId.get(bound.entityId) === bound) this.byEntityId.delete(bound.entityId);
+    bound.entityId = undefined;
+  }
+
+  private markAllUnavailable(): void {
+    this.lastSummary = undefined;
+    for (const bound of this.bound.values()) {
+      if (bound.entityId) bound.imported.sensor.setSourceState('unavailable');
+    }
+  }
+
+  private handleStateChanged(entityId: string, state: HaState | null): void {
+    const bound = this.byEntityId.get(entityId);
+    if (state && (bound || importableSensorType(state))) {
+      this.lastStates.set(entityId, state);
+    } else if (!state) {
+      this.lastStates.delete(entityId);
+    }
+    if (!bound) return;
+
+    if (!state) {
+      bound.imported.sensor.setSourceState('unavailable');
+      return;
+    }
+    this.applyState(bound, state, true);
+  }
+
+  private handleRegistryUpdated(event: HaRegistryEvent): void {
+    const registry = this.registry;
+
+    if (event.action === 'remove') {
+      const entry = registry?.byEntityId.get(event.entity_id);
+      if (registry && entry) {
+        registry.byEntityId.delete(event.entity_id);
+        registry.byId.delete(entry.id);
+      }
+      const bound = this.byEntityId.get(event.entity_id);
+      if (!bound) return;
+      this.detach(bound);
+      bound.imported.sensor.setSourceState('removed');
+      this.logger.log(`${event.entity_id} was removed in Home Assistant`);
       return;
     }
 
-    if (this.ownEntities.has(state.entity_id) || this.isExcluded(state.entity_id)) return;
-    if (this.guardLoaded && !isImportableEntity(state)) return;
-    this.scheduleResync();
+    if (event.action === 'update' && event.old_entity_id && event.old_entity_id !== event.entity_id) {
+      const entry = registry?.byEntityId.get(event.old_entity_id);
+      if (registry && entry) {
+        registry.byEntityId.delete(event.old_entity_id);
+        entry.entity_id = event.entity_id;
+        registry.byEntityId.set(event.entity_id, entry);
+      }
+      const bound = this.byEntityId.get(event.old_entity_id);
+      if (!bound) return;
+      this.attach(bound, event.entity_id);
+      const state = this.lastStates.get(event.entity_id);
+      if (state) this.applyState(bound, state, false);
+      this.logger.log(`${event.old_entity_id} was renamed to ${event.entity_id} in Home Assistant`);
+    }
   }
 
-  private scheduleResync(): void {
-    if (this.resyncTimer) return;
-    this.resyncTimer = setTimeout(() => {
-      this.resyncTimer = undefined;
-      void this.syncEntities();
-    }, 5000);
+  private rememberStates(states: HaState[]): void {
+    const relevant = states.filter((state) => this.byEntityId.has(state.entity_id) || importableSensorType(state));
+    this.lastStates = new Map(relevant.map((state) => [state.entity_id, state]));
   }
 
-  private applyOrImport(state: HaState, live: boolean): boolean {
-    const entityId = state.entity_id;
-    if (this.ownEntities.has(entityId) || this.isExcluded(entityId)) return false;
-
-    const existing = this.imported.get(entityId);
-    if (existing) {
-      applyEntityState(existing, state, live);
-      return true;
-    }
-
-    const imported = createImportedSensor(state, (kind) => async (property, value) => {
-      const call = commandToService(kind, entityId, property, value);
-      if (!call || !this.client) return;
-      try {
-        await this.client.callService(call.domain, call.service, call.data ?? {});
-      } catch (error) {
-        this.logger.error(`Command for ${entityId} failed:`, error);
-      }
-    });
-    if (!imported) {
-      const deviceClass = state.attributes.device_class;
-      const domain = entityId.split('.')[0];
-      if (deviceClass && (domain === 'binary_sensor' || domain === 'sensor') && !this.skippedLogged.has(deviceClass)) {
-        this.skippedLogged.add(deviceClass);
-        this.logger.debug(`No sensor type for device_class '${deviceClass}', skipping such entities`);
-      }
-      return false;
-    }
-
-    this.imported.set(entityId, imported);
-    this.registerImported(entityId, imported, state);
-    return true;
-  }
-
-  private async registerImported(entityId: string, imported: ImportedSensor, state: HaState): Promise<void> {
-    try {
-      await this.api.sensorManager.addSensor(imported.sensor);
-      if (this.storage.values.debug) {
-        this.logger.log(`Imported ${entityId} as ${imported.sensor.type} sensor`);
-      }
-      applyEntityState(imported, state, false);
-    } catch (error) {
-      this.imported.delete(entityId);
-      this.logger.error(`Failed to register sensor for ${entityId}:`, error);
-    }
+  private isOwnEntity(registry: Registry, entityId: string): boolean {
+    const entry = registry.byEntityId.get(entityId);
+    if (entry?.platform === OWN_PLATFORM) return true;
+    const device = entry?.device_id ? registry.devices.get(entry.device_id) : undefined;
+    if (!device) return false;
+    if (device.manufacturer === OWN_MANUFACTURER) return true;
+    return device.identifiers?.some(([domain, id]) => domain === OWN_PLATFORM || (typeof id === 'string' && id.startsWith(OWN_ID_PREFIX))) ?? false;
   }
 
   private isExcluded(entityId: string): boolean {
@@ -273,4 +439,10 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       .map((item) => item.trim())
       .includes(entityId);
   }
+}
+
+function areaName(registry: Registry, entry: HaRegistryEntry | undefined): string | undefined {
+  if (!entry) return undefined;
+  const areaId = entry.area_id ?? (entry.device_id ? registry.devices.get(entry.device_id)?.area_id : undefined);
+  return areaId ? registry.areas.get(areaId) : undefined;
 }

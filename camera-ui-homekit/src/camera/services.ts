@@ -8,12 +8,12 @@ import type { Accessory, CharacteristicValue } from '../hap.js';
 
 export class CameraServices extends Subscribed {
   public services: Service[] = [];
+  public motionService: Service;
 
   private accessory: Accessory;
   private cameraDevice: CameraDevice;
   private cameraLogger: CameraDevice['logger'];
 
-  private motionService: Service;
   private doorbellService?: Service;
   private batteryService?: Service;
 

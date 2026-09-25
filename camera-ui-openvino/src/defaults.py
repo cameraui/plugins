@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from camera_ui_ml import Normalize
 from camera_ui_sdk import DetectionLabel
 
 # flipped to True by the legacy sibling plugin's sync script
@@ -46,11 +49,36 @@ CLIP_TEXT_MODELS: dict[str, int] = {
     "clip-vit-base-patch32-datacomp-text": 77,
 }
 
-# value = model input size in px
-FACE_EMBEDDER_MODELS: dict[str, int] = {
-    "facenet-inceptionresnetv1-512": 160,
-    "arcface-r100-512": 112,
+
+@dataclass(frozen=True)
+class FaceEmbedderSpec:
+    """How a recognition head wants its crop. The key it is stored under names
+    the vector space, which is what the NVR keys enrolled faces by, so it
+    changes whenever the preprocessing changes, not only the weights."""
+
+    model: str
+    size: int
+    normalize: Normalize
+    aligned: bool
+
+
+FACE_EMBEDDERS: dict[str, FaceEmbedderSpec] = {
+    # the suffixes name the crop, not the weights: both heads see a padded face
+    # box now, where they used to get the detector's tight box, and that alone
+    # makes the vectors incomparable to the ones already stored
+    "facenet-inceptionresnetv1-512-padded": FaceEmbedderSpec(
+        "facenet-inceptionresnetv1-512", 160, "facenet", False
+    ),
+    "arcface-r100-512-aligned": FaceEmbedderSpec("arcface-r100-512", 112, "arcface", True),
 }
+
+FACE_EMBEDDER_MODELS: list[str] = list(FACE_EMBEDDERS)
+
+FACE_LANDMARK_MODEL = "yunet-256-face-landmarks"
+FACE_LANDMARK_INPUT_SIZE = 256
+
+# the padded face crop the server sends; the landmark model takes it from there
+FACE_EMBEDDER_CROP_SIZE = 256
 
 OCR_MODELS: list[str] = [
     "cct-xs-v2-global",
@@ -60,7 +88,7 @@ OCR_MODELS: list[str] = [
 DEFAULT_OBJECT_MODEL = "yolo-v9-s-320"
 
 DEFAULT_FACE_DETECTOR = "yolo-v9-s-320-faces"
-DEFAULT_FACE_EMBEDDER = "facenet-inceptionresnetv1-512"
+DEFAULT_FACE_EMBEDDER = "arcface-r100-512-aligned"
 
 DEFAULT_LPD_DETECTOR = "yolo-v9-t-384-license-plates"
 DEFAULT_OCR = "cct-xs-v2-global"
@@ -68,8 +96,6 @@ DEFAULT_OCR = "cct-xs-v2-global"
 DEFAULT_CLIP_VISION = "clip-vit-base-patch32-vision"
 DEFAULT_CLIP_TEXT = "clip-vit-base-patch32-text"
 DEFAULT_CLIP_EMBEDDER = "clip-vit-base-patch32"
-
-FACE_EMBEDDER_INPUT_SIZE = 160
 
 OCR_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 OCR_PAD_CHAR = "_"
@@ -88,7 +114,8 @@ DEFAULT_OPENVINO_DEVICE = "Default"
 # some IRs ship with dynamic dims, but the runtime always feeds exactly these
 # shapes (batch 1, fixed size); pinning them makes the models NPU-compilable
 STATIC_INPUT_SHAPES: dict[str, list[list[int]]] = {
-    **{name: [[1, 3, size, size]] for name, size in FACE_EMBEDDER_MODELS.items()},
+    **{spec.model: [[1, 3, spec.size, spec.size]] for spec in FACE_EMBEDDERS.values()},
+    FACE_LANDMARK_MODEL: [[1, 3, FACE_LANDMARK_INPUT_SIZE, FACE_LANDMARK_INPUT_SIZE]],
     **{name: [[1, OCR_INPUT_HEIGHT, OCR_INPUT_WIDTH, 3]] for name in OCR_MODELS},
     **{name: [[1, 3, size, size]] for name, size in CLIP_VISION_MODELS.items()},
     **{name: [[1, tokens], [1, tokens]] for name, tokens in CLIP_TEXT_MODELS.items()},

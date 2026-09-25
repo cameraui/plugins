@@ -1,3 +1,19 @@
+## [1.2.10]
+
+- Updated camera.ui engine
+
+## [1.2.9]
+
+- Updated camera.ui engine
+
+## [1.2.8]
+
+- Minor bugfixes
+
+## [1.2.7]
+
+- Updated deps
+
 ## [1.2.5]
 
 - Object detection follows the per-type confidence values (person, vehicle, animal) from the camera settings

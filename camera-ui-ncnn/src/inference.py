@@ -43,7 +43,8 @@ class NcnnBackend(InferenceBackend):
     def adapt(self, image: NDArray, spec: InputSpec) -> Sequence[Any]:
         # to_tensor yields a batched tensor; ncnn wants a single float32 Mat (no batch).
         tensor = np.ascontiguousarray(to_tensor(image, spec)[0].astype(np.float32))
-        return [ncnn.Mat(tensor)]
+        # a Mat only points at the array's memory, the array rides along until the extractor ran
+        return [(ncnn.Mat(tensor), tensor)]
 
     async def infer(self, inputs: Sequence[Any]) -> Outputs:
         return await asyncio.get_event_loop().run_in_executor(self._executor, self._run, list(inputs))
@@ -53,7 +54,7 @@ class NcnnBackend(InferenceBackend):
 
     def _run(self, inputs: list[Any]) -> Outputs:
         extractor = self._net.create_extractor()
-        for name, mat in zip(self._input_names, inputs, strict=False):
+        for name, (mat, _array) in zip(self._input_names, inputs, strict=False):
             extractor.input(name, mat)
         outputs: list[NDArray] = []
         for name in self._output_names:

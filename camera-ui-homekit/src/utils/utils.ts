@@ -64,16 +64,18 @@ export class Subscribed {
 
 export function filterBindAddresses(addresses: string[], logger: LoggerService): string[] {
   const local = new Set<string>();
+  const found: string[] = [];
   for (const infos of Object.values(networkInterfaces())) {
     for (const info of infos ?? []) {
       local.add(info.address);
+      if (!info.internal && !info.address.startsWith('fe80:')) found.push(info.address);
     }
   }
 
   const usable = addresses.filter((address) => local.has(address));
   const dropped = addresses.filter((address) => !local.has(address));
   if (dropped.length) {
-    logger.warn(`Ignoring configured server address(es) not present on this machine: ${dropped.join(', ')}`);
+    logger.warn(`Ignoring configured server address(es) not present on this machine: ${dropped.join(', ')} (found: ${found.join(', ') || 'none'})`);
   }
   return usable;
 }

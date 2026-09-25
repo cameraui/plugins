@@ -7,9 +7,10 @@
 [submodule "externals/hap"]
 	path = externals/hap
 	url = https://github.com/seydx/HAP-NodeJS.git
-[submodule "externals/eufy-security-client"]
-	path = externals/eufy-security-client
-	url = https://github.com/seydx/eufy-security-client.git
 [submodule "externals/reolinkproxy"]
 	path = externals/reolinkproxy
 	url = https://github.com/seydx/reolinkproxy.git
+[submodule "externals/eufy-sdk"]
+	path = externals/eufy-sdk
+	url = https://github.com/seydx/eufy-sdk.git
+	branch = beta-0.2.0

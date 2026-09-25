@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sdk "github.com/cameraui/sdk/go"
@@ -19,7 +20,14 @@ type reolinkCamera struct {
 	settings cameraSettings
 	logger   *sdk.Logger
 
+	bridge       *bridge.Bridge
+	mainsPowered atomic.Bool
+
+	activeMu  sync.Mutex
+	camMu     sync.RWMutex
 	bridgeCam *bridge.Camera
+
+	watchDisabled *sdk.Disposable
 
 	motionSensor  *sdk.MotionSensor
 	objectSensor  *sdk.ObjectSensor
@@ -73,6 +81,41 @@ func (p *ReolinkPlugin) initializeCamera(dev *sdk.CameraDevice) {
 }
 
 func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
+	c.bridge = b
+	c.mainsPowered.Store(c.settings.MainsPowered)
+	c.watchMainsPowered()
+	if err := c.dev.Implement(&cameraImplementation{cam: c}); err != nil {
+		return err
+	}
+	if err := c.setupSensors(); err != nil {
+		return err
+	}
+
+	c.watchDisabled = c.dev.OnPropertyChange("disabled").Subscribe(func(e sdk.PropertyChangeEvent) {
+		if e.NewCamera.Disabled {
+			c.deactivate(b)
+			return
+		}
+		if err := c.activate(b); err != nil {
+			c.logger.Error("Failed to connect the camera:", err)
+		}
+	})
+
+	if c.dev.Disabled() {
+		c.logger.Log("Camera is disabled, staying disconnected")
+		return nil
+	}
+	return c.activate(b)
+}
+
+func (c *reolinkCamera) activate(b *bridge.Bridge) error {
+	c.activeMu.Lock()
+	defer c.activeMu.Unlock()
+
+	if _, err := c.cam(); err == nil {
+		return nil
+	}
+
 	liveCatchUp := time.Duration(c.settings.LiveCatchUpSeconds) * time.Second
 	bridgeCam, err := b.AddCamera(bridge.CameraConfig{
 		Name:           c.dev.ID(),
@@ -85,32 +128,96 @@ func (c *reolinkCamera) initialize(b *bridge.Bridge) error {
 		Streams:        c.settings.Streams,
 		IdleDisconnect: true,
 		BatteryCamera:  c.settings.BatteryCamera,
+		MainsPowered:   c.mainsPowered.Load(),
 		AudioHints:     c.loadAudioHints(),
 		LiveCatchUp:    &liveCatchUp,
 	})
 	if err != nil {
 		return err
 	}
+	c.camMu.Lock()
 	c.bridgeCam = bridgeCam
-	c.watchLiveCatchUp()
+	c.camMu.Unlock()
 
-	if err := c.dev.Implement(&cameraImplementation{cam: c}); err != nil {
-		return err
-	}
-	if err := c.setupSensors(); err != nil {
-		return err
-	}
-	c.subscribeEvents()
+	c.watchLiveCatchUp(bridgeCam)
+	c.subscribeEvents(bridgeCam)
 	return nil
 }
 
-func (c *reolinkCamera) watchLiveCatchUp() {
+func (c *reolinkCamera) deactivate(b *bridge.Bridge) {
+	c.activeMu.Lock()
+	defer c.activeMu.Unlock()
+
+	c.camMu.Lock()
+	if c.bridgeCam == nil {
+		c.camMu.Unlock()
+		return
+	}
+	c.bridgeCam = nil
+	c.camMu.Unlock()
+
+	c.connMu.Lock()
+	if c.disconnectTimer != nil {
+		c.disconnectTimer.Stop()
+		c.disconnectTimer = nil
+	}
+	c.connGen++
+	wasReported := c.connReported
+	c.connReported = false
+	c.connMu.Unlock()
+
+	if err := b.RemoveCamera(c.dev.ID()); err != nil {
+		c.logger.Warn("Failed to remove bridge camera:", err)
+	}
+	if wasReported {
+		_ = c.dev.Disconnect()
+	}
+}
+
+// cam returns the camera connection, or an error while the camera is disabled.
+func (c *reolinkCamera) cam() (*bridge.Camera, error) {
+	c.camMu.RLock()
+	defer c.camMu.RUnlock()
+	if c.bridgeCam == nil {
+		return nil, fmt.Errorf("camera %s is disabled", c.dev.Name())
+	}
+	return c.bridgeCam, nil
+}
+
+func (c *reolinkCamera) watchMainsPowered() {
+	schema := mainsPoweredSchema(!c.settings.BatteryCamera, func(newValue, _ any) any {
+		powered := truthy(newValue, false)
+		if powered == c.mainsPowered.Swap(powered) {
+			return newValue
+		}
+		if powered {
+			c.logger.Log("Camera is permanently powered, keeping the connection open")
+		} else {
+			c.logger.Log("Camera runs on its battery, letting it sleep between events")
+		}
+		go func() {
+			c.deactivate(c.bridge)
+			if c.dev.Disabled() {
+				return
+			}
+			if err := c.activate(c.bridge); err != nil {
+				c.logger.Error("Failed to reconnect the camera:", err)
+			}
+		}()
+		return newValue
+	})
+	if err := c.dev.Storage().ChangeSchema(storageKeyMainsPowered, &schema); err != nil {
+		c.logger.Warn("Failed to make the power setting live:", err)
+	}
+}
+
+func (c *reolinkCamera) watchLiveCatchUp(bridgeCam *bridge.Camera) {
 	schema := liveCatchUpSchema(func(newValue, _ any) any {
 		seconds, ok := toInt(newValue)
 		if !ok {
 			return newValue
 		}
-		c.bridgeCam.SetLiveCatchUp(time.Duration(seconds) * time.Second)
+		bridgeCam.SetLiveCatchUp(time.Duration(seconds) * time.Second)
 		c.logger.Log("Catch up to live set to", seconds, "seconds")
 		return newValue
 	})
@@ -120,18 +227,10 @@ func (c *reolinkCamera) watchLiveCatchUp() {
 }
 
 func (c *reolinkCamera) release(b *bridge.Bridge) {
-	c.connMu.Lock()
-	if c.disconnectTimer != nil {
-		c.disconnectTimer.Stop()
-		c.disconnectTimer = nil
+	if c.watchDisabled != nil {
+		c.watchDisabled.Dispose()
 	}
-	c.connGen++
-	c.connReported = false
-	c.connMu.Unlock()
-
-	if err := b.RemoveCamera(c.dev.ID()); err != nil {
-		c.logger.Warn("Failed to remove bridge camera:", err)
-	}
+	c.deactivate(b)
 }
 
 func (c *reolinkCamera) setupSensors() error {
@@ -182,14 +281,14 @@ func (c *reolinkCamera) setupSensors() error {
 	return nil
 }
 
-func (c *reolinkCamera) subscribeEvents() {
-	c.bridgeCam.OnMotion(func(event bridge.MotionEvent) {
+func (c *reolinkCamera) subscribeEvents(bridgeCam *bridge.Camera) {
+	bridgeCam.OnMotion(func(event bridge.MotionEvent) {
 		c.motionSensor.ReportDetections(event.Active, nil)
 		c.reportObjects(event)
 		c.reportSounds(event)
 	})
 
-	c.bridgeCam.OnDoorbell(func() {
+	bridgeCam.OnDoorbell(func() {
 		c.doorbellOnce.Do(func() {
 			// Fallback for cameras whose Support report missed the doorbell:
 			// add the sensor the first time a visitor press actually arrives.
@@ -205,7 +304,7 @@ func (c *reolinkCamera) subscribeEvents() {
 		}
 	})
 
-	c.bridgeCam.OnBattery(func(state bridge.BatteryState) {
+	bridgeCam.OnBattery(func(state bridge.BatteryState) {
 		if c.batterySensor == nil {
 			return
 		}
@@ -221,7 +320,7 @@ func (c *reolinkCamera) subscribeEvents() {
 		c.batterySensor.SetLow(state.LowPower)
 	})
 
-	c.bridgeCam.OnFloodlight(func(on bool) {
+	bridgeCam.OnFloodlight(func(on bool) {
 		if c.spotlight == nil {
 			return
 		}
@@ -232,16 +331,16 @@ func (c *reolinkCamera) subscribeEvents() {
 		}
 	})
 
-	c.bridgeCam.OnSleep(func(sleeping bool) {
+	bridgeCam.OnSleep(func(sleeping bool) {
 		c.connMu.Lock()
 		c.sleeping = sleeping
 		c.connMu.Unlock()
 		c.logger.Log("Camera sleep state:", sleeping)
 	})
 
-	c.bridgeCam.OnAudioHint(c.storeAudioHint)
+	bridgeCam.OnAudioHint(c.storeAudioHint)
 
-	c.bridgeCam.OnConnection(c.handleConnection)
+	bridgeCam.OnConnection(c.handleConnection)
 }
 
 // loadAudioHints returns what earlier runs observed per stream profile, so a
@@ -418,13 +517,21 @@ func (i *cameraImplementation) StreamUrl(sourceID string) (string, error) {
 	if source == nil {
 		return "", fmt.Errorf("unknown source %q", sourceID)
 	}
-	return i.cam.bridgeCam.TwoWayURL(source.Name()), nil
+	cam, err := i.cam.cam()
+	if err != nil {
+		return "", err
+	}
+	return cam.TwoWayURL(source.Name()), nil
 }
 
 func (i *cameraImplementation) Snapshot(_ string, _ bool) ([]byte, error) {
+	cam, err := i.cam.cam()
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), snapshotTimeout)
 	defer cancel()
-	return i.cam.bridgeCam.Snapshot(ctx)
+	return cam.Snapshot(ctx)
 }
 
 const (
@@ -445,6 +552,7 @@ const (
 	storageKeyChannel       = "channel"
 	storageKeyAudioHints    = "audioHints"
 	storageKeyLiveCatchUp   = "liveCatchUpSeconds"
+	storageKeyMainsPowered  = "mainsPowered"
 )
 
 // defaultLiveCatchUpSeconds matches the bridge default and is written for
@@ -461,6 +569,20 @@ func liveCatchUpSchema(onSet func(newValue, oldValue any) any) sdk.JsonSchema {
 		DefaultValue: defaultLiveCatchUpSeconds,
 		Minimum:      sdk.Float64(0),
 		Maximum:      sdk.Float64(60),
+		Store:        &storeTrue,
+		OnSet:        onSet,
+	}
+}
+
+func mainsPoweredSchema(hidden bool, onSet func(newValue, oldValue any) any) sdk.JsonSchema {
+	storeTrue := true
+	return sdk.JsonSchema{
+		Type:         sdk.JsonSchemaTypeBoolean,
+		Key:          storageKeyMainsPowered,
+		Title:        "Permanently Powered",
+		Description:  "Battery cameras are left alone between events so they can sleep, and report what they see by push. Turn this on if the camera is wired permanently, for example a doorbell on its bell transformer. It then keeps a connection like a mains camera, which reacts faster and opens the live view quicker, but would empty a battery within a day.",
+		DefaultValue: false,
+		Hidden:       hidden,
 		Store:        &storeTrue,
 		OnSet:        onSet,
 	}
@@ -580,6 +702,7 @@ func ensureStorageSchemas(storage *sdk.DeviceStorage) {
 			Store:  &storeTrue,
 		},
 		liveCatchUpSchema(nil),
+		mainsPoweredSchema(!boolValue(storage, storageKeyBatteryCamera), nil),
 	})
 }
 
@@ -602,6 +725,7 @@ func persistSettings(storage *sdk.DeviceStorage, settings cameraSettings) error 
 		storageKeyHasAI:         settings.HasAI,
 		storageKeyChannel:       settings.Channel,
 		storageKeyLiveCatchUp:   settings.LiveCatchUpSeconds,
+		storageKeyMainsPowered:  settings.MainsPowered,
 	}
 	for key, value := range values {
 		if err := storage.SetValue(key, value); err != nil {
@@ -627,6 +751,7 @@ func loadSettings(storage *sdk.DeviceStorage) cameraSettings {
 		PTZZoom:       boolValue(storage, storageKeyPTZZoom),
 		HasDoorbell:   boolValue(storage, storageKeyHasDoorbell),
 		HasAI:         boolValue(storage, storageKeyHasAI),
+		MainsPowered:  boolValue(storage, storageKeyMainsPowered),
 	}
 	if v, ok := toInt(storage.GetValue(storageKeyChannel)); ok {
 		settings.Channel = v

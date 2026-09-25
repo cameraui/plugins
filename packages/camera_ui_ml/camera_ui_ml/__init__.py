@@ -13,6 +13,7 @@ from .detectors import (
     BaseDetector,
     BoxDetector,
     Embedder,
+    LandmarkDetector,
     NormalizedDetection,
     OcrResult,
     ParseKind,
@@ -38,7 +39,14 @@ from .parsing import (
     parse_yolov9,
 )
 from .pipeline import prepare_executor, run_prepare
-from .pipelines import detect_clip, detect_faces, detect_objects, detect_plates
+from .pipelines import (
+    detect_clip,
+    detect_faces,
+    detect_objects,
+    detect_plates,
+    embed_face_images,
+    embed_faces,
+)
 from .preprocess import (
     crop_rgb,
     decode_image,
@@ -66,6 +74,7 @@ __all__ = [
     "NormalizedDetection",
     "ParseKind",
     "Embedder",
+    "LandmarkDetector",
     "PlateOcr",
     "OcrResult",
     "Box",
@@ -95,4 +104,6 @@ __all__ = [
     "detect_plates",
     "reset_stored_settings",
     "detect_clip",
+    "embed_faces",
+    "embed_face_images",
 ]

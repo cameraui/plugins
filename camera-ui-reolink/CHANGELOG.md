@@ -1,3 +1,59 @@
+## [1.2.25]
+
+- Update SDK
+
+## [1.2.24]
+
+- Update SDK
+
+## [1.2.23]
+
+- A camera added by IP no longer stays on the slow UID connection after a hiccup. If the direct connection failed once, the camera switched to its UID and kept using it for hours, with choppy video and dropped frames. When it reconnects, it now tries the direct connection again, at most every five minutes.
+
+## [1.2.22]
+
+- Updated camera.ui engine
+
+## [1.2.21]
+
+- Changing a camera between H.264 and H.265 no longer crashes the plugin. The stream now renegotiates with the new codec on the fly.
+
+## [1.2.20]
+
+- Minor bugfixes
+
+## [1.2.19]
+
+- Updated camera.ui engine and deps
+
+## [1.2.18]
+
+- Updated camera.ui engine and deps
+
+## [1.2.17]
+
+- Updated camera.ui engine and deps
+
+## [1.2.16]
+
+- Adding a slow-waking battery camera no longer gives up mid-attempt. The adoption allowed exactly as much time as the wake-up needs, so it could abort a moment before the camera answered
+
+## [1.2.15]
+
+- Battery-only cameras can now be added by IP address alone. The UID fallback needed the UID to be known, which it is not when a camera is typed in by hand; the camera is now asked for its UID over the same port the Reolink app uses, and the answer is saved with the camera
+- Waking a sleeping camera gets the time it needs. A battery camera answers only after about ten seconds of knocking, and the connection attempt gave up just before that
+
+## [1.2.14]
+
+- Battery-only cameras can be added again. A camera that is asleep keeps no connection port open, so adopting one failed with "connection refused" even though the Reolink app reached it. The plugin now falls back to the camera's UID connection
+
+## [1.2.13]
+
+- Battery cameras and doorbells no longer lose their charge within a day. The plugin kept a connection to the camera open around the clock, which is what stops a battery model from sleeping. It now hands the camera a push address and lets the connection go; motion, doorbell presses and the battery level arrive on their own. Cameras whose firmware cannot push say so in the log and keep the old behavior
+- The connection to a battery camera is only dropped once the camera has actually reached camera.ui with a push. If it cannot, the connection stays up and the log says so, so a camera in an odd network setup never ends up silent
+- New camera setting "Permanently Powered" for battery models. A doorbell wired to its bell transformer has no reason to sleep, so it keeps a connection like a mains camera and reacts faster. It takes effect right away
+- A camera you disabled is now really disabled. Disabling only stopped the recording and streaming side, the plugin stayed logged in to the camera and kept asking it for events. Enabling and disabling takes effect right away
+
 ## [1.2.12]
 
 - Updated camera.ui engine and deps

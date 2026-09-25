@@ -1,3 +1,3 @@
 export default {
-  exclude: ['typescript', 'eslint', 'eufy-security-client'],
+  exclude: ['typescript', 'eslint', '@mega-yfue/eufy-sdk'],
 };

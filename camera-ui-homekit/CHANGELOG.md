@@ -1,3 +1,36 @@
+## [1.3.2]
+
+- **Remote live view stays clean.** Encrypted video packets could end up larger than the size the Home app asked for, so the picture got more and more corrupted when watching away from home.
+- The bridge no longer reports "No server addresses are set" when an address is set but missing on this machine. The warning above it names the ignored address and the addresses the plugin does find.
+
+## [1.3.1]
+
+- **A camera that changes its encoder is picked up again.** Switching a camera's main stream from H.264 to H.265 while camera.ui was running left HomeKit recording an H.265 stream labelled as H.264, which Apple dropped after three fragments. The accessory now follows the change.
+- **Clean audio in local live view on iOS 27.** HEVC cameras on the Secure Video path could sound distorted when watched at home. Audio now uses the sample rate Apple expects there, remote view was not affected.
+
+## [1.3.0]
+
+- **HomeKit Secure Video for iOS 27.** Cameras with an HEVC main stream use Apple's new secure video services: local and remote live view, recording and two-way audio run on the camera's native HEVC stream without transcoding, so 4K cameras no longer cost a CPU core each. Needs iOS 27 / tvOS 27 on the viewer and the home hub. Remote view is HEVC only on Apple's side, H.264 cameras stay on the classic path.
+- **Force legacy path.** A per-camera switch in the advanced settings keeps a camera on the classic HomeKit services, for homes that stay on iOS 26 or older.
+- A failed publish no longer drops the camera's pairing. Before, a startup error during publishing removed the accessory including its pairing, so the camera had to be added to Home again.
+
+## [1.2.11]
+
+- Updated camera.ui engine
+
+## [1.2.10]
+
+- Bugfixes and improvements
+
+## [1.2.9]
+
+- Bugfixes and improvements
+
+## [1.2.8]
+
+- When a stream ends, one line reports what the Apple device measured: packet loss, jitter, round trip time and keyframe requests. If no reports arrived, the line says so.
+- Minor bugfixes and improvements
+
 ## [1.2.7]
 
 - Updated camera.ui engine and deps

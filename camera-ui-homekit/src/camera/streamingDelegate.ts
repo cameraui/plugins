@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { StreamRequestTypes } from '../hap.js';
 
-import { noSnapshotImage, placeholderImageFor } from '../utils/placeholder.js';
+import { captureSnapshot } from '../utils/placeholder.js';
 import { getDurationSeconds } from '../utils/utils.js';
 import { StreamingSession } from './streamingSession.js';
 
@@ -32,34 +31,9 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   }
 
   public handleSnapshotRequest(_request: SnapshotRequest, callback: SnapshotRequestCallback): void {
-    const placeholder = placeholderImageFor(this.cameraDevice);
-    if (placeholder) {
-      try {
-        callback(undefined, readFileSync(placeholder));
-      } catch (error: any) {
-        callback(error);
-      }
-      return;
-    }
-
-    const source = this.cameraDevice.snapshotSource ?? this.cameraDevice.streamSource;
-
-    source
-      .snapshot(true)
-      .then((snapshot) => {
-        let snapshotBuffer = snapshot ? Buffer.from(snapshot) : undefined;
-        if (!snapshotBuffer || snapshotBuffer.length === 0) {
-          snapshotBuffer = readFileSync(noSnapshotImage);
-        }
-        callback(undefined, snapshotBuffer);
-      })
-      .catch((error: any) => {
-        try {
-          callback(undefined, readFileSync(noSnapshotImage));
-        } catch {
-          callback(error);
-        }
-      });
+    captureSnapshot(this.cameraDevice)
+      .then((snapshot) => callback(undefined, snapshot))
+      .catch((error: any) => callback(error));
   }
 
   public async stopAllSessions(): Promise<void> {
@@ -72,7 +46,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     const start = Date.now();
     const session = new StreamingSession(this.cameraAccessory, this.cameraDevice, request, start);
 
-    this.cameraLogger.debug('Preparing stream...');
+    this.cameraLogger.debug('[RTP] Preparing stream...');
 
     session
       .prepare()
@@ -83,11 +57,12 @@ export class StreamingDelegate implements CameraStreamingDelegate {
           return;
         }
 
-        this.cameraLogger.debug(`Stream prepared (${getDurationSeconds(start)}s)`);
+        this.cameraLogger.debug(`[RTP] Stream prepared (${getDurationSeconds(start)}s)`);
 
         this.sessions[request.sessionID] = session;
 
         callback(undefined, {
+          addressOverride: session.sourceAddress,
           audio: {
             port: session.audioSplitter.port!,
             ssrc: session.audioSsrc,
@@ -103,7 +78,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
         });
       })
       .catch(async (error: any) => {
-        this.cameraLogger.error(`Failed to prepare stream (${getDurationSeconds(start)}s)`, error);
+        this.cameraLogger.error(`[RTP] Failed to prepare stream (${getDurationSeconds(start)}s)`, error);
         await session.stop();
         callback(error);
       });
@@ -120,7 +95,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     }
 
     if (requestType === StreamRequestTypes.START) {
-      this.cameraLogger.debug(`Activating stream (${getDurationSeconds(session.start)}s)`);
+      this.cameraLogger.debug(`[RTP] Activating stream (${getDurationSeconds(session.start)}s)`);
 
       session
         .activate(request)
@@ -131,11 +106,11 @@ export class StreamingDelegate implements CameraStreamingDelegate {
             return;
           }
 
-          this.cameraLogger.log(`Streaming activated (${getDurationSeconds(session.start)}s)`);
+          this.cameraLogger.log(`[RTP] Streaming activated (${getDurationSeconds(session.start)}s)`);
           callback();
         })
         .catch(async (error: any) => {
-          this.cameraLogger.error('Failed to activate stream', error);
+          this.cameraLogger.error('[RTP] Failed to activate stream', error);
           if (this.sessions[sessionID] === session) {
             delete this.sessions[sessionID];
           }
@@ -143,7 +118,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
           callback(error);
         });
     } else if (requestType === StreamRequestTypes.STOP) {
-      this.cameraLogger.log('Stopping stream...');
+      this.cameraLogger.log('[RTP] Stopping stream...');
       delete this.sessions[sessionID];
       session.stop().then(() => callback(), callback);
     } else {

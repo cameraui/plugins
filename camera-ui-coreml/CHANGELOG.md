@@ -1,3 +1,21 @@
+## [1.2.11]
+
+**Needs camera.ui 2.2.5.** After the update, pick this plugin as Face Recognition for each camera: camera settings, Plugins, Detections. Faces are detected but not named until then. The plugin downloads its new face models on the first start.
+- **Face recognition is a sensor of its own and lines the face up before it recognizes it.** It recognizes far more people, and a face seen from the side or steeply from above gets no name instead of a wrong one. The recognition model is set once for the plugin, the NVR embeds the enrolled pictures again by itself.
+- Updated camera.ui engine
+
+## [1.2.10]
+
+- Updated camera.ui engine
+
+## [1.2.9]
+
+- Minor bugfixes
+
+## [1.2.8]
+
+- **License plates are read again.** Every read was scored as unreadable and dropped before it reached an event, whatever the camera saw. If you lowered the reading confidence in the camera settings to work around it, put it back.
+
 ## [1.2.6]
 
 - A second CLIP model is available for the semantic search, and the model is a single plugin setting now instead of a per-camera choice. After switching, the recordings view offers to reindex existing events so old footage stays searchable.

@@ -1,13 +1,22 @@
+import { entityDisplayName } from './mapping.js';
+
 import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice } from '@camera.ui/sdk';
 import type { HaClient } from './ha.js';
 import type { HaState, StorageValues } from './types.js';
 
 const DEVICE_PREFIX = 'notify:';
 
+function toHaImageUrl(imageUrl: string | undefined): string | undefined {
+  if (!imageUrl) return undefined;
+  if (/^https?:\/\//.test(imageUrl)) return imageUrl;
+  return `/api/cameraui/notify${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+}
+
 export class HaNotifier {
   private services: string[] = [];
   private entities = new Map<string, string>();
   private lastOwnerUserId = '';
+  private panelPath: string | undefined;
 
   constructor(
     private readonly storage: DeviceStorage<StorageValues>,
@@ -20,13 +29,21 @@ export class HaNotifier {
     if (!client) return;
 
     const previousCount = this.targetKeys().length;
-    this.entities = new Map(
-      states.filter((state) => state.entity_id.startsWith('notify.')).map((state) => [state.entity_id, state.attributes.friendly_name ?? state.entity_id]),
-    );
+    this.entities = new Map(states.filter((state) => state.entity_id.startsWith('notify.')).map((state) => [state.entity_id, entityDisplayName(state)]));
     try {
-      this.services = await client.fetchNotifyServices();
+      // 'notify' fans out to every mobile_app service and 'persistent_notification' is not a device,
+      // both would duplicate what the concrete targets already deliver
+      this.services = (await client.fetchNotifyServices()).filter((service) => service !== 'notify' && service !== 'persistent_notification');
     } catch (error) {
       this.logger.debug('Could not list Home Assistant notify services:', error);
+    }
+
+    try {
+      const panels = await client.fetchPanels();
+      const panel = Object.values(panels).find((p) => p.config?._panel_custom?.name === 'cameraui-panel');
+      this.panelPath = panel ? `/${panel.url_path}` : undefined;
+    } catch (error) {
+      this.logger.debug('Could not list Home Assistant panels:', error);
     }
 
     const keys = this.targetKeys();
@@ -49,10 +66,19 @@ export class HaNotifier {
   public async sendNotification(deviceIds: string[], n: Notification): Promise<void> {
     const client = this.getClient();
     if (!client) return;
+    // silent replaces an existing banner in the apps; HA notify can only add a new audible one
+    if (n.silent) return;
 
     const message = [n.subtitle, n.body].filter(Boolean).join('\n') || n.title;
     const data: Record<string, unknown> = {};
-    if (n.imageUrl) data.image = n.imageUrl;
+    const image = toHaImageUrl(n.imageUrl);
+    if (image) data.image = image;
+    if (n.tag) data.tag = n.tag;
+    if (n.deepLink && this.panelPath) {
+      const link = `${this.panelPath}${n.deepLink}`;
+      data.url = link; // iOS
+      data.clickAction = link; // Android
+    }
 
     // before the first sync the target list is empty, send blind rather than drop
     const known = this.targetKeys();
@@ -103,7 +129,10 @@ export class HaNotifier {
   }
 
   private targetKeys(): string[] {
-    return [...this.services, ...this.entities.keys()];
+    // mobile_app registers a notify entity next to its service for the same phone, keep the
+    // service (it can carry a picture) and drop the entity twin
+    const entityKeys = [...this.entities.keys()].filter((entity) => !this.services.includes(`mobile_app_${entity.split('.')[1]}`));
+    return [...this.services, ...entityKeys];
   }
 
   private keyForId(deviceId: string): string | undefined {

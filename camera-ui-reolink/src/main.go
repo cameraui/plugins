@@ -18,7 +18,7 @@ const (
 	discoveryPrefix    = "reolink:"
 	defaultRTSPPort    = 8556
 	defaultWebhookPort = 8557
-	adoptProbeTimeout  = 20 * time.Second
+	adoptProbeTimeout  = 45 * time.Second
 	storageKeyNVRs     = "nvrs"
 	storageKeyDuals    = "dualLensCameras"
 	presenceGrace      = 5 * time.Minute
@@ -75,6 +75,7 @@ type cameraSettings struct {
 	PTZZoom            bool
 	HasDoorbell        bool
 	HasAI              bool
+	MainsPowered       bool
 	LiveCatchUpSeconds int
 }
 
@@ -549,9 +550,13 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 		return nil, p.expandNVR(camera, entry, username, password, probe.channels)
 	}
 
+	uid := device.UID
+	if uid == "" {
+		uid = probe.uid
+	}
 	camSettings := cameraSettings{
 		Host:          device.IP,
-		UID:           device.UID,
+		UID:           uid,
 		Username:      username,
 		Password:      password,
 		Channel:       channel,
@@ -724,18 +729,17 @@ type probeResult struct {
 	streams   []string
 	loginInfo baichuan.LoginDeviceInfo
 	channels  []int
+	uid       string
 }
 
 func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username string, password string, channel uint8) (probeResult, error) {
 	cfg := baichuan.Config{
 		Host:     device.IP,
 		Port:     9000,
+		UID:      device.UID,
 		Username: username,
 		Password: password,
 		Timeout:  10 * time.Second,
-	}
-	if cfg.Host == "" {
-		cfg.UID = device.UID
 	}
 
 	client, err := baichuan.Dial(ctx, cfg)
@@ -748,8 +752,11 @@ func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username
 		return probeResult{}, err
 	}
 
-	result := probeResult{streams: []string{"main", "sub"}}
-	result.loginInfo = client.LoginDeviceInfo()
+	result := probeResult{
+		streams:   []string{"main", "sub"},
+		loginInfo: client.LoginDeviceInfo(),
+		uid:       client.UID(),
+	}
 
 	if result.loginInfo.IsNVR() {
 		if channels, err := client.OccupiedChannels(ctx); err == nil {

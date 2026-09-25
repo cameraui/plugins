@@ -8,6 +8,7 @@ export const contract: PluginContract = {
   provides: [
     SensorType.Object,
     SensorType.Face,
+    SensorType.FaceEmbedder,
     SensorType.LicensePlate,
     SensorType.Clip,
   ],
@@ -16,6 +17,7 @@ export const contract: PluginContract = {
   interfaces: [
     PluginInterface.ObjectDetection,
     PluginInterface.FaceDetection,
+    PluginInterface.FaceEmbedding,
     PluginInterface.LicensePlateDetection,
     PluginInterface.ClipDetection,
   ],

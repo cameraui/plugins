@@ -1,41 +1,25 @@
-import type { Device, Station } from 'eufy-security-client';
+import type { EufyMega } from '@mega-yfue/eufy-sdk';
 
-export interface DeviceIdentifier {
-  uniqueId: string;
-  displayName: string;
-  type: number;
-}
-
-export interface StationContainer {
-  deviceIdentifier: DeviceIdentifier;
-  eufyDevice: Station;
-}
-
-export interface DeviceContainer {
-  deviceIdentifier: DeviceIdentifier;
-  eufyDevice: Device;
-}
-
-export interface EufyHome {
-  name: string;
-  username: string;
-  password: string;
-  country?: string;
-  deviceName?: string;
-  debug?: boolean;
-  maxLiveStreamDuration?: number;
-  ignoreDevices?: string[];
-  localOnly?: boolean;
-}
+export type StreamMode = 'p2p' | 'rtsp';
 
 export interface EufyCameraStorage {
-  useP2P?: boolean;
+  streamMode?: StreamMode;
 }
 
-export interface StorageValues extends EufyHome {}
+export interface StorageValues {
+  debug?: boolean;
+  username?: string;
+  password?: string;
+  country?: string;
+  maxLiveStreamDuration?: number;
+  ignoreDevices?: string[];
+  captcha?: string;
+  captchaCode?: string;
+  twoFactorCode?: string;
+}
 
-export interface EufyConnectionResponse {
-  connected: boolean;
-  is2FA?: boolean;
-  isCaptcha?: { id: string; captcha: string };
+export interface EufyContext {
+  readonly client: EufyMega;
+  readonly debug: boolean;
+  readonly maxLiveStreamDuration: number;
 }

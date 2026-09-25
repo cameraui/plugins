@@ -1,3 +1,12 @@
+## [1.2.6]
+
+- A camera that was unreachable when camera.ui started now comes back on its own
+- Updated camera.ui engine
+
+## [1.2.5]
+
+- Updated camera.ui engine
+
 ## [1.2.4]
 
 - Updated camera.ui engine and deps

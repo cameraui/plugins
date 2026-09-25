@@ -1,3 +1,27 @@
+## [1.2.15]
+
+**Needs camera.ui 2.2.5.** After the update, pick this plugin as Face Recognition for each camera: camera settings, Plugins, Detections. Faces are detected but not named until then. The plugin downloads its new face models on the first start.
+- **Face recognition is a sensor of its own and lines the face up before it recognizes it.** It recognizes far more people, and a face seen from the side or steeply from above gets no name instead of a wrong one. The recognition model is set once for the plugin, the NVR embeds the enrolled pictures again by itself.
+- Updated camera.ui engine
+
+## [1.2.14]
+
+- Updated camera.ui engine
+
+## [1.2.13]
+
+- **TensorRT rebuilds its engines faster after a model or plugin update.** The kernel timing measurements are kept next to the engine cache.
+- **A missing TensorRT runtime now points to the right image.** With the tensorrt provider selected, the log names the `:nvidia-tensorrt` image that ships the libraries.
+- Minor bugfixes
+
+## [1.2.12]
+
+- **When CUDA cannot load, the log now says which Docker image fits.** This plugin needs the CUDA 13 libraries (Docker image `:nvidia`, host driver 580 or newer). On a CUDA 12 setup, use the `:nvidia-cuda12` image with the ONNX Legacy plugin.
+
+## [1.2.11]
+
+- **License plates are read again.** Every read was scored as unreadable and dropped before it reached an event, whatever the camera saw. If you lowered the reading confidence in the camera settings to work around it, put it back.
+
 ## [1.2.9]
 
 - A second CLIP model is available for the semantic search, and the model is a single plugin setting now instead of a per-camera choice. After switching, the recordings view offers to reindex existing events so old footage stays searchable.

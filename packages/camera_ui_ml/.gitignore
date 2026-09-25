@@ -43,3 +43,6 @@ requirements-lock.txt
 test*
 /build
 .pytest*
+!/tests/
+!/tests/**
+/tests/**/__pycache__/
