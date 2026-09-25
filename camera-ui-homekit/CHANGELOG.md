@@ -1,5 +1,6 @@
 ## [1.3.2]
 
+- **Remote live view stays clean.** Encrypted video packets could end up larger than the size the Home app asked for, so the picture got more and more corrupted when watching away from home.
 - The bridge no longer reports "No server addresses are set" when an address is set but missing on this machine. The warning above it names the ignored address and the addresses the plugin does find.
 
 ## [1.3.1]
