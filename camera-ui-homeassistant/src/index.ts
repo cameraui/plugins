@@ -428,7 +428,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     const device = entry?.device_id ? registry.devices.get(entry.device_id) : undefined;
     if (!device) return false;
     if (device.manufacturer === OWN_MANUFACTURER) return true;
-    return device.identifiers?.some(([domain, id]) => domain === OWN_PLATFORM || id.startsWith(OWN_ID_PREFIX)) ?? false;
+    return device.identifiers?.some(([domain, id]) => domain === OWN_PLATFORM || (typeof id === 'string' && id.startsWith(OWN_ID_PREFIX))) ?? false;
   }
 
   private isExcluded(entityId: string): boolean {

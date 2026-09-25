@@ -59,6 +59,7 @@ export function mapEntity(state: HaState): EntityMapping | undefined {
 }
 
 export function entityDisplayName(state: HaState): string {
-  const name = state.attributes.friendly_name?.trim();
-  return name?.length ? name : state.entity_id;
+  const raw = state.attributes.friendly_name;
+  const name = typeof raw === 'string' || typeof raw === 'number' ? String(raw).trim() : '';
+  return name.length ? name : state.entity_id;
 }

@@ -1,3 +1,5 @@
+import { entityDisplayName } from './mapping.js';
+
 import type { DeviceStorage, JsonSchema, LoggerService, Notification, NotifierDevice } from '@camera.ui/sdk';
 import type { HaClient } from './ha.js';
 import type { HaState, StorageValues } from './types.js';
@@ -27,9 +29,7 @@ export class HaNotifier {
     if (!client) return;
 
     const previousCount = this.targetKeys().length;
-    this.entities = new Map(
-      states.filter((state) => state.entity_id.startsWith('notify.')).map((state) => [state.entity_id, state.attributes.friendly_name ?? state.entity_id]),
-    );
+    this.entities = new Map(states.filter((state) => state.entity_id.startsWith('notify.')).map((state) => [state.entity_id, entityDisplayName(state)]));
     try {
       // 'notify' fans out to every mobile_app service and 'persistent_notification' is not a device,
       // both would duplicate what the concrete targets already deliver

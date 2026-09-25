@@ -16,7 +16,7 @@ export interface StorageValues {
 export interface HaStateAttributes {
   device_class?: string;
   state_class?: string;
-  friendly_name?: string;
+  friendly_name?: unknown;
   [key: string]: unknown;
 }
 
@@ -47,7 +47,7 @@ export interface HaDevice {
   id: string;
   area_id?: string | null;
   manufacturer?: string | null;
-  identifiers?: [string, string][];
+  identifiers?: [string, unknown][];
 }
 
 export interface HaPanel {
