@@ -76,6 +76,14 @@ FACE_LANDMARK_INPUT_SIZE = 256
 # the padded face crop the server sends; the landmark model takes it from there
 FACE_EMBEDDER_CROP_SIZE = 256
 
+PERSON_EMBEDDER_MODEL = "person-reid-256"
+PERSON_EMBEDDER_WIDTH = 128
+PERSON_EMBEDDER_HEIGHT = 256
+
+SEGMENTATION_MODELS: dict[str, int] = {
+    "yolo-v9-t-320-seg": 320,
+}
+
 OCR_MODELS: list[str] = [
     "cct-xs-v2-global",
     "cct-s-v2-global",
@@ -85,6 +93,8 @@ DEFAULT_OBJECT_MODEL = "yolo-v9-s-320"
 
 DEFAULT_FACE_DETECTOR = "yolo-v9-s-320-faces"
 DEFAULT_FACE_EMBEDDER = "arcface-r100-512-aligned"
+
+DEFAULT_SEGMENTATION_MODEL = "yolo-v9-t-320-seg"
 
 DEFAULT_LPD_DETECTOR = "yolo-v9-t-384-license-plates"
 DEFAULT_OCR = "cct-xs-v2-global"

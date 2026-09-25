@@ -5,13 +5,15 @@ import type { PluginContract } from '@camera.ui/sdk';
 export const contract: PluginContract = {
   name: 'CoreML',
   role: PluginRole.SensorProvider,
-  provides: [SensorType.Object, SensorType.Face, SensorType.FaceEmbedder, SensorType.LicensePlate, SensorType.Clip],
+  provides: [SensorType.Object, SensorType.Face, SensorType.FaceEmbedder, SensorType.PersonEmbedder, SensorType.Segmenter, SensorType.LicensePlate, SensorType.Clip],
   consumes: [],
   pythonVersion: '3.11',
   interfaces: [
     PluginInterface.ObjectDetection,
     PluginInterface.FaceDetection,
     PluginInterface.FaceEmbedding,
+    PluginInterface.PersonEmbedding,
+    PluginInterface.Segmentation,
     PluginInterface.LicensePlateDetection,
     PluginInterface.ClipDetection,
   ],

@@ -8,13 +8,17 @@ from camera_ui_ml import (
     BoxDetector,
     Embedder,
     LandmarkDetector,
+    PersonEmbedder,
     PlateOcr,
+    Segmenter,
     crop_rgb,
     decode_image,
     embed_face_images,
+    embed_person_images,
     normalize_box,
     reset_stored_settings,
     scale_box,
+    segment_images,
 )
 from camera_ui_sdk import (
     API_EVENT,
@@ -35,8 +39,13 @@ from camera_ui_sdk import (
     LoggerService,
     ObjectDetectionInterface,
     ObjectDetectionPluginResponse,
+    PersonEmbeddingInterface,
+    PersonEmbeddingPluginResponse,
     PluginAPI,
     Point,
+    SegmentationImage,
+    SegmentationInterface,
+    SegmentationPluginResponse,
     VideoFrameData,
 )
 
@@ -47,6 +56,7 @@ from defaults import (
     DEFAULT_OBJECT_MODEL,
     DEFAULT_OCR,
     DEFAULT_OPTION,
+    DEFAULT_SEGMENTATION_MODEL,
     DEFAULT_USE_VULKAN,
     FACE_DETECTOR_MODELS,
     FACE_EMBEDDER_MODELS,
@@ -61,6 +71,10 @@ from defaults import (
     OCR_MAX_SLOTS,
     OCR_MODELS,
     OCR_PAD_CHAR,
+    PERSON_EMBEDDER_HEIGHT,
+    PERSON_EMBEDDER_MODEL,
+    PERSON_EMBEDDER_WIDTH,
+    SEGMENTATION_MODELS,
     resolve_model,
 )
 from model_manager import NcnnModelManager
@@ -68,6 +82,8 @@ from sensors.face_embedder_sensor import NCNNFaceEmbedderSensor
 from sensors.face_sensor import NCNNFaceSensor
 from sensors.lpd_sensor import NCNNLPDSensor
 from sensors.object_sensor import NCNNObjectSensor
+from sensors.person_embedder_sensor import NCNNPersonEmbedderSensor
+from sensors.segmenter_sensor import NCNNSegmenterSensor
 from vulkan import gpu_count, gpu_devices
 
 
@@ -76,6 +92,8 @@ class NCNNPlugin(
     ObjectDetectionInterface,
     FaceDetectionInterface,
     FaceEmbeddingInterface,
+    PersonEmbeddingInterface,
+    SegmentationInterface,
     LicensePlateDetectionInterface,
 ):
     def __init__(self, logger: LoggerService, api: PluginAPI, storage: DeviceStorage[Any]) -> None:
@@ -92,6 +110,8 @@ class NCNNPlugin(
         self.object_detectors: dict[str, BoxDetector] = {}
         self.face_detectors: dict[str, BoxDetector] = {}
         self.face_embedders: dict[str, Embedder] = {}
+        self.person_embedders: dict[str, PersonEmbedder] = {}
+        self.segmenters: dict[str, Segmenter] = {}
         self.face_landmarkers: dict[str, LandmarkDetector] = {}
         self.plate_detectors: dict[str, BoxDetector] = {}
         self.ocr_models: dict[str, PlateOcr] = {}
@@ -241,6 +261,39 @@ class NCNNPlugin(
         else:
             await landmarker.initialize(FACE_LANDMARK_MODEL)
         return landmarker
+
+    async def get_person_embedder(self) -> PersonEmbedder:
+        embedder = self.person_embedders.get(PERSON_EMBEDDER_MODEL)
+        if not embedder:
+            embedder = PersonEmbedder(
+                self.model_manager,
+                self.logger,
+                width=PERSON_EMBEDDER_WIDTH,
+                height=PERSON_EMBEDDER_HEIGHT,
+            )
+            self.person_embedders[PERSON_EMBEDDER_MODEL] = embedder
+            try:
+                await embedder.initialize(PERSON_EMBEDDER_MODEL)
+            except Exception:
+                self.person_embedders.pop(PERSON_EMBEDDER_MODEL, None)
+                raise
+        else:
+            await embedder.initialize(PERSON_EMBEDDER_MODEL)
+        return embedder
+
+    async def get_segmenter(self, model_name: str) -> Segmenter:
+        segmenter = self.segmenters.get(model_name)
+        if not segmenter:
+            segmenter = Segmenter(self.model_manager, self.logger)
+            self.segmenters[model_name] = segmenter
+            try:
+                await segmenter.initialize(model_name)
+            except Exception:
+                self.segmenters.pop(model_name, None)
+                raise
+        else:
+            await segmenter.initialize(model_name)
+        return segmenter
 
     async def get_plate_detector(self, model_name: str) -> BoxDetector:
         detector = self.plate_detectors.get(model_name)
@@ -553,6 +606,41 @@ class NCNNPlugin(
         results = await embed_face_images(landmarker, embedder, images, space, landmarks)
         return [result for result in results]
 
+    async def embedPersonImages(
+        self, images: list[bytes], config: dict[str, Any] | None = None
+    ) -> list[PersonEmbeddingPluginResponse | None]:
+        embedder = await self.get_person_embedder()
+        if not embedder.initialized:
+            return [None for _ in images]
+
+        results = await embed_person_images(embedder, images, PERSON_EMBEDDER_MODEL)
+        return [result for result in results]
+
+    async def segmentationSettings(self) -> list[JsonSchema] | None:
+        return [
+            {
+                "type": "string",
+                "key": "model",
+                "title": "Model",
+                "description": "Segmentation model for testing",
+                "required": True,
+                "defaultValue": DEFAULT_OPTION,
+                "enum": [DEFAULT_OPTION, *SEGMENTATION_MODELS],
+                "store": False,
+            },
+        ]
+
+    async def segmentImages(
+        self, images: list[SegmentationImage], config: dict[str, Any] | None = None
+    ) -> list[SegmentationPluginResponse | None]:
+        model_name = resolve_model((config or {}).get("model"), DEFAULT_SEGMENTATION_MODEL)
+        segmenter = await self.get_segmenter(model_name)
+        if not segmenter.initialized:
+            return [None for _ in images]
+
+        results = await segment_images(segmenter, images)
+        return [result for result in results]
+
     async def _add_sensors(self, camera: CameraDevice) -> None:
         sensors: dict[str, Any] = {}
 
@@ -572,6 +660,14 @@ class NCNNPlugin(
         await camera.addSensor(embedder)
         sensors["faceEmbedder"] = embedder
 
+        person = NCNNPersonEmbedderSensor(self, self.logger)
+        await camera.addSensor(person)
+        sensors["personEmbedder"] = person
+
+        segmenter = NCNNSegmenterSensor(self, self.logger)
+        await camera.addSensor(segmenter)
+        sensors["segmenter"] = segmenter
+
         self._sensors[camera.id] = sensors
 
     def _active_hardware(self) -> str:
@@ -582,6 +678,8 @@ class NCNNPlugin(
                 *self.face_detectors.values(),
                 *self.plate_detectors.values(),
                 *self.face_embedders.values(),
+                *self.person_embedders.values(),
+                *self.segmenters.values(),
                 *self.face_landmarkers.values(),
                 *self.ocr_models.values(),
             )
@@ -614,6 +712,8 @@ class NCNNPlugin(
         obj = list(self.object_detectors)
         fdet = list(self.face_detectors)
         femb = list(self.face_embedders)
+        pemb = list(self.person_embedders)
+        seg = list(self.segmenters)
         pdet = list(self.plate_detectors)
         ocr = list(self.ocr_models)
 
@@ -624,6 +724,8 @@ class NCNNPlugin(
             *(self.get_object_detector(n) for n in obj),
             *(self.get_face_detector(n) for n in fdet),
             *(self.get_face_embedder(n) for n in femb),
+            *(self.get_person_embedder() for _ in pemb),
+            *(self.get_segmenter(n) for n in seg),
             *(self.get_plate_detector(n) for n in pdet),
             *(self.get_ocr(n) for n in ocr),
             return_exceptions=True,
@@ -649,11 +751,15 @@ class NCNNPlugin(
             *(d.close() for d in self.face_detectors.values()),
             *(d.close() for d in self.plate_detectors.values()),
             *(e.close() for e in self.face_embedders.values()),
+            *(e.close() for e in self.person_embedders.values()),
+            *(s.close() for s in self.segmenters.values()),
             *(o.close() for o in self.ocr_models.values()),
         )
         self.object_detectors.clear()
         self.face_detectors.clear()
         self.face_embedders.clear()
+        self.person_embedders.clear()
+        self.segmenters.clear()
         self.plate_detectors.clear()
         self.ocr_models.clear()
 

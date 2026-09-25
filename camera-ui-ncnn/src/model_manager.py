@@ -14,13 +14,14 @@ from defaults import (
     MODEL_BASE_URL,
     MODEL_LFS_URL,
     OBJECT_MODELS,
+    SEGMENTATION_MODELS,
     model_version,
 )
 from inference import NcnnBackend
 from vulkan import gpu_count
 
 # pnnx-converted .param carries no input dims; sizes come from the registry.
-_BOX_INPUT_SIZES = {**OBJECT_MODELS, **FACE_DETECTOR_MODELS, **LPD_DETECTOR_MODELS}
+_BOX_INPUT_SIZES = {**OBJECT_MODELS, **FACE_DETECTOR_MODELS, **LPD_DETECTOR_MODELS, **SEGMENTATION_MODELS}
 
 
 class NcnnModelManager(BaseModelManager):

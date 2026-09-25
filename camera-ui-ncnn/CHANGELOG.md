@@ -1,3 +1,9 @@
+## [1.2.13]
+
+**Needs camera.ui 2.2.9.** Pick this plugin for each camera as Person Re-ID, to find people whose face is not visible, and as Segmentation, to outline what you click: camera settings, Plugins, Detections. The plugin downloads the models on the first start.
+- **Finds people by their clothing.** With the NVR plugin, a click on a person without a visible face finds the people who look most alike.
+- **Outlines what you click.** With the NVR plugin, finding an object shows the outline of the clicked person or vehicle instead of a box.
+
 ## [1.2.12]
 
 - **The model always reads the picture it was given.** The picture could be overwritten in memory before the model read it, so an object or a face could be missed or scored wrong.
