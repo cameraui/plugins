@@ -78,7 +78,7 @@ class CoralObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
         )
         if detector is None or not detector.initialized:
             return {"detected": False, "detections": []}
-        return await detect_objects(detector, frame, self._camera_confidences(0.5))
+        return await detect_objects(detector, frame)
 
     async def destroy(self) -> None:
         pass
@@ -98,9 +98,3 @@ class CoralObjectSensor(ObjectDetectorSensor["ObjectStorageValues"]):
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
-
-    def _camera_confidences(self, fallback: float) -> dict[str, float] | float:
-        per_label = self._camera.detectionSettings["object"].get("confidences")
-        if per_label:
-            return {label: float(value) for label, value in per_label.items()}
-        return fallback

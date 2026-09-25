@@ -79,13 +79,12 @@ class ONNXFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
 
     async def detectFaces(self, frames: list[VideoFrameData]) -> list[FaceResult]:
         detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_FACE_DETECTOR)
-        threshold = self._camera_confidence(0.5)
 
         detector = self._plugin.face_detectors.get(detector_name)
         if detector is None or not detector.initialized:
             return [{"detected": False, "detections": []} for _ in frames]
 
-        return await detect_faces(detector, frames, threshold)
+        return await detect_faces(detector, frames)
 
     async def destroy(self) -> None:
         pass
@@ -105,8 +104,3 @@ class ONNXFaceSensor(FaceDetectorSensor["FaceStorageValues"]):
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
-
-    def _camera_confidence(self, fallback: float) -> float:
-        settings = self._camera.detectionSettings.get("face") or {}
-        value = settings.get("confidence")
-        return float(value) if value is not None else fallback

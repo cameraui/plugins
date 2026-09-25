@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import re
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from camera_ui_ml import detect_plates, model_runtime, reset_stored_settings
 from camera_ui_sdk import (
     JsonSchema,
-    LicensePlateDetection,
     LicensePlateDetectorSensor,
     LicensePlateResult,
     ModelSpec,
@@ -24,21 +22,9 @@ from defaults import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from camera_ui_sdk import CameraDevice, LoggerService
 
     from main import CoreMLPlugin
-
-
-PLATE_NOISE = re.compile(r"[^0-9A-Z]")
-
-
-def _readable(detection: LicensePlateDetection, ocr_confidence: float, min_length: int) -> bool:
-    if len(PLATE_NOISE.sub("", detection.get("plateText", "").upper())) < min_length:
-        return False
-    confidence = detection.get("ocrConfidence")
-    return confidence is None or confidence >= ocr_confidence
 
 
 class LPDStorageValues(TypedDict):
@@ -114,7 +100,6 @@ class CoreMLLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     async def detectLicensePlates(self, frames: list[VideoFrameData]) -> list[LicensePlateResult]:
         detector_name = resolve_model(self.storage.values.get("detector_model"), DEFAULT_LPD_DETECTOR)
         ocr_name = resolve_model(self.storage.values.get("ocr_model"), DEFAULT_OCR)
-        confidence, ocr_confidence, min_length = self._plate_settings()
 
         detector = self._plugin.plate_detectors.get(detector_name)
         ocr = self._plugin.ocr_models.get(ocr_name)
@@ -122,12 +107,7 @@ class CoreMLLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
         if detector is None or not detector.initialized or ocr is None or not ocr.initialized:
             return [{"detected": False, "detections": []} for _ in frames]
 
-        results = await detect_plates(detector, ocr, frames, confidence)
-        for result in results:
-            kept = [d for d in result["detections"] if _readable(d, ocr_confidence, min_length)]
-            result["detected"] = len(kept) > 0
-            result["detections"] = kept
-        return results
+        return await detect_plates(detector, ocr, frames)
 
     async def destroy(self) -> None:
         pass
@@ -158,14 +138,3 @@ class CoreMLLPDSensor(LicensePlateDetectorSensor["LPDStorageValues"]):
     async def _reset_settings(self) -> None:
         await reset_stored_settings(self.storage)
         self._logger.log("Settings reset to defaults")
-
-    def _plate_settings(self) -> tuple[float, float, int]:
-        settings: Mapping[str, Any] = self._camera.detectionSettings.get("licensePlate") or {}
-        confidence = settings.get("confidence")
-        ocr_confidence = settings.get("ocrConfidence")
-        min_length = settings.get("minLength")
-        return (
-            float(confidence) if confidence is not None else 0.3,
-            float(ocr_confidence) if ocr_confidence is not None else 0.9,
-            int(min_length) if min_length is not None else 4,
-        )
