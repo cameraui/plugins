@@ -186,7 +186,7 @@ export class CameraAccessory extends Subscribed {
         let bind = addresses.length ? addresses : undefined;
 
         if (!bind) {
-          this.cameraLogger.debug('No server addresses set, binding to: 0.0.0.0');
+          this.cameraLogger.debug('No usable server address, binding to: 0.0.0.0');
           bind = ['0.0.0.0'];
         }
 

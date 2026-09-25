@@ -182,9 +182,10 @@ export class SensorBridge {
         this.logger.log(`Please add the bridge manually in Home app. Setup Code: ${bridgePin}`);
       });
 
-      const addresses = filterBindAddresses(await this.api.coreManager.getServerAddresses(), this.logger);
+      const configured = await this.api.coreManager.getServerAddresses();
+      const addresses = filterBindAddresses(configured, this.logger);
       const bind = addresses.length ? addresses : ['0.0.0.0'];
-      if (!addresses.length) {
+      if (!configured.length) {
         this.logger.attention('No server addresses are set in Settings > Remote > Network. If live streams stutter or fail, select your wired LAN address there.');
       }
 
