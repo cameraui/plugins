@@ -186,7 +186,9 @@ export class SensorBridge {
       const addresses = filterBindAddresses(configured, this.logger);
       const bind = addresses.length ? addresses : ['0.0.0.0'];
       if (!configured.length) {
-        this.logger.attention('No server addresses are set in Settings > Remote > Network. If live streams stutter or fail, select your wired LAN address there.');
+        this.logger.attention(
+          'No server addresses are set. If live streams stutter or fail, select your wired LAN address in Settings > Remote > Network or, on a worker, in Workers.',
+        );
       }
 
       const port = portOverride === 0 && this.bridgePort === undefined ? undefined : portOverride || this.bridgePort;
