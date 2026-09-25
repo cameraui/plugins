@@ -287,7 +287,11 @@ export class RecordingSession extends EventEmitter {
     ];
 
     await session.startStream({
-      supportedVideoCodecs: this.cameraAccessory.secureVideoCodec === 'hevc' ? ['h264', 'hevc'] : ['h264'],
+      // Keep the HEVC/HKSV3 codec path intact. An empty list selects H.264
+      // encoding, so forced transcoding applies only to the classic path
+      // (including an HEVC source explicitly switched to forceLegacyPath).
+      supportedVideoCodecs:
+        this.cameraAccessory.secureVideoCodec === 'hevc' ? ['h264', 'hevc'] : this.cameraAccessory.cameraStorage.values.forceVideoTranscodingForRecording ? [] : ['h264'],
       supportedAudioCodecs: ['aac'],
       boxMode: true,
       fragDuration: (this.configuration?.mediaContainerConfiguration?.fragmentLength ?? 4000) * 1000,

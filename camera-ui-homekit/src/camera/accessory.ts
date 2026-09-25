@@ -460,6 +460,19 @@ export class CameraAccessory extends Subscribed {
           this.recordingDelegate?.refreshPrebuffer();
         },
       },
+      {
+        type: 'boolean',
+        key: 'forceVideoTranscodingForRecording',
+        title: 'Force Video Transcoding for HKSV',
+        description: 'Re-encode classic H.264 HKSV recordings to apply negotiated limits. Does not affect HEVC Secure Video (HKSV3).',
+        group: 'Advanced',
+        defaultValue: false,
+        store: true,
+        onSet: async (state: boolean) => {
+          this.cameraLogger.log('Force video transcoding for HKSV:', state);
+          this.recordingDelegate?.refreshPrebuffer();
+        },
+      },
     ]);
   }
 
