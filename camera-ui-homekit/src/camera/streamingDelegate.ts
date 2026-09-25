@@ -31,7 +31,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   }
 
   public handleSnapshotRequest(_request: SnapshotRequest, callback: SnapshotRequestCallback): void {
-    captureSnapshot(this.cameraDevice)
+    captureSnapshot(this.cameraDevice, this.cameraAccessory.batteryPowered)
       .then((snapshot) => callback(undefined, snapshot))
       .catch((error: any) => callback(error));
   }

@@ -33,6 +33,9 @@ export class RecordingSession extends EventEmitter {
   private sessionSubscriptions: { unsubscribe(): void }[] = [];
   private configuration?: CameraRecordingConfiguration;
 
+  private batteryRequests = 0;
+  private batteryTimer?: NodeJS.Timeout;
+  private batteryRetryAfter = 0;
   private recordingActive = false;
   private stopped = false;
   private deferred = false;
@@ -70,6 +73,12 @@ export class RecordingSession extends EventEmitter {
     }
   }
 
+  public refreshBatteryState(): void {
+    if (this.cameraAccessory.batteryPowered && (!this.cameraAccessory.batteryRecordingAllowed || this.batteryRequests === 0)) {
+      void this.stopPrebuffer();
+    }
+  }
+
   public refreshPrebuffer(): void {
     if (this.recordingActive && !this.stopped) {
       this.restartPrebuffer();
@@ -102,10 +111,8 @@ export class RecordingSession extends EventEmitter {
       throw new Error('No recording configuration set');
     }
 
-    const session = this.session;
-    if (!session) {
-      throw new Error('FMP4 session unavailable');
-    }
+    const onDemand = this.cameraAccessory.batteryPowered;
+    const session = await this.acquireRecordingSession(signal);
 
     const tfdtOffsets = new Map<number, bigint>();
     const buffered = [...this.prebuffer];
@@ -146,16 +153,14 @@ export class RecordingSession extends EventEmitter {
       if (this.hdsConsumer === consumer) {
         this.hdsConsumer = undefined;
       }
+      if (onDemand) await this.releaseBatterySession(session);
     }
   }
 
   public async *getClipStream(options: ClipStreamOptions): AsyncGenerator<ClipPart, void> {
-    const session = this.session;
-    if (!session) {
-      throw new Error('FMP4 session unavailable');
-    }
-
     const { signal } = options;
+    const onDemand = this.cameraAccessory.batteryPowered;
+    const session = await this.acquireRecordingSession(signal);
     const fragmentLength = this.fragmentLength();
     const startMs = options.start === undefined ? 0 : ntpToMilliseconds(options.start);
     const stopMs = options.stop === undefined ? Infinity : ntpToMilliseconds(options.stop);
@@ -192,7 +197,56 @@ export class RecordingSession extends EventEmitter {
       }
     } finally {
       this.removeConsumer(consumer);
+      if (onDemand) await this.releaseBatterySession(session);
     }
+  }
+
+  private async acquireRecordingSession(signal?: AbortSignal): Promise<Fmp4Session> {
+    signal?.throwIfAborted();
+    if (!this.cameraAccessory.batteryPowered) {
+      if (!this.session) throw new Error('FMP4 session unavailable');
+      return this.session;
+    }
+    let result: Fmp4Session | undefined;
+    await this.enqueueLifecycle(async () => {
+      signal?.throwIfAborted();
+      if (
+        this.stopped ||
+        !this.recordingActive ||
+        !this.configuration ||
+        this.cameraDevice.disabled ||
+        !this.cameraDevice.connected ||
+        !this.cameraAccessory.batteryRecordingAllowed ||
+        Date.now() < this.batteryRetryAfter
+      ) {
+        throw new Error('Battery recording unavailable: low/unknown battery, offline or cooling down');
+      }
+      try {
+        if (!this.session) {
+          const session = await this.startSession();
+          signal?.throwIfAborted();
+          if (this.stopped || !this.recordingActive || !this.cameraAccessory.batteryRecordingAllowed) throw new Error('Battery recording cancelled');
+          this.startCollector(session);
+          this.batteryTimer = setTimeout(() => {
+            void this.stopPrebuffer();
+          }, 60_000);
+        }
+        this.batteryRequests++;
+        result = this.session;
+      } catch (error) {
+        this.batteryRetryAfter = Date.now() + 30_000;
+        await this.stopSession();
+        throw error;
+      }
+    });
+    if (!result) throw new Error('Battery recording unavailable');
+    return result;
+  }
+
+  private async releaseBatterySession(session: Fmp4Session): Promise<void> {
+    if (this.session !== session) return;
+    this.batteryRequests = Math.max(0, this.batteryRequests - 1);
+    if (!this.batteryRequests) await this.stopPrebuffer();
   }
 
   public closeCurrentRecording(): void {
@@ -213,6 +267,9 @@ export class RecordingSession extends EventEmitter {
     ++this.lifecycleRevision;
     this.deferred = false;
     this.clearRestart();
+    if (this.batteryTimer) clearTimeout(this.batteryTimer);
+    this.batteryTimer = undefined;
+    if (this.cameraAccessory.batteryPowered && this.session) this.batteryRetryAfter = Date.now() + 30_000;
     this.closeConsumers();
     this.collectAbort?.abort();
     this.prebuffer = [];
@@ -221,6 +278,10 @@ export class RecordingSession extends EventEmitter {
   }
 
   private restartPrebuffer(): void {
+    if (this.cameraAccessory.batteryPowered) {
+      this.refreshBatteryState();
+      return;
+    }
     const revision = ++this.lifecycleRevision;
     this.clearRestart();
     this.closeConsumers();
@@ -234,7 +295,7 @@ export class RecordingSession extends EventEmitter {
         return;
       }
 
-      if (this.cameraDevice.disabled || !this.cameraDevice.connected) {
+      if (this.cameraAccessory.batteryPowered || this.cameraDevice.disabled || !this.cameraDevice.connected) {
         this.logger.debug(this.logPrefix, 'Camera unavailable, prebuffer deferred');
         this.deferred = true;
         return;
@@ -340,7 +401,12 @@ export class RecordingSession extends EventEmitter {
       return;
     }
 
+    if (this.batteryTimer) clearTimeout(this.batteryTimer);
+    this.batteryTimer = undefined;
+    if (this.cameraAccessory.batteryPowered) this.batteryRetryAfter = Date.now() + 30_000;
+
     this.session = undefined;
+    this.batteryRequests = 0;
     this.collectAbort?.abort();
     this.collectAbort = undefined;
     this.sessionSubscriptions.forEach((subscription) => subscription.unsubscribe());
@@ -355,7 +421,7 @@ export class RecordingSession extends EventEmitter {
   }
 
   private scheduleRestart(): void {
-    if (this.stopped || !this.recordingActive || this.restartTimeout) {
+    if (this.cameraAccessory.batteryPowered || this.stopped || !this.recordingActive || this.restartTimeout) {
       return;
     }
     this.restartTimeout = setTimeout(() => {
