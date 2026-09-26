@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, cast
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from camera_ui_sdk import (
     ClipEmbedding,
     ClipResult,
+    Detection,
     DetectionLabel,
     FaceDetection,
+    FaceDetectionPluginResponse,
     FaceEmbeddingResult,
     FaceResult,
+    ImageMetadata,
     LicensePlateDetection,
+    LicensePlateDetectionPluginResponse,
     LicensePlateResult,
+    ObjectDetectionPluginResponse,
     ObjectResult,
     Point,
     TrackedDetection,
@@ -26,9 +32,9 @@ from .detectors.landmarks import LandmarkDetector
 from .detectors.ocr import PlateOcr
 from .detectors.person import PersonEmbedder
 from .detectors.segmenter import Segmenter
-from .geometry import normalize_box
+from .geometry import normalize_box, scale_box
 from .parsing import FaceLandmarks
-from .preprocess import decode_image, frame_to_rgb
+from .preprocess import crop_rgb, decode_image, frame_to_rgb
 
 if TYPE_CHECKING:
     from camera_ui_sdk import (
@@ -43,6 +49,17 @@ if TYPE_CHECKING:
 
 
 DETECTION_FLOOR = 0.25
+
+
+def requested_threshold(config: Mapping[str, Any] | None) -> float | None:
+    """The ``threshold`` a caller put into a test method's config, never below the floor.
+
+    None when the caller set none, the detector then keeps its own default.
+    """
+    value = config.get("threshold") if config else None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return max(float(value), DETECTION_FLOOR)
 
 
 async def detect_objects(
@@ -128,6 +145,68 @@ async def _detect_plates_one(
                 "ocrConfidence": float(result.confidence),
                 "plateText": result.text,
                 "box": normalize_box(box, width, height),
+            }
+        )
+    return {"detected": len(detections) > 0, "detections": detections}
+
+
+async def detect_objects_in_image(
+    detector: BoxDetector,
+    image: bytes,
+    metadata: ImageMetadata,
+    threshold: float | None = None,
+) -> ObjectDetectionPluginResponse:
+    raw = await detector.detect_single(image, metadata, threshold)
+    detections: list[Detection] = [
+        {
+            "label": cast(DetectionLabel, detector.labels.get(cid, "unknown")),
+            "confidence": conf,
+            "box": box,
+        }
+        for cid, conf, box in raw
+    ]
+    return {"detected": len(detections) > 0, "detections": detections}
+
+
+async def detect_faces_in_image(
+    detector: BoxDetector,
+    image: bytes,
+    metadata: ImageMetadata,
+    threshold: float | None = None,
+) -> FaceDetectionPluginResponse:
+    raw = await detector.detect_single(image, metadata, threshold)
+    detections: list[FaceDetection] = [
+        {"label": "person", "attribute": "face", "confidence": conf, "box": box} for _cid, conf, box in raw
+    ]
+    return {"detected": len(detections) > 0, "detections": detections}
+
+
+async def detect_plates_in_image(
+    detector: BoxDetector,
+    ocr: PlateOcr,
+    image: bytes,
+    threshold: float | None = None,
+) -> LicensePlateDetectionPluginResponse:
+    rgb = decode_image(image)
+    height, width = int(rgb.shape[0]), int(rgb.shape[1])
+    raw = await detector.detect(rgb, threshold)
+    scale_x = width / detector.input_size[0]
+    scale_y = height / detector.input_size[1]
+
+    detections: list[LicensePlateDetection] = []
+    for _cid, conf, box in raw:
+        image_box = scale_box(box, scale_x, scale_y)
+        result = await ocr.recognize(crop_rgb(rgb, image_box))
+        if result is None or not result.text:
+            continue
+        detections.append(
+            {
+                "label": "vehicle",
+                "attribute": "license_plate",
+                "confidence": float(conf),
+                "ocrConfidence": float(result.confidence),
+                "plateText": result.text,
+                "box": normalize_box(image_box, width, height),
             }
         )
     return {"detected": len(detections) > 0, "detections": detections}
