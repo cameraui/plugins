@@ -4,6 +4,7 @@
 - **Finds people by their clothing.** With the NVR plugin, a click on a person in the player finds the people who look most alike, also when the face is not visible. The plugin page does the same for a picture you upload.
 - **Outlines what you click.** With the NVR plugin, the person or vehicle you click in the player gets its outline. The plugin page outlines every person, vehicle and animal in a picture.
 - **Each object is reported once, and camera.ui applies your confidence settings.** Less certain detections are passed on too. camera.ui only uses them to keep following what it already tracks. Events and notifications still start only above your confidence settings.
+- **Tells the NVR how clear a face picture is.** With the NVR plugin, unclear faces stay out of Unknown Faces and the Faces view marks unclear training pictures.
 
 ## [1.2.16]
 
