@@ -11,13 +11,15 @@ from camera_ui_ml import (
     PersonEmbedder,
     PlateOcr,
     Segmenter,
-    crop_rgb,
     decode_image,
+    detect_faces_in_image,
+    detect_objects_in_image,
+    detect_plates_in_image,
     embed_face_images,
     embed_person_images,
     normalize_box,
+    requested_threshold,
     reset_stored_settings,
-    scale_box,
     segment_images,
 )
 from camera_ui_ml.detectors.clip import ClipEncoder
@@ -378,17 +380,7 @@ class CoreMLPlugin(
         detector = await self.get_object_detector(model_name)
         if not detector.initialized:
             return None
-
-        raw = await detector.detect_single(image_data, metadata)
-        detections: list[Detection] = [
-            {
-                "label": detector.labels.get(cid, "unknown"),  # type: ignore[typeddict-item]
-                "confidence": conf,
-                "box": box,
-            }
-            for cid, conf, box in raw
-        ]
-        return {"detected": len(detections) > 0, "detections": detections}
+        return await detect_objects_in_image(detector, image_data, metadata, requested_threshold(config))
 
     async def detectObjects(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
@@ -432,29 +424,7 @@ class CoreMLPlugin(
         detector = await self.get_face_detector(detector_name)
         if not detector.initialized:
             return None
-
-        rgb = decode_image(image_data)
-        height, width = int(rgb.shape[0]), int(rgb.shape[1])
-        raw = await detector.detect(rgb)
-        if not raw:
-            return {"detected": False, "detections": []}
-
-        scale_x = width / detector.input_size[0]
-        scale_y = height / detector.input_size[1]
-
-        detections: list[FaceDetection] = []
-        for _cid, conf, box in raw:
-            image_box = scale_box(box, scale_x, scale_y)
-            detections.append(
-                {
-                    "label": "person",
-                    "attribute": "face",
-                    "confidence": conf,
-                    "box": normalize_box(image_box, width, height),
-                }
-            )
-
-        return {"detected": len(detections) > 0, "detections": detections}
+        return await detect_faces_in_image(detector, image_data, metadata, requested_threshold(config))
 
     async def detectFaces(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
@@ -519,30 +489,7 @@ class CoreMLPlugin(
         ocr = await self.get_ocr(ocr_name)
         if not detector.initialized or not ocr.initialized:
             return None
-
-        rgb = decode_image(image_data)
-        height, width = int(rgb.shape[0]), int(rgb.shape[1])
-        raw = await detector.detect(rgb)
-
-        scale_x = width / detector.input_size[0]
-        scale_y = height / detector.input_size[1]
-
-        detections: list[LicensePlateDetection] = []
-        for _cid, conf, box in raw:
-            image_box = scale_box(box, scale_x, scale_y)
-            ocr_result = await ocr.recognize(crop_rgb(rgb, image_box))
-            if ocr_result and ocr_result.text:
-                detections.append(
-                    {
-                        "label": "vehicle",
-                        "attribute": "license_plate",
-                        "confidence": conf,
-                        "plateText": ocr_result.text,
-                        "box": normalize_box(image_box, width, height),
-                    }
-                )
-
-        return {"detected": len(detections) > 0, "detections": detections}
+        return await detect_plates_in_image(detector, ocr, image_data, requested_threshold(config))
 
     async def detectLicensePlates(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None

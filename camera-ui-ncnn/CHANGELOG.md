@@ -1,8 +1,8 @@
 ## [1.2.13]
 
 **Needs camera.ui 2.2.9.** Pick this plugin for each camera as Person Re-ID, to find people whose face is not visible, and as Segmentation, to outline what you click: camera settings, Plugins, Detections. The plugin downloads the models on the first start.
-- **Finds people by their clothing.** With the NVR plugin, a click on a person without a visible face finds the people who look most alike.
-- **Outlines what you click.** With the NVR plugin, finding an object shows the outline of the clicked person or vehicle instead of a box.
+- **Finds people by their clothing.** With the NVR plugin, a click on a person in the player finds the people who look most alike, also when the face is not visible. The plugin page does the same for a picture you upload.
+- **Outlines what you click.** With the NVR plugin, the person or vehicle you click in the player gets its outline. The plugin page outlines every person, vehicle and animal in a picture.
 - **Each object is reported once, and camera.ui applies your confidence settings.** Less certain detections are passed on too. camera.ui only uses them to keep following what it already tracks. Events and notifications still start only above your confidence settings.
 
 ## [1.2.12]

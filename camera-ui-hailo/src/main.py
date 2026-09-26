@@ -4,7 +4,7 @@ import asyncio
 import shutil
 from typing import Any
 
-from camera_ui_ml import normalize_box, reset_stored_settings
+from camera_ui_ml import detect_objects_in_image, normalize_box, requested_threshold, reset_stored_settings
 from camera_ui_sdk import (
     API_EVENT,
     BasePlugin,
@@ -148,17 +148,7 @@ class HailoPlugin(BasePlugin, ObjectDetectionInterface):
         detector = await self.get_object_detector(model_name)
         if not detector.initialized:
             return None
-
-        raw = await detector.detect_single(image_data, metadata)
-        detections: list[Detection] = [
-            {
-                "label": detector.labels.get(cid, "unknown"),  # type: ignore[typeddict-item]
-                "confidence": conf,
-                "box": box,
-            }
-            for cid, conf, box in raw
-        ]
-        return {"detected": len(detections) > 0, "detections": detections}
+        return await detect_objects_in_image(detector, image_data, metadata, requested_threshold(config))
 
     async def detectObjects(
         self, frame: VideoFrameData, config: dict[str, Any] | None = None
