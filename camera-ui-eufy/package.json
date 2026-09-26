@@ -25,7 +25,7 @@
     "@seydx/rtsp": "^1.0.7"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.114",
+    "@camera.ui/cli": "^0.0.115",
     "@camera.ui/sdk": "^1.4.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.6.3",
@@ -39,7 +39,7 @@
     "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.70.1",
-    "updates": "^19.0.2"
+    "updates": "^19.0.3"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
