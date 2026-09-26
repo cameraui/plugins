@@ -1,5 +1,9 @@
 ## [2.0.4]
 
+- Detections that come in as Eufy notifications reach their camera. Many of them were dropped because the notification could not be assigned to a device
+- Cameras connect more reliably when the direct connection has to pass a router
+- The Wall Light Cam S100 no longer cuts its live view about once a minute
+- The light of the Floodlight Cam T8423 can be switched
 - Bump camera.ui engine and SDK
 
 ## [2.0.3]
