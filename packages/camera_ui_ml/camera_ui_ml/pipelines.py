@@ -252,7 +252,11 @@ async def _embed_crops(
     for index, crop in enumerate(crops):
         points = known[index] if known and index < len(known) else None
         # a plain head is cut around the face box, which stored points do not carry
-        face = _stored_face(crop, points) if points and embedder.aligned else await landmarker.points(crop)
+        if points and embedder.aligned:
+            found = face = _stored_face(crop, points)
+        else:
+            found = await landmarker.best(crop)
+            face = landmarker.sure(found)
         result: FaceEmbeddingResult = {
             "embedding": await embedder.embed_face(crop, face),
             "embeddingModel": space,
@@ -260,8 +264,9 @@ async def _embed_crops(
         if face is not None and result["embedding"]:
             size = (crop.shape[1], crop.shape[0])
             result["landmarks"] = [(float(x / size[0]), float(y / size[1])) for x, y in face.points]
-            if not points:
-                result["quality"] = face.score
+        # clarity, also under the threshold: 0 means no face, so only from a detector that ran
+        if not points and landmarker.initialized:
+            result["quality"] = found.score if found is not None else 0.0
         results.append(result)
     return results
 

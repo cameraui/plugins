@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 import numpy as np
 
 from camera_ui_ml.align import ARCFACE_DST_112, umeyama_similarity, warp_face
-from camera_ui_ml.backend import InputSpec
+from camera_ui_ml.backend import InferenceBackend, InputSpec, Outputs
 from camera_ui_ml.detectors.embedder import Embedder
+from camera_ui_ml.detectors.landmarks import FACE_SURE_AT, LandmarkDetector
 from camera_ui_ml.geometry import square_box
 from camera_ui_ml.parsing import FaceLandmarks, parse_yunet
 from camera_ui_ml.pipelines import _embed_crops
@@ -106,10 +109,14 @@ def test_arcface_normalization_maps_to_minus_one_and_one():
 
 
 class FakeLandmarker:
+    threshold = FACE_SURE_AT
+    initialized = True
+    sure = LandmarkDetector.sure
+
     def __init__(self, found: FaceLandmarks | None) -> None:
         self.found = found
 
-    async def points(self, crop: np.ndarray) -> FaceLandmarks | None:
+    async def best(self, crop: np.ndarray) -> FaceLandmarks | None:
         return self.found
 
 
@@ -127,8 +134,8 @@ class FakeEmbedder(Embedder):
         return [1.0]
 
 
-def face_at(box: tuple[float, float, float, float]) -> FaceLandmarks:
-    return FaceLandmarks(score=0.9, box=box, points=np.array(ARCFACE_DST_112, dtype=np.float32))
+def face_at(box: tuple[float, float, float, float], score: float = 0.9) -> FaceLandmarks:
+    return FaceLandmarks(score=score, box=box, points=np.array(ARCFACE_DST_112, dtype=np.float32))
 
 
 def test_square_box_pads_the_longer_side_and_stays_square():
@@ -149,11 +156,35 @@ def test_plain_head_embeds_the_located_face_not_the_whole_picture():
     assert results[0]["quality"] == 0.9
 
 
-def test_no_face_means_no_vector_for_either_head():
+def test_no_face_means_no_vector_and_zero_quality_for_either_head():
     picture = np.zeros((64, 64, 3), dtype=np.uint8)
     for aligned in (True, False):
         results = asyncio.run(_embed_crops(FakeLandmarker(None), FakeEmbedder(aligned), [picture], "space"))
-        assert results == [{"embedding": [], "embeddingModel": "space"}]
+        assert results == [{"embedding": [], "embeddingModel": "space", "quality": 0.0}]
+
+
+def test_an_unclear_face_gets_no_vector_but_its_score_for_either_head():
+    picture = np.zeros((112, 112, 3), dtype=np.uint8)
+    for aligned in (True, False):
+        embedder = FakeEmbedder(aligned)
+        unclear = FakeLandmarker(face_at((0, 0, 112, 112), score=0.55))
+
+        results = asyncio.run(_embed_crops(unclear, embedder, [picture], "space"))
+
+        assert results == [{"embedding": [], "embeddingModel": "space", "quality": 0.55}]
+        assert embedder.seen == []
+
+
+def test_a_clear_face_keeps_vector_points_and_quality_for_either_head():
+    picture = np.zeros((112, 112, 3), dtype=np.uint8)
+    for aligned in (True, False):
+        results = asyncio.run(
+            _embed_crops(FakeLandmarker(face_at((0, 0, 112, 112))), FakeEmbedder(aligned), [picture], "space")
+        )
+
+        assert results[0]["embedding"] == [1.0]
+        assert results[0]["quality"] == 0.9
+        assert len(results[0]["landmarks"]) == 5
 
 
 def test_found_points_come_back_in_the_pictures_own_scale():
@@ -169,7 +200,7 @@ def test_found_points_come_back_in_the_pictures_own_scale():
 
 def test_stored_points_spare_the_search_for_the_face():
     class Unused(FakeLandmarker):
-        async def points(self, crop: np.ndarray) -> FaceLandmarks | None:
+        async def best(self, crop: np.ndarray) -> FaceLandmarks | None:
             raise AssertionError("the face was searched again")
 
     picture = np.zeros((112, 112, 3), dtype=np.uint8)
@@ -179,3 +210,108 @@ def test_stored_points_spare_the_search_for_the_face():
 
     assert results[0]["embedding"] == [1.0]
     assert "quality" not in results[0]
+
+
+def test_stored_points_give_no_quality_on_a_plain_head_either():
+    picture = np.zeros((112, 112, 3), dtype=np.uint8)
+    stored = [(float(x / 112), float(y / 112)) for x, y in ARCFACE_DST_112]
+
+    for found in (face_at((0, 0, 112, 112)), face_at((0, 0, 112, 112), score=0.55), None):
+        results = asyncio.run(
+            _embed_crops(FakeLandmarker(found), FakeEmbedder(False), [picture], "space", [stored])
+        )
+        assert "quality" not in results[0]
+
+
+class FixedBackend(InferenceBackend):
+    def __init__(self, outputs: Outputs) -> None:
+        self.outputs = outputs
+
+    @property
+    def input_size(self) -> tuple[int, int]:
+        return (256, 256)
+
+    def metadata(self) -> Mapping[str, str]:
+        return {}
+
+    async def infer(self, inputs: Sequence[Any]) -> Outputs:
+        return self.outputs
+
+    def close(self) -> None:
+        pass
+
+
+def landmarker(outputs: Outputs) -> LandmarkDetector:
+    model = LandmarkDetector(cast(Any, None), cast(Any, None))
+    model.backend = FixedBackend(outputs)
+    model.initialized = True
+    return model
+
+
+def one_face(cls: float) -> list[np.ndarray]:
+    cols = 256 // 16
+    outputs = yunet_outputs(256, 16, cols * 3 + 4, (0.5, 0.5), np.tile([0.5, 0.5], 5).astype(np.float32))
+    outputs[1] = outputs[1] * cls  # stride 16 cls, score is sqrt(cls * obj)
+    return outputs
+
+
+def test_the_best_candidate_is_found_under_the_threshold_but_not_taken_as_a_face():
+    model = landmarker(one_face(0.25))
+    crop = np.zeros((256, 512, 3), dtype=np.uint8)
+
+    best = asyncio.run(model.best(crop))
+
+    assert best is not None
+    assert best.score == 0.5
+    # the crop is twice as wide as the input
+    assert best.box == (2 * (4.5 * 16 - 16), 3.5 * 16 - 16, 2 * (4.5 * 16 + 16), 3.5 * 16 + 16)
+    assert asyncio.run(model.points(crop)) is None
+
+
+def test_a_face_over_the_threshold_is_taken():
+    model = landmarker(one_face(1.0))
+    crop = np.zeros((256, 256, 3), dtype=np.uint8)
+
+    face = asyncio.run(model.points(crop))
+
+    assert face is not None
+    assert face.score == 1.0
+
+
+def test_noise_under_the_floor_is_no_candidate():
+    model = landmarker(one_face(0.001))
+    crop = np.zeros((256, 256, 3), dtype=np.uint8)
+
+    assert asyncio.run(model.best(crop)) is None
+
+
+def test_the_detector_reports_an_unclear_face_as_quality_without_a_vector():
+    crop = np.zeros((256, 256, 3), dtype=np.uint8)
+    for cls, quality in ((0.25, 0.5), (0.0, 0.0)):
+        embedder = FakeEmbedder(True)
+
+        results = asyncio.run(_embed_crops(landmarker(one_face(cls)), embedder, [crop], "space"))
+
+        assert results == [{"embedding": [], "embeddingModel": "space", "quality": quality}]
+        assert embedder.seen == []
+
+
+def test_the_detector_embeds_a_clear_face_with_its_quality():
+    crop = np.zeros((256, 256, 3), dtype=np.uint8)
+
+    results = asyncio.run(_embed_crops(landmarker(one_face(1.0)), FakeEmbedder(True), [crop], "space"))
+
+    assert results[0]["embedding"] == [1.0]
+    assert results[0]["quality"] == 1.0
+
+
+def test_a_detector_that_is_not_ready_reports_no_quality():
+    model = landmarker(one_face(1.0))
+    model.initialized = False
+    crop = np.zeros((256, 256, 3), dtype=np.uint8)
+    embedder = FakeEmbedder(True)
+
+    results = asyncio.run(_embed_crops(model, embedder, [crop], "space"))
+
+    assert results == [{"embedding": [], "embeddingModel": "space"}]
+    assert embedder.seen == []

@@ -8,6 +8,7 @@ from ..parsing import FaceLandmarks, parse_yunet
 from .base import BaseDetector
 
 FACE_SURE_AT = 0.8
+CANDIDATE_FLOOR = 0.05
 
 
 class LandmarkDetector(BaseDetector):
@@ -36,14 +37,20 @@ class LandmarkDetector(BaseDetector):
         assert self.backend is not None
         self.input_size = self.backend.input_size
 
+    def sure(self, face: FaceLandmarks | None) -> FaceLandmarks | None:
+        return face if face is not None and face.score >= self.threshold else None
+
     async def points(self, crop: NDArray) -> FaceLandmarks | None:
+        return self.sure(await self.best(crop))
+
+    async def best(self, crop: NDArray) -> FaceLandmarks | None:
         if not self._ready() or crop.size == 0:
             return None
         assert self.backend is not None
 
         width, height = self.input_size
         outputs = await self.backend.run(crop, self._spec)
-        found = parse_yunet(outputs, width, self.threshold)
+        found = parse_yunet(outputs, width, min(CANDIDATE_FLOOR, self.threshold))
         if not found:
             return None
 
