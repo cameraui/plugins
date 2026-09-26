@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) - NAME
+Copyright (c) 2026 seydx <hi@seydx.dev>
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
