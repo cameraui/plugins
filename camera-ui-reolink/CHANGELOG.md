@@ -1,3 +1,7 @@
+## [1.2.26]
+
+- Bump camera.ui engine and SDK
+
 ## [1.2.25]
 
 - Update SDK

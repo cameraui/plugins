@@ -1,3 +1,7 @@
+## [1.2.7]
+
+- Bump camera.ui engine and SDK
+
 ## [1.2.6]
 
 - A camera that was unreachable when camera.ui started now comes back on its own

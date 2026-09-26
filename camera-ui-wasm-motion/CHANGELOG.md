@@ -1,3 +1,7 @@
+## [1.2.6]
+
+- Bump camera.ui engine and SDK
+
 ## [1.2.5]
 
 - Updated camera.ui engine

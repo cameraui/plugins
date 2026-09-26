@@ -48,7 +48,7 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.2.5",
+    "camera.ui": ">=2.3.0",
     "node": ">=22.18.0"
   },
   "os": [],

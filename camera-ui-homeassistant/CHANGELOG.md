@@ -1,3 +1,7 @@
+## [1.0.17]
+
+- Bump camera.ui engine and SDK
+
 ## [1.0.16]
 
 - **Home Assistant entities show up for adoption again.** One device whose integration uses numbers in its identifiers, or an entity named with a plain number, made the whole search fail.

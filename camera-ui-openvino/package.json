@@ -29,7 +29,7 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.2.9",
+    "camera.ui": ">=2.3.0",
     "node": ">=22.0.0"
   },
   "os": [

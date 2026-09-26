@@ -1,6 +1,6 @@
-## [1.2.11]
+## [1.3.0]
 
-**Needs camera.ui 2.2.9.**
+**Needs camera.ui 2.3.0.**
 - **Each object is reported once, and camera.ui applies your confidence settings.** Less certain detections are passed on too. camera.ui only uses them to keep following what it already tracks. Events and notifications still start only above your confidence settings.
 
 ## [1.2.10]
