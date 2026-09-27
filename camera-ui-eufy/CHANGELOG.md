@@ -1,3 +1,7 @@
+## [2.0.5]
+
+- **Battery cameras and doorbells are recognized when you add them.** camera.ui then sets up a battery camera so it can sleep. Needs camera.ui 2.3.1.
+
 ## [2.0.4]
 
 - Detections that come in as Eufy notifications reach their camera. Many of them were dropped because the notification could not be assigned to a device

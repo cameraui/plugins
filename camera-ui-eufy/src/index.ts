@@ -5,7 +5,7 @@ import { installNativeLogging } from '@seydx/rtsp';
 import { accountKey, EufyAccount, isCameraRecord } from './account.js';
 import { EufyCamera } from './camera.js';
 import { createStandaloneSensor, discoverStandaloneSensors } from './standalone.js';
-import { COUNTRIES, errorMessage } from './utils.js';
+import { COUNTRIES, errorMessage, isBatteryPowered } from './utils.js';
 
 import type {
   AdoptedSensor,
@@ -181,6 +181,7 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
       name: device.name,
       nativeId: sn,
       isCloud: true,
+      type: device.has('doorbell') ? 'doorbell' : 'camera',
       info: {
         manufacturer: 'Eufy',
         model: device.modelName,
@@ -188,6 +189,7 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         serialNumber: sn,
         firmwareVersion: info?.firmwareVersion,
         supportUrl: 'https://support.eufy.com/',
+        power: isBatteryPowered(device) ? 'battery' : 'mains',
       },
       sources: [
         {
