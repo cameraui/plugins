@@ -1,3 +1,4 @@
+import { BatteryProperty } from '@camera.ui/sdk';
 import { randomBytes } from 'crypto';
 import {
   Accessory,
@@ -27,8 +28,9 @@ import {
 
 import { audioPayloadType, baseAdvertiser, secureVideoMaxRemoteSessions, videoPayloadType } from '../constants.js';
 import * as mac from '../utils/mac.js';
+import { canRecordOnBattery } from '../utils/battery-policy.js';
 import { captureSnapshot } from '../utils/placeholder.js';
-import { filterBindAddresses, generateValidAccessoryName, Subscribed } from '../utils/utils.js';
+import { filterBindAddresses, generateValidAccessoryName, isBatteryInfo, Subscribed } from '../utils/utils.js';
 import { CmafRecordingDelegate } from './cmafRecordingDelegate.js';
 import { MultiTierRtpDelegate } from './multiTierRtpDelegate.js';
 import { RecordingDelegate } from './recordingDelegate.js';
@@ -69,6 +71,25 @@ export class CameraAccessory extends Subscribed {
   private cameraSeenOnline = false;
 
   private sourceCodec: SecureVideoCodec = 'hevc';
+
+  private batteryDetected = false;
+
+  public get batteryPowered(): boolean {
+    return this.batteryDetected;
+  }
+
+  public get batteryRecordingAllowed(): boolean {
+    const sensors = [...this.attachedSensors.values()].filter(isBatteryInfo);
+    return (
+      !this.batteryPowered ||
+      canRecordOnBattery(
+        sensors.map((sensor) => ({
+          level: sensor.getValue(BatteryProperty.Level),
+          low: sensor.getValue(BatteryProperty.Low),
+        })),
+      )
+    );
+  }
 
   private attachedSensors = new Map<string, SensorLike>();
 
@@ -113,13 +134,16 @@ export class CameraAccessory extends Subscribed {
   }
 
   public attachSensor(sensor: SensorLike): void {
+    this.batteryDetected ||= isBatteryInfo(sensor);
     this.attachedSensors.set(sensor.id, sensor);
     this.cameraServices?.addSensor(sensor);
+    this.recordingDelegate?.refreshBatteryState();
   }
 
   public detachSensor(sensorId: string): void {
     if (this.attachedSensors.delete(sensorId)) {
       this.cameraServices?.removeSensor(sensorId);
+      this.recordingDelegate?.refreshBatteryState();
     }
   }
 
@@ -300,7 +324,7 @@ export class CameraAccessory extends Subscribed {
       }),
     );
 
-    this.cameraServices = new CameraServices(this.accessory, this.cameraDevice, this.attachedSensors.values());
+    this.cameraServices = new CameraServices(this.accessory, this.cameraDevice, this.attachedSensors.values(), () => this.recordingDelegate?.refreshBatteryState());
     this.recordingDelegate = new RecordingDelegate(this, this.accessory, this.cameraDevice);
 
     // the main stream codec decides the path without transcoding: HKSV3 remote (WebRTC) is HEVC only, the classic
@@ -481,7 +505,7 @@ export class CameraAccessory extends Subscribed {
   private async detectSecureVideoCodec(): Promise<SecureVideoCodec> {
     const source = this.cameraDevice.streamSource;
     let codec = source.videoCodec;
-    if (!codec) {
+    if (!codec && !this.batteryPowered) {
       try {
         const timeout = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), PROBE_TIMEOUT));
         const probe = await Promise.race([source.probeStream({ video: true, audio: false }), timeout]);
@@ -556,7 +580,7 @@ export class CameraAccessory extends Subscribed {
       recording: { options: this.createRecordingOptions(), delegate: recordingDelegate },
       ...(cmafDelegate ? { ingest: { delegate: cmafDelegate } } : {}),
       motionService,
-      snapshot: () => captureSnapshot(this.cameraDevice),
+      snapshot: () => captureSnapshot(this.cameraDevice, this.batteryPowered),
     });
 
     return controller;

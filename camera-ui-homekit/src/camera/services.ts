@@ -25,7 +25,12 @@ export class CameraServices extends Subscribed {
 
   private activeEventTypes?: Set<string>;
 
-  constructor(accessory: Accessory, cameraDevice: CameraDevice, sensors: Iterable<SensorLike>) {
+  constructor(
+    accessory: Accessory,
+    cameraDevice: CameraDevice,
+    sensors: Iterable<SensorLike>,
+    private onBatteryChange: () => void = () => {},
+  ) {
     super();
 
     this.accessory = accessory;
@@ -393,6 +398,7 @@ export class CameraServices extends Subscribed {
         : undefined;
 
       this.updateBatteryValues(batteryService, currentLevel, currentLow, currentCharging);
+      this.onBatteryChange();
     });
     this.sensorSubscriptions.set(sensorId, sub);
 

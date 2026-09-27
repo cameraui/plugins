@@ -1,3 +1,5 @@
+import { BatterySnapshotCache } from './battery-snapshot.js';
+
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -13,10 +15,16 @@ export function placeholderImageFor(cameraDevice: CameraDevice): string | undefi
   return undefined;
 }
 
-export async function captureSnapshot(cameraDevice: CameraDevice): Promise<Buffer> {
+const batterySnapshots = new BatterySnapshotCache();
+
+export async function captureSnapshot(cameraDevice: CameraDevice, batteryPowered = false): Promise<Buffer> {
   const placeholder = placeholderImageFor(cameraDevice);
   if (placeholder) {
     return readFileSync(placeholder);
+  }
+
+  if (batteryPowered) {
+    return (await batterySnapshots.get(cameraDevice)) ?? readFileSync(noSnapshotImage);
   }
 
   const source = cameraDevice.snapshotSource ?? cameraDevice.streamSource;

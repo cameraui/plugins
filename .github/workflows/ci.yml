@@ -104,6 +104,10 @@ jobs:
       - name: Lint
         run: npm --prefix ${{ matrix.plugin }} run lint
 
+      - name: Test HomeKit battery protection
+        if: matrix.plugin == 'camera-ui-homekit'
+        run: node --test camera-ui-homekit/tests/battery-protection.test.mjs
+
   go-plugins:
     needs: changes
     if: needs.changes.outputs.go != '[]'
