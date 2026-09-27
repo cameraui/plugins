@@ -1,3 +1,8 @@
+## [1.3.4]
+
+- **Battery cameras can sleep.** HomeKit Secure Video only keeps a camera connected for the seconds before an event when hot mode is on for its main stream. Without hot mode, as plugins set it for battery cameras, a recording opens the stream when the event starts.
+- **The picture in Home follows the camera's snapshot setting.** It used to fetch a new one on every request, which woke battery cameras. While an event runs or the doorbell rings, it still fetches a fresh one.
+
 ## [1.3.3]
 
 - Bump camera.ui engine and SDK

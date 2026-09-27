@@ -69,6 +69,7 @@ export class CameraAccessory extends Subscribed {
   private cameraSeenOnline = false;
 
   private sourceCodec: SecureVideoCodec = 'hevc';
+  private sourceHotMode: boolean;
 
   private attachedSensors = new Map<string, SensorLike>();
 
@@ -87,6 +88,7 @@ export class CameraAccessory extends Subscribed {
     this.cameraLogger = cameraDevice.logger;
     this.cameraDevice = cameraDevice;
     this.publishedExternalAccessories = platform.publishedExternalAccessories;
+    this.sourceHotMode = this.hotMode();
 
     this.cameraStorage = this.createCameraStorage();
 
@@ -106,10 +108,15 @@ export class CameraAccessory extends Subscribed {
     });
 
     this.cameraDevice.onPropertyChange('sources').subscribe(() => {
+      this.followSourceHotMode();
       this.followSourceCodec();
     });
 
     this.publishAccessory();
+  }
+
+  public get eventActive(): boolean {
+    return this.cameraServices?.eventActive ?? false;
   }
 
   public attachSensor(sensor: SensorLike): void {
@@ -463,6 +470,21 @@ export class CameraAccessory extends Subscribed {
     ]);
   }
 
+  private followSourceHotMode(): void {
+    const hotMode = this.hotMode();
+    if (hotMode === this.sourceHotMode) {
+      return;
+    }
+
+    this.sourceHotMode = hotMode;
+    this.cameraLogger.debug(`Hot mode of the main stream turned ${hotMode ? 'on' : 'off'}`);
+    this.recordingDelegate?.refreshPrebuffer();
+  }
+
+  private hotMode(): boolean {
+    return this.cameraDevice.streamSource.hotMode !== false;
+  }
+
   private async followSourceCodec(): Promise<void> {
     const codec = this.cameraDevice.streamSource.videoCodec;
     if (!this.published || this.publishing || !codec) {
@@ -556,7 +578,7 @@ export class CameraAccessory extends Subscribed {
       recording: { options: this.createRecordingOptions(), delegate: recordingDelegate },
       ...(cmafDelegate ? { ingest: { delegate: cmafDelegate } } : {}),
       motionService,
-      snapshot: () => captureSnapshot(this.cameraDevice),
+      snapshot: () => captureSnapshot(this.cameraDevice, this.eventActive),
     });
 
     return controller;

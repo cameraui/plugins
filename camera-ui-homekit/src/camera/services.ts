@@ -21,6 +21,7 @@ export class CameraServices extends Subscribed {
   private capabilitySubscriptions = new Map<string, Disposable>();
   private sensorServices = new Map<string, Service>();
   private doorbellSensorIds = new Set<string>();
+  private ringingSensorIds = new Set<string>();
   private batterySensorId?: string;
 
   private activeEventTypes?: Set<string>;
@@ -57,6 +58,10 @@ export class CameraServices extends Subscribed {
     }
   }
 
+  public get eventActive(): boolean {
+    return this.activeEventTypes !== undefined || this.ringingSensorIds.size > 0;
+  }
+
   public addSensor(sensor: SensorLike): void {
     if (this.sensorSubscriptions.has(sensor.id)) {
       return;
@@ -79,6 +84,7 @@ export class CameraServices extends Subscribed {
     this.capabilitySubscriptions.get(sensorId)?.dispose();
     this.capabilitySubscriptions.delete(sensorId);
 
+    this.ringingSensorIds.delete(sensorId);
     if (this.doorbellSensorIds.delete(sensorId) && !this.doorbellSensorIds.size && this.cameraDevice.type !== 'doorbell') {
       this.removeDoorbellService();
     }
@@ -120,6 +126,7 @@ export class CameraServices extends Subscribed {
     this.capabilitySubscriptions.clear();
 
     this.doorbellSensorIds.clear();
+    this.ringingSensorIds.clear();
     this.sensorServices.clear();
     this.unsubscribe();
     this.services.forEach((service) => service.removeAllListeners());
@@ -199,10 +206,17 @@ export class CameraServices extends Subscribed {
     const ringProperty: string = DoorbellProperty.Ring;
 
     const sub = sensor.onPropertyChanged.subscribe(({ property, value }) => {
-      if (property === ringProperty && value === true) {
-        this.cameraLogger.debug(`Doorbell ring from sensor: ${sensor.displayName}`);
-        doorbellService.getCharacteristic(Characteristic.ProgrammableSwitchEvent).updateValue(Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+      if (property !== ringProperty) {
+        return;
       }
+      if (value !== true) {
+        this.ringingSensorIds.delete(sensor.id);
+        return;
+      }
+
+      this.ringingSensorIds.add(sensor.id);
+      this.cameraLogger.debug(`Doorbell ring from sensor: ${sensor.displayName}`);
+      doorbellService.getCharacteristic(Characteristic.ProgrammableSwitchEvent).updateValue(Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
     });
 
     this.sensorSubscriptions.set(sensor.id, sub);

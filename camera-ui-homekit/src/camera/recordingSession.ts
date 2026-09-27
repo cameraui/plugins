@@ -47,6 +47,7 @@ export class RecordingSession extends EventEmitter {
 
   private consumers = new Set<LiveConsumer>();
   private hdsConsumer?: LiveConsumer;
+  private demandConsumers = 0;
 
   constructor(
     private cameraAccessory: CameraAccessory,
@@ -102,11 +103,7 @@ export class RecordingSession extends EventEmitter {
       throw new Error('No recording configuration set');
     }
 
-    const session = this.session;
-    if (!session) {
-      throw new Error('FMP4 session unavailable');
-    }
-
+    const session = await this.acquireSession();
     const tfdtOffsets = new Map<number, bigint>();
     const buffered = [...this.prebuffer];
     const consumer = this.addConsumer();
@@ -146,15 +143,12 @@ export class RecordingSession extends EventEmitter {
       if (this.hdsConsumer === consumer) {
         this.hdsConsumer = undefined;
       }
+      await this.releaseSession(session);
     }
   }
 
   public async *getClipStream(options: ClipStreamOptions): AsyncGenerator<ClipPart, void> {
-    const session = this.session;
-    if (!session) {
-      throw new Error('FMP4 session unavailable');
-    }
-
+    const session = await this.acquireSession();
     const { signal } = options;
     const fragmentLength = this.fragmentLength();
     const startMs = options.start === undefined ? 0 : ntpToMilliseconds(options.start);
@@ -192,6 +186,7 @@ export class RecordingSession extends EventEmitter {
       }
     } finally {
       this.removeConsumer(consumer);
+      await this.releaseSession(session);
     }
   }
 
@@ -234,6 +229,12 @@ export class RecordingSession extends EventEmitter {
         return;
       }
 
+      if (!this.keepsConnection()) {
+        this.logger.debug(this.logPrefix, 'Hot mode is off, recordings open the stream on demand');
+        this.deferred = false;
+        return;
+      }
+
       if (this.cameraDevice.disabled || !this.cameraDevice.connected) {
         this.logger.debug(this.logPrefix, 'Camera unavailable, prebuffer deferred');
         this.deferred = true;
@@ -263,6 +264,51 @@ export class RecordingSession extends EventEmitter {
       this.logger.error(this.logPrefix, 'Session lifecycle error:', error);
     });
     return next;
+  }
+
+  private keepsConnection(): boolean {
+    return this.cameraDevice.streamSource.hotMode !== false;
+  }
+
+  private async acquireSession(): Promise<Fmp4Session> {
+    if (this.keepsConnection()) {
+      if (!this.session) {
+        throw new Error('FMP4 session unavailable');
+      }
+      return this.session;
+    }
+
+    let session: Fmp4Session | undefined;
+    await this.enqueueLifecycle(async () => {
+      if (!this.session) {
+        try {
+          this.startCollector(await this.startSession());
+        } catch (error) {
+          await this.stopSession();
+          throw error;
+        }
+      }
+      this.demandConsumers++;
+      session = this.session;
+    });
+
+    if (!session) {
+      throw new Error('FMP4 session unavailable');
+    }
+    return session;
+  }
+
+  private async releaseSession(session: Fmp4Session): Promise<void> {
+    if (this.keepsConnection() || this.session !== session) {
+      return;
+    }
+
+    this.demandConsumers = Math.max(0, this.demandConsumers - 1);
+    await this.enqueueLifecycle(async () => {
+      if (this.demandConsumers === 0) {
+        await this.stopSession(session);
+      }
+    });
   }
 
   private async startSession(): Promise<Fmp4Session> {
@@ -323,7 +369,7 @@ export class RecordingSession extends EventEmitter {
           await this.enqueueLifecycle(async () => {
             if (this.session === session) {
               await this.stopSession(session);
-              if (this.recordingActive && !this.stopped) {
+              if (this.recordingActive && !this.stopped && this.keepsConnection()) {
                 this.deferred = true;
               }
               this.scheduleRestart();
@@ -341,6 +387,8 @@ export class RecordingSession extends EventEmitter {
     }
 
     this.session = undefined;
+    this.demandConsumers = 0;
+    this.prebuffer = [];
     this.collectAbort?.abort();
     this.collectAbort = undefined;
     this.sessionSubscriptions.forEach((subscription) => subscription.unsubscribe());
@@ -355,7 +403,7 @@ export class RecordingSession extends EventEmitter {
   }
 
   private scheduleRestart(): void {
-    if (this.stopped || !this.recordingActive || this.restartTimeout) {
+    if (this.stopped || !this.recordingActive || this.restartTimeout || !this.keepsConnection()) {
       return;
     }
     this.restartTimeout = setTimeout(() => {

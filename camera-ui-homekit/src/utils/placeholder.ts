@@ -13,7 +13,7 @@ export function placeholderImageFor(cameraDevice: CameraDevice): string | undefi
   return undefined;
 }
 
-export async function captureSnapshot(cameraDevice: CameraDevice): Promise<Buffer> {
+export async function captureSnapshot(cameraDevice: CameraDevice, fresh: boolean): Promise<Buffer> {
   const placeholder = placeholderImageFor(cameraDevice);
   if (placeholder) {
     return readFileSync(placeholder);
@@ -21,7 +21,7 @@ export async function captureSnapshot(cameraDevice: CameraDevice): Promise<Buffe
 
   const source = cameraDevice.snapshotSource ?? cameraDevice.streamSource;
   try {
-    const snapshot = await source.snapshot(true);
+    const snapshot = await source.snapshot(fresh);
     const buffer = snapshot ? Buffer.from(snapshot) : undefined;
     if (buffer && buffer.length > 0) {
       return buffer;
