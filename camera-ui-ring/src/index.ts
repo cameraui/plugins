@@ -199,6 +199,7 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
       name: ringCamera.name,
       nativeId: ringCamera.id.toString(),
       isCloud: true,
+      type: ringCamera.isDoorbot ? 'doorbell' : 'camera',
       info: {
         manufacturer: 'Ring',
         model: ringCamera.model ?? '',
@@ -206,6 +207,7 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
         serialNumber: ringCamera.data.device_id ?? '',
         firmwareVersion: ringCamera.data.health.firmware_version ?? '',
         supportUrl: 'https://support.ring.com/',
+        power: ringCamera.hasBattery ? 'battery' : 'mains',
       },
       sources: [
         {
