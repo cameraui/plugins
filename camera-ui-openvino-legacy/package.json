@@ -21,8 +21,8 @@
     "update": "updates -M npm,pypi,go,cargo,docker,make --update ./ && cupdate"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.115",
-    "@camera.ui/sdk": "^1.4.0",
+    "@camera.ui/cli": "^0.0.116",
+    "@camera.ui/sdk": "^1.4.1",
     "cross-env": "^10.1.0"
   },
   "bugs": {
