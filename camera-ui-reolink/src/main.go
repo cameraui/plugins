@@ -612,6 +612,9 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 			info["firmwareVersion"] = probe.info.FirmwareVersion
 		}
 	}
+	if probe.caps.Battery {
+		info["power"] = "battery"
+	}
 
 	if entry.channel < 0 && probe.loginInfo.IsDualLens() {
 		p.registerTeleLenses(camera.ID, entry, username, password, probe.loginInfo.ChannelNum)
@@ -619,12 +622,16 @@ func (p *ReolinkPlugin) OnAdoptCamera(camera sdk.DiscoveredCamera, settings map[
 
 	p.Logger.Log("Adopted camera:", name)
 
-	return map[string]any{
+	config := map[string]any{
 		"name":     name,
 		"nativeId": camera.ID,
 		"info":     info,
 		"sources":  sources,
-	}, nil
+	}
+	if probe.caps.Doorbell {
+		config["type"] = "doorbell"
+	}
+	return config, nil
 }
 
 func (p *ReolinkPlugin) expandNVR(camera sdk.DiscoveredCamera, nvrEntry discoveredEntry, username string, password string, channels []int) error {
