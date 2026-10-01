@@ -25,7 +25,7 @@
     "@seydx/rtsp": "^1.0.7"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.115",
+    "@camera.ui/cli": "^0.0.116",
     "@camera.ui/sdk": "^1.4.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.6.3",
