@@ -1,6 +1,10 @@
 ## [2.0.5]
 
 - **Battery cameras and doorbells are recognized when you add them.** camera.ui then sets up a battery camera so it can sleep. Needs camera.ui 2.3.1.
+- The live view freezes less often. A frame lost on the way, or cut between two network packets, stopped the picture until the next full frame arrived
+- Cameras behind a HomeBase 3 keep streaming. After a while every new live view failed until the connection was rebuilt
+- Cameras behind a HomeBase 2 show the picture of their latest event, and an event that arrives before its picture still gets one
+- The siren of a HomeBase 3 can be triggered
 
 ## [2.0.4]
 
