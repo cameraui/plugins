@@ -5,6 +5,8 @@
 - Cameras behind a HomeBase 3 keep streaming. After a while every new live view failed until the connection was rebuilt
 - Cameras behind a HomeBase 2 show the picture of their latest event, and an event that arrives before its picture still gets one
 - The siren of a HomeBase 3 can be triggered
+- A connection to a camera that went silent is noticed and rebuilt. The live view no longer stays stuck on it
+- With debug logging on, every Eufy notification shows up in the log, so a missing detection can be traced
 
 ## [2.0.4]
 
