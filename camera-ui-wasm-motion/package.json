@@ -29,7 +29,7 @@
     "@camera.ui/sdk": "^1.4.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "26.6.3",
+    "@types/node": "26.6.4",
     "@typescript-eslint/parser": "^8.71.0",
     "assemblyscript": "^0.28.20",
     "concurrently": "^10.0.5",

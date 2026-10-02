@@ -27,7 +27,7 @@
     "@camera.ui/cli": "^0.0.116",
     "@camera.ui/sdk": "^1.4.1",
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@types/node": "26.6.3",
+    "@types/node": "26.6.4",
     "@types/ws": "^8.18.2",
     "@typescript-eslint/parser": "^8.71.0",
     "concurrently": "^10.0.5",
