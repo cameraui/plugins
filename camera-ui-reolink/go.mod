@@ -3,14 +3,14 @@ module github.com/cameraui/plugins/camera-ui-reolink
 go 1.27.0
 
 require (
-	github.com/cameraui/sdk/go v1.4.1
+	github.com/cameraui/sdk/go v1.4.2
 	github.com/shareed2k/reolinkproxy v0.2.5
 )
 
 require (
 	github.com/bluenviron/gortsplib/v5 v5.6.0 // indirect
 	github.com/bluenviron/mediacommon/v2 v2.9.0 // indirect
-	github.com/cameraui/rpc/go v1.0.19 // indirect
+	github.com/cameraui/rpc/go v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
