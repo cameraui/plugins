@@ -125,7 +125,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version-file: ${{ matrix.plugin }}/go.mod
+          go-version: "stable"
           cache-dependency-path: ${{ matrix.plugin }}/go.sum
 
       - name: Install
