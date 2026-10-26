@@ -1,3 +1,7 @@
+## [1.3.2]
+
+- Build with Go 1.27.3, which brings security fixes for certificate checks, TLS and HTTP
+
 ## [1.3.1]
 
 - Update camera.ui SDK
