@@ -27,7 +27,7 @@
     "@camera.ui/sdk": "^1.4.4",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.5",
-    "@typescript-eslint/parser": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.1",
     "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
     "eslint": "9.39.2",
@@ -37,7 +37,7 @@
     "set-interval-async": "^3.0.4",
     "sharp": "^0.35.5",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "updates": "^19.3.0"
   },
   "bugs": {
