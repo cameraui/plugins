@@ -1,3 +1,14 @@
+## [2.1.1]
+
+- **Some cameras without a HomeBase show a live view again**, among them the Wired Doorbell 2K and the Floodlight Cam 2. They accepted the live view and never sent a picture.
+- **Some HomeBases and cameras connect reliably after a restart again.** Their connection failed on most restarts.
+- **Cameras connect when no direct connection gets through**, for example with camera.ui in Docker on the default bridge network. The plugin then goes through Eufy's relay servers, like the Eufy app.
+- **A live view that joins a running stream starts at its next full frame** instead of a broken picture.
+- **More cameras behind a recorder (T8N00) show a live view with sound**: the PoE Cam E41, eufyCam S3 Pro, Indoor Cam Pan & Tilt and Video Doorbell E340, on a 64-bit system. The PoE Cam E41 no longer shows a battery it does not have.
+- **The Video Doorbell C30 shows a live view**, without sound and on a 64-bit system.
+- **More devices work as in the Eufy app.** The spotlight of a Wall Light Cam S4 can be switched, an older Smart Lock Touch & Wi-Fi (T8520) locks and unlocks, and a Floodlight Cam T8423 no longer ignores guard mode changes.
+- **Less memory and disk use on installs that run for a long time.** The plugin kept an ID for every Eufy notification it ever received and saved the whole list after each new one.
+
 ## [2.1.0]
 
 - **Battery cameras and doorbells are recognized when you add them.** camera.ui then sets up a battery camera so it can sleep. Needs camera.ui 2.4.0.
