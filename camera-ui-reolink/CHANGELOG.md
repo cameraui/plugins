@@ -1,3 +1,9 @@
+## [1.3.3]
+
+- **Battery cameras on a Home Hub or NVR get their events through the recorder.** The plugin keeps its connection to the recorder open for them, as Home Assistant does, and no longer takes over the recorder's push address, which Home Assistant uses too.
+- **Battery cameras reached over their UID can sleep as soon as the plugin is done.** The plugin now tells the camera it leaves, before it stayed awake until it timed out.
+- **Smaller fixes.** Cameras on an NVR or Home Hub no longer log a warning about alarms for other channels, and an account device that offers no local login at all is named as such.
+
 ## [1.3.2]
 
 - Build with Go 1.27.3, which brings security fixes for certificate checks, TLS and HTTP
