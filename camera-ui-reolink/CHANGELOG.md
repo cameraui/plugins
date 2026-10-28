@@ -1,3 +1,7 @@
+## [1.3.4]
+
+- **Cameras in privacy mode are back as soon as it ends.** The picture returns within a second instead of up to a minute later, and the log no longer reports the stream as stalled while privacy mode is on.
+
 ## [1.3.3]
 
 - **Battery cameras on a Home Hub or NVR get their events through the recorder.** The plugin keeps its connection to the recorder open for them, as Home Assistant does, and no longer takes over the recorder's push address, which Home Assistant uses too.

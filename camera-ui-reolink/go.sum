@@ -4,8 +4,8 @@ github.com/bluenviron/mediacommon/v2 v2.9.0 h1:8gBeby10B/qD8ctnesKTHx3pgdsxiZcaQ
 github.com/bluenviron/mediacommon/v2 v2.9.0/go.mod h1:syqw4j2RmBCKZgUtGFtB/7gcnh1aaX8I3vd24+bgXWc=
 github.com/cameraui/rpc/go v1.1.2 h1:DeXmGWMGIfseRibtpM3C6HmGtCb2nE5nzNO6E1i218o=
 github.com/cameraui/rpc/go v1.1.2/go.mod h1:I+p4LrtKYRNsTpDWmbEBS4GI5754Yjoc0vSf5ow/sMc=
-github.com/cameraui/sdk/go v1.4.4 h1:tEPjMxUibzUOETPoI52vV2nI7+p5xEwOq2Sh/4pOgGY=
-github.com/cameraui/sdk/go v1.4.4/go.mod h1:+lZ+RRpZEbivYDHTDkhSPmGWMc31sy7le5/wgdc3S5U=
+github.com/cameraui/sdk/go v1.4.5 h1:906xhv7AvQLzVRjafhnkJC6vqDUxFjGp8qDpeq7V1zU=
+github.com/cameraui/sdk/go v1.4.5/go.mod h1:+lZ+RRpZEbivYDHTDkhSPmGWMc31sy7le5/wgdc3S5U=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
