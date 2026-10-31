@@ -1,3 +1,7 @@
+## [1.3.5]
+
+- **A camera you connect to an NVR or Home Hub later shows up in the camera search.** The plugin checks the NVRs you added on every search, before you had to add the NVR again.
+
 ## [1.3.4]
 
 - **Cameras in privacy mode are back as soon as it ends.** The picture returns within a second instead of up to a minute later, and the log no longer reports the stream as stalled while privacy mode is on.

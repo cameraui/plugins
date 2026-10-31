@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sdk "github.com/cameraui/sdk/go"
@@ -19,6 +22,7 @@ const (
 	defaultRTSPPort    = 8556
 	defaultWebhookPort = 8557
 	adoptProbeTimeout  = 45 * time.Second
+	nvrRefreshTimeout  = 15 * time.Second
 	storageKeyNVRs     = "nvrs"
 	storageKeyDuals    = "dualLensCameras"
 	presenceGrace      = 5 * time.Minute
@@ -40,6 +44,7 @@ type ReolinkPlugin struct {
 	nvrs            map[string]storedNVR         // base discovery ID → connected NVR
 	duals           map[string]storedNVR         // base discovery ID → dual-lens camera, tele channels
 	pendingSettings map[string]cameraSettings
+	refreshingNVRs  atomic.Bool
 }
 
 type discoveredEntry struct {
@@ -233,7 +238,7 @@ func (p *ReolinkPlugin) loadNVRs() {
 	defer p.mu.Unlock()
 	p.nvrs = nvrs
 	for baseID, nvr := range nvrs {
-		device := baichuan.DiscoveredDevice{IP: nvr.IP, UID: nvr.UID, Name: nvr.Name}
+		device := nvr.device()
 		for _, ch := range nvr.Channels {
 			p.discovered[fmt.Sprintf("%s:ch%d", baseID, ch)] = discoveredEntry{device: device, channel: ch, manual: nvr.Manual}
 		}
@@ -266,7 +271,7 @@ func (p *ReolinkPlugin) loadDuals() {
 	defer p.mu.Unlock()
 	p.duals = duals
 	for baseID, dual := range duals {
-		device := baichuan.DiscoveredDevice{IP: dual.IP, UID: dual.UID, Name: dual.Name}
+		device := dual.device()
 		for _, ch := range dual.Channels {
 			p.discovered[fmt.Sprintf("%s:ch%d", baseID, ch)] = discoveredEntry{device: device, channel: ch, manual: dual.Manual, tele: true}
 		}
@@ -433,6 +438,8 @@ func (p *ReolinkPlugin) OnCameraReleased(cameraID string) error {
 }
 
 func (p *ReolinkPlugin) OnDiscoverCameras() ([]sdk.DiscoveredCamera, error) {
+	p.refreshNVRs()
+
 	p.mu.Lock()
 	watcher := p.watcher
 	p.mu.Unlock()
@@ -643,7 +650,7 @@ func (p *ReolinkPlugin) expandNVR(camera sdk.DiscoveredCamera, nvrEntry discover
 	device := nvrEntry.device
 
 	p.mu.Lock()
-	p.nvrs[camera.ID] = storedNVR{
+	entries := p.storeNVRLocked(camera.ID, storedNVR{
 		Username: username,
 		Password: password,
 		IP:       device.IP,
@@ -651,37 +658,7 @@ func (p *ReolinkPlugin) expandNVR(camera sdk.DiscoveredCamera, nvrEntry discover
 		Name:     device.Name,
 		Manual:   nvrEntry.manual,
 		Channels: channels,
-	}
-	p.persistNVRs()
-
-	adopted := make(map[string]struct{}, len(p.existing))
-	for _, dev := range p.existing {
-		if nativeID := dev.NativeID(); nativeID != "" {
-			adopted[nativeID] = struct{}{}
-		}
-	}
-
-	entries := make([]sdk.DiscoveredCamera, 0, len(channels))
-	valid := make(map[string]struct{}, len(channels))
-	for _, ch := range channels {
-		chID := fmt.Sprintf("%s:ch%d", camera.ID, ch)
-		valid[chID] = struct{}{}
-		chEntry := discoveredEntry{device: device, channel: ch, manual: nvrEntry.manual}
-		p.discovered[chID] = chEntry
-		if _, ok := adopted[chID]; ok {
-			continue
-		}
-		entries = append(entries, discoveredCameraFrom(chID, chEntry))
-	}
-
-	prefix := camera.ID + ":ch"
-	for id, e := range p.discovered {
-		if e.channel >= 0 && strings.HasPrefix(id, prefix) {
-			if _, ok := valid[id]; !ok {
-				delete(p.discovered, id)
-			}
-		}
-	}
+	})
 	p.mu.Unlock()
 
 	if len(entries) > 0 {
@@ -692,6 +669,95 @@ func (p *ReolinkPlugin) expandNVR(camera sdk.DiscoveredCamera, nvrEntry discover
 
 	p.Logger.Log(fmt.Sprintf("NVR %s expanded into %d channel camera(s)", camera.Name, len(entries)))
 	return fmt.Errorf("NVR detected: %d channel camera(s) were added to the discovered list, adopt each channel individually (credentials are prefilled)", len(entries))
+}
+
+func (p *ReolinkPlugin) storeNVRLocked(baseID string, nvr storedNVR) []sdk.DiscoveredCamera {
+	p.nvrs[baseID] = nvr
+	p.persistNVRs()
+
+	adopted := make(map[string]struct{}, len(p.existing))
+	for _, dev := range p.existing {
+		if nativeID := dev.NativeID(); nativeID != "" {
+			adopted[nativeID] = struct{}{}
+		}
+	}
+
+	device := nvr.device()
+	entries := make([]sdk.DiscoveredCamera, 0, len(nvr.Channels))
+	valid := make(map[string]struct{}, len(nvr.Channels))
+	for _, ch := range nvr.Channels {
+		chID := fmt.Sprintf("%s:ch%d", baseID, ch)
+		valid[chID] = struct{}{}
+		chEntry := discoveredEntry{device: device, channel: ch, manual: nvr.Manual}
+		p.discovered[chID] = chEntry
+		if _, ok := adopted[chID]; ok {
+			continue
+		}
+		entries = append(entries, discoveredCameraFrom(chID, chEntry))
+	}
+
+	prefix := baseID + ":ch"
+	for id, e := range p.discovered {
+		if e.channel >= 0 && strings.HasPrefix(id, prefix) {
+			if _, ok := valid[id]; !ok {
+				delete(p.discovered, id)
+			}
+		}
+	}
+	return entries
+}
+
+func (p *ReolinkPlugin) refreshNVRs() {
+	if !p.refreshingNVRs.CompareAndSwap(false, true) {
+		return
+	}
+	p.mu.Lock()
+	nvrs := maps.Clone(p.nvrs)
+	p.mu.Unlock()
+
+	// in the background, an NVR that is offline must not hold up the scan
+	go func() {
+		defer p.refreshingNVRs.Store(false)
+		var wg sync.WaitGroup
+		for baseID, nvr := range nvrs {
+			wg.Go(func() { p.refreshNVR(baseID, nvr) })
+		}
+		wg.Wait()
+	}()
+}
+
+func (p *ReolinkPlugin) refreshNVR(baseID string, nvr storedNVR) {
+	ctx, cancel := context.WithTimeout(context.Background(), nvrRefreshTimeout)
+	defer cancel()
+
+	client, err := loginDevice(ctx, nvr.device(), nvr.Username, nvr.Password)
+	if err != nil {
+		p.Logger.Debug("Failed to reach NVR", nvr.Name, "for its cameras:", err)
+		return
+	}
+	channels, err := client.OccupiedChannels(ctx)
+	_ = client.Close()
+	// an empty list is more likely a hiccup than an NVR without cameras
+	if err != nil || len(channels) == 0 || slices.Equal(channels, nvr.Channels) {
+		return
+	}
+
+	p.mu.Lock()
+	current, ok := p.nvrs[baseID]
+	if !ok {
+		p.mu.Unlock()
+		return
+	}
+	current.Channels = channels
+	entries := p.storeNVRLocked(baseID, current)
+	p.mu.Unlock()
+
+	p.Logger.Log(fmt.Sprintf("NVR %s now reports %d camera(s)", nvr.Name, len(channels)))
+	if len(entries) > 0 {
+		if err := p.API.DeviceManager.PushDiscoveredCameras(entries); err != nil {
+			p.Logger.Warn("Failed to push NVR channels:", err)
+		}
+	}
 }
 
 func (p *ReolinkPlugin) registerTeleLenses(baseID string, baseEntry discoveredEntry, username string, password string, channelNum int) {
@@ -741,25 +807,31 @@ type probeResult struct {
 	uid       string
 }
 
-func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username string, password string, channel uint8) (probeResult, error) {
-	cfg := baichuan.Config{
+func loginDevice(ctx context.Context, device baichuan.DiscoveredDevice, username string, password string) (*baichuan.Client, error) {
+	client, err := baichuan.Dial(ctx, baichuan.Config{
 		Host:     device.IP,
 		Port:     9000,
 		UID:      device.UID,
 		Username: username,
 		Password: password,
 		Timeout:  10 * time.Second,
+	})
+	if err != nil {
+		return nil, err
 	}
+	if err := client.Login(ctx); err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	return client, nil
+}
 
-	client, err := baichuan.Dial(ctx, cfg)
+func probeCamera(ctx context.Context, device baichuan.DiscoveredDevice, username string, password string, channel uint8) (probeResult, error) {
+	client, err := loginDevice(ctx, device, username, password)
 	if err != nil {
 		return probeResult{}, err
 	}
 	defer func() { _ = client.Close() }()
-
-	if err := client.Login(ctx); err != nil {
-		return probeResult{}, err
-	}
 
 	result := probeResult{
 		streams:   []string{"main", "sub"},
@@ -837,6 +909,10 @@ func (p *ReolinkPlugin) onAddManual(value any) *sdk.FormSubmitResponse {
 	}
 
 	return &sdk.FormSubmitResponse{Toast: &sdk.ToastMessage{Type: "success", Message: name + " added. Adopt it from the discovered cameras list."}}
+}
+
+func (n storedNVR) device() baichuan.DiscoveredDevice {
+	return baichuan.DiscoveredDevice{IP: n.IP, UID: n.UID, Name: n.Name}
 }
 
 func discoveryID(device baichuan.DiscoveredDevice) string {
