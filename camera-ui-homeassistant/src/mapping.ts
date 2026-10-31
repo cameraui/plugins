@@ -14,7 +14,8 @@ const DEVICE_CLASS_ALIASES: Record<string, string> = {
 // battery becomes a capability of the owning sensor, never a standalone import
 const SKIPPED_DEVICE_CLASSES = new Set(['battery']);
 
-export type EntityMapping = { kind: 'binary'; meta: SensorMeta } | { kind: 'measurement'; meta: SensorMeta } | { kind: 'motion' } | { kind: 'doorbell' };
+export type EntityMapping =
+  { kind: 'binary'; meta: SensorMeta } | { kind: 'measurement'; meta: SensorMeta } | { kind: 'motion' } | { kind: 'audio' } | { kind: 'doorbell' };
 
 const binaryMetas = new Map<string, SensorMeta>();
 const measurementMetas = new Map<string, SensorMeta>();
@@ -40,6 +41,7 @@ export function mapEntity(state: HaState): EntityMapping | undefined {
   if (domain === 'binary_sensor') {
     // motion is a detection type without catalog semantics, mapped explicitly
     if (deviceClass === 'motion' || deviceClass === 'moving') return { kind: 'motion' };
+    if (deviceClass === 'sound') return { kind: 'audio' };
     const meta = binaryMetas.get(deviceClass);
     return meta ? { kind: 'binary', meta } : undefined;
   }

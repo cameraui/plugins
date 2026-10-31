@@ -96,6 +96,22 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       },
       {
         type: 'string',
+        key: 'includeEntities',
+        title: 'Included Entities',
+        description: 'Comma-separated entity ids to offer for adoption. Leave empty to allow all supported entities. Excluded Entities takes priority.',
+        required: false,
+        store: true,
+      },
+      {
+        type: 'string',
+        key: 'doorbellEntities',
+        title: 'Doorbell Entities',
+        description: 'Comma-separated binary_sensor ids to offer as doorbells. Rings only on live off-to-on changes. Re-adopt existing sensors to change their type.',
+        required: false,
+        store: true,
+      },
+      {
+        type: 'string',
         key: 'excludeEntities',
         title: 'Excluded Entities',
         description: 'Comma-separated entity ids that should not be offered for adoption.',
@@ -154,10 +170,14 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     this.rememberStates(states);
 
     const result: DiscoveredSensor[] = [];
+    const included = entityIds(this.storage.values.includeEntities);
+    const doorbells = entityIds(this.storage.values.doorbellEntities);
+    const excluded = entityIds(this.storage.values.excludeEntities);
     for (const state of states) {
       const entityId = state.entity_id;
-      if (this.isOwnEntity(registry, entityId) || this.isExcluded(entityId)) continue;
-      const type = importableSensorType(state);
+      if (included.size > 0 && !included.has(entityId)) continue;
+      if (this.isOwnEntity(registry, entityId) || excluded.has(entityId)) continue;
+      const type = importableSensorType(state, doorbells.has(entityId));
       if (!type) continue;
       const entry = registry.byEntityId.get(entityId);
       result.push({ id: entry?.id ?? entityId, address: entityId, name: entityDisplayName(state), type, room: areaName(registry, entry) });
@@ -332,6 +352,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     this.attach(bound, entityId);
     const state = this.lastStates.get(entityId);
     if (!state) {
+      if (bound.imported.kind === 'doorbell') bound.imported.lastEventState = undefined;
       sensor.setSourceState('unavailable');
       return 'unavailable';
     }
@@ -340,6 +361,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   private applyState(bound: BoundSensor, state: HaState, live: boolean): 'connected' | 'unavailable' {
     if (entityUnavailable(bound.imported, state)) {
+      if (bound.imported.kind === 'doorbell') bound.imported.lastEventState = undefined;
       bound.imported.sensor.setSourceState('unavailable');
       return 'unavailable';
     }
@@ -359,11 +381,13 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   private detach(bound: BoundSensor): void {
     if (bound.entityId && this.byEntityId.get(bound.entityId) === bound) this.byEntityId.delete(bound.entityId);
     bound.entityId = undefined;
+    if (bound.imported.kind === 'doorbell') bound.imported.lastEventState = undefined;
   }
 
   private markAllUnavailable(): void {
     this.lastSummary = undefined;
     for (const bound of this.bound.values()) {
+      if (bound.imported.kind === 'doorbell') bound.imported.lastEventState = undefined;
       if (bound.entityId) bound.imported.sensor.setSourceState('unavailable');
     }
   }
@@ -378,6 +402,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     if (!bound) return;
 
     if (!state) {
+      if (bound.imported.kind === 'doorbell') bound.imported.lastEventState = undefined;
       bound.imported.sensor.setSourceState('unavailable');
       return;
     }
@@ -430,15 +455,15 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     if (device.manufacturer === OWN_MANUFACTURER) return true;
     return device.identifiers?.some(([domain, id]) => domain === OWN_PLATFORM || (typeof id === 'string' && id.startsWith(OWN_ID_PREFIX))) ?? false;
   }
+}
 
-  private isExcluded(entityId: string): boolean {
-    const raw = this.storage.values.excludeEntities;
-    if (!raw) return false;
-    return raw
+function entityIds(raw: string | undefined): Set<string> {
+  return new Set(
+    (raw ?? '')
       .split(',')
       .map((item) => item.trim())
-      .includes(entityId);
-  }
+      .filter(Boolean),
+  );
 }
 
 function areaName(registry: Registry, entry: HaRegistryEntry | undefined): string | undefined {

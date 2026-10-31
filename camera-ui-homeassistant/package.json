@@ -7,6 +7,7 @@
   "main": "./bundle/dist/index.js",
   "type": "module",
   "scripts": {
+    "test": "node --import tsx --test test/*.test.ts",
     "build": "rimraf dist && tsc",
     "bundle": "npm run format && npm run lint && npm run build && cui bundle",
     "bundle:dev": "npm run format && npm run lint && npm run build && cross-env MODE=development cui bundle",
