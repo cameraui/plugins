@@ -25,8 +25,8 @@
     "as-wasi": "^0.6.0"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.0.119",
-    "@camera.ui/sdk": "^1.4.4",
+    "@camera.ui/cli": "^0.0.120",
+    "@camera.ui/sdk": "^1.4.5",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "26.6.6",
