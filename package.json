@@ -16,7 +16,7 @@
     "release": "tsx ./scripts/release.ts",
     "presetup": "npm install",
     "setup": "tsx ./scripts/setup.ts",
-    "update": "updates -M npm,pypi,go,cargo,docker,make --update ./ && cupdate && tsx ./scripts/update.ts"
+    "update": "updates -M npm,pypi,go,cargo,docker --update ./ && cupdate && tsx ./scripts/update.ts"
   },
   "homepage": "https://github.com/cameraui/plugins#readme",
   "bugs": {
