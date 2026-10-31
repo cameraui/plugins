@@ -7,6 +7,7 @@ export const contract: PluginContract = {
   role: PluginRole.SensorProvider,
   provides: [
     SensorType.Motion,
+    SensorType.Audio,
     SensorType.Occupancy,
     SensorType.Contact,
     SensorType.Doorbell,

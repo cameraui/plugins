@@ -10,7 +10,7 @@ export interface StorageValues {
   notifyServiceNames?: Record<string, string>;
   host?: string;
   token?: string;
-  excludeEntities?: string;
+  doorbellEntities?: string;
 }
 
 export interface HaStateAttributes {

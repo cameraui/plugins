@@ -1,3 +1,11 @@
+## [1.0.19]
+
+**Needs camera.ui 2.4.4.**
+
+- **Sound sensors come in as audio sensors.** Binary sensors with the device class Sound can be adopted and report a sound while they are on.
+- **Binary sensors can be doorbells.** List them under **Doorbell Entities** in the plugin settings, the doorbell rings when the sensor turns on. Thanks @JxnLexn!
+- **Excluded Entities is gone.** Entities you don't want can be hidden on the Sensors page instead. Entities you had excluded show up as discovered again once.
+
 ## [1.0.18]
 
 - Bump camera.ui engine and SDK

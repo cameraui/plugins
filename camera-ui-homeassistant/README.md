@@ -8,6 +8,8 @@ Create a long-lived access token in Home Assistant (Profile > Security) and ente
 
 ## What gets imported
 
-Every entity with a supported device class is imported automatically. Unsupported device classes are skipped. Entities that camera.ui itself exports to Home Assistant are never re-imported. Use the Excluded Entities setting to keep specific entities out.
+Every entity with a supported device class is offered under Discovered in the Sensors view, nothing comes over until you adopt it. Unsupported device classes are skipped. Entities that camera.ui itself exports to Home Assistant are never offered. An entity you don't want can be hidden from the list there.
+
+Binary sensors with the device class `sound` come in as audio sensors. Home Assistant has no doorbell class for binary sensors, so a doorbell button exposed as one (for example by Tapo Camera Control) goes into the Doorbell Entities setting. It is then offered as a doorbell that rings when the sensor turns on.
 
 Imported sensors show up in the Sensors view. Assigning one to a camera makes it a detection trigger for that camera, exactly like a native sensor.

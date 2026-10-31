@@ -96,9 +96,9 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       },
       {
         type: 'string',
-        key: 'excludeEntities',
-        title: 'Excluded Entities',
-        description: 'Comma-separated entity ids that should not be offered for adoption.',
+        key: 'doorbellEntities',
+        title: 'Doorbell Entities',
+        description: 'Comma-separated binary_sensor entity ids to offer as doorbells. The doorbell rings when the sensor turns on.',
         required: false,
         store: true,
       },
@@ -154,10 +154,11 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     this.rememberStates(states);
 
     const result: DiscoveredSensor[] = [];
+    const doorbells = this.doorbellIds();
     for (const state of states) {
       const entityId = state.entity_id;
-      if (this.isOwnEntity(registry, entityId) || this.isExcluded(entityId)) continue;
-      const type = importableSensorType(state);
+      if (this.isOwnEntity(registry, entityId)) continue;
+      const type = importableSensorType(state, doorbells);
       if (!type) continue;
       const entry = registry.byEntityId.get(entityId);
       result.push({ id: entry?.id ?? entityId, address: entityId, name: entityDisplayName(state), type, room: areaName(registry, entry) });
@@ -370,7 +371,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   private handleStateChanged(entityId: string, state: HaState | null): void {
     const bound = this.byEntityId.get(entityId);
-    if (state && (bound || importableSensorType(state))) {
+    if (state && (bound || importableSensorType(state, this.doorbellIds()))) {
       this.lastStates.set(entityId, state);
     } else if (!state) {
       this.lastStates.delete(entityId);
@@ -418,7 +419,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   }
 
   private rememberStates(states: HaState[]): void {
-    const relevant = states.filter((state) => this.byEntityId.has(state.entity_id) || importableSensorType(state));
+    const doorbells = this.doorbellIds();
+    const relevant = states.filter((state) => this.byEntityId.has(state.entity_id) || importableSensorType(state, doorbells));
     this.lastStates = new Map(relevant.map((state) => [state.entity_id, state]));
   }
 
@@ -431,13 +433,14 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     return device.identifiers?.some(([domain, id]) => domain === OWN_PLATFORM || (typeof id === 'string' && id.startsWith(OWN_ID_PREFIX))) ?? false;
   }
 
-  private isExcluded(entityId: string): boolean {
-    const raw = this.storage.values.excludeEntities;
-    if (!raw) return false;
-    return raw
-      .split(',')
-      .map((item) => item.trim())
-      .includes(entityId);
+  private doorbellIds(): Set<string> {
+    const raw = this.storage.values.doorbellEntities ?? '';
+    return new Set(
+      raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    );
   }
 }
 

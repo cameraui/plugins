@@ -1,4 +1,4 @@
-import { DoorbellTrigger, MotionSensor, Sensor, SensorType, sensorMeta } from '@camera.ui/sdk';
+import { AudioSensor, DoorbellTrigger, MotionSensor, Sensor, SensorType, sensorMeta } from '@camera.ui/sdk';
 
 import { applyControlState, controlKindForEntity, createControl } from './controls.js';
 import { mapEntity } from './mapping.js';
@@ -34,6 +34,7 @@ export class ImportedStateSensor extends Sensor<Record<string, unknown>> {
 export type ImportedSensor =
   | { kind: 'binary' | 'measurement'; sensor: ImportedStateSensor }
   | { kind: 'motion'; sensor: MotionSensor }
+  | { kind: 'audio'; sensor: AudioSensor }
   | { kind: 'doorbell'; sensor: DoorbellTrigger; lastEventState?: string }
   | { kind: 'control'; controlKind: ControlKind; sensor: HaControl };
 
@@ -55,12 +56,14 @@ const CONTROL_SENSOR_TYPES: Record<ControlKind, SensorType> = {
 
 const CONTROL_KINDS = new Map(Object.entries(CONTROL_SENSOR_TYPES).map(([kind, type]) => [type, kind as ControlKind]));
 
-export function importableSensorType(state: HaState): SensorType | undefined {
+export function importableSensorType(state: HaState, doorbells: ReadonlySet<string>): SensorType | undefined {
+  if (isBinarySensor(state) && doorbells.has(state.entity_id)) return SensorType.Doorbell;
   const controlKind = controlKindForEntity(state);
   if (controlKind) return CONTROL_SENSOR_TYPES[controlKind];
   const mapping = mapEntity(state);
   if (!mapping) return undefined;
   if (mapping.kind === 'motion') return SensorType.Motion;
+  if (mapping.kind === 'audio') return SensorType.Audio;
   if (mapping.kind === 'doorbell') return SensorType.Doorbell;
   return mapping.meta.type;
 }
@@ -78,6 +81,9 @@ function buildImportedSensor({ type, name, nativeId }: ImportSpec, commandFor: (
   }
   if (type === SensorType.Motion) {
     return { kind: 'motion', sensor: new MotionSensor(name, importOptions(nativeId)) };
+  }
+  if (type === SensorType.Audio) {
+    return { kind: 'audio', sensor: new AudioSensor(name, importOptions(nativeId)) };
   }
   if (type === SensorType.Doorbell) {
     return { kind: 'doorbell', sensor: new DoorbellTrigger(name, importOptions(nativeId)) };
@@ -97,6 +103,12 @@ export function entityUnavailable(imported: ImportedSensor, state: HaState): boo
 
 export function applyEntityState(imported: ImportedSensor, state: HaState, live: boolean): void {
   if (imported.kind === 'doorbell') {
+    if (isBinarySensor(state)) {
+      const pressed = live && imported.lastEventState === 'off' && state.state === 'on';
+      imported.lastEventState = state.state;
+      if (pressed) imported.sensor.trigger();
+      return;
+    }
     if (state.state === 'unavailable') return;
     // an event entity's state is its last trigger time, only a live change is a press
     const changed = imported.lastEventState !== undefined && imported.lastEventState !== state.state;
@@ -112,7 +124,7 @@ export function applyEntityState(imported: ImportedSensor, state: HaState, live:
     return;
   }
 
-  if (imported.kind === 'motion') {
+  if (imported.kind === 'motion' || imported.kind === 'audio') {
     imported.sensor.reportDetections(state.state === 'on');
     return;
   }
@@ -126,4 +138,8 @@ export function applyEntityState(imported: ImportedSensor, state: HaState, live:
   if (!Number.isNaN(value)) {
     imported.sensor.writeStateValue(value);
   }
+}
+
+function isBinarySensor(state: HaState): boolean {
+  return state.entity_id.startsWith('binary_sensor.');
 }
