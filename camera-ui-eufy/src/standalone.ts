@@ -1,5 +1,6 @@
 import { SensorType } from '@camera.ui/sdk';
 
+import { isCameraRecord } from './account.js';
 import {
   EufyCarbonMonoxideSensor,
   EufyContactSensor,
@@ -100,7 +101,7 @@ export function createStandaloneSensor(record: AdoptedSensor, logger: LoggerServ
 }
 
 function standaloneKinds(record: EufyDevice, device: Device): StandaloneKind[] {
-  if (record.deviceClass === 'camera') return [];
+  if (isCameraRecord(record)) return [];
 
   // sdk model hints also match the name the user gave, a name alone must not create a sensor
   const kinds: StandaloneKind[] = [];

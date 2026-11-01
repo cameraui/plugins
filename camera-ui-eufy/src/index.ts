@@ -3,7 +3,8 @@ import { LoginStatus } from '@mega-yfue/eufy-sdk';
 import { installNativeLogging } from '@seydx/rtsp';
 
 import { accountKey, EufyAccount, isCameraRecord } from './account.js';
-import { EufyCamera } from './camera.js';
+import { cameraName, cameraNativeId, EufyCamera, parseCameraNativeId } from './camera.js';
+import { StationHistory } from './history.js';
 import { createStandaloneSensor, discoverStandaloneSensors } from './standalone.js';
 import { COUNTRIES, errorMessage, isBatteryPowered } from './utils.js';
 
@@ -23,7 +24,7 @@ import type {
   Sensor,
   SensorDiscoveryProvider,
 } from '@camera.ui/sdk';
-import type { AnyDeviceEvent, EufyDevice, LoginResult } from '@mega-yfue/eufy-sdk';
+import type { AnyDeviceEvent, Device, EufyDevice, LoginResult } from '@mega-yfue/eufy-sdk';
 import type { NativeLoggingHandle } from '@seydx/rtsp';
 import type { AccountCredentials } from './account.js';
 import type { StandaloneSensor } from './standalone.js';
@@ -38,8 +39,10 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
   private devicesLoaded = false;
   private ffmpegPath?: string;
   private nativeLogging?: NativeLoggingHandle;
+  private history?: StationHistory;
 
   private readonly records = new Map<string, EufyDevice>();
+  private readonly views = new Map<string, readonly number[]>();
   private readonly cameraDevices = new Map<string, CameraDevice>();
   private readonly cameras = new Map<string, EufyCamera>();
   private readonly standalone = new Map<string, StandaloneSensor>();
@@ -144,17 +147,18 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
   public async onCameraAdded(camera: CameraDevice): Promise<void> {
     this.cameraDevices.set(camera.id, camera);
     await this.initializeCamera(camera);
+    await this.pushDiscoveredCameras();
   }
 
   public async onCameraReleased(cameraId: string): Promise<void> {
     const cameraDevice = this.cameraDevices.get(cameraId);
     this.cameraDevices.delete(cameraId);
 
-    const sn = cameraDevice?.nativeId;
-    if (!sn) return;
+    const nativeId = cameraDevice?.nativeId;
+    if (!nativeId) return;
 
-    const controller = this.cameras.get(sn);
-    this.cameras.delete(sn);
+    const controller = this.cameras.get(nativeId);
+    this.cameras.delete(nativeId);
     await controller?.release().catch((error: unknown) => this.logger.warn(`Could not release camera ${cameraDevice.name}: ${errorMessage(error)}`));
 
     await this.pushDiscoveredCameras();
@@ -169,19 +173,21 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
   }
 
   public async onAdoptCamera(camera: DiscoveredCamera, _settings: Record<string, unknown>): Promise<CameraConfig> {
-    const sn = camera.id.replace(/^eufy:/, '');
+    const { sn, view } = parseCameraNativeId(camera.id.replace(/^eufy:/, ''));
     if (!this.account || !this.records.has(sn)) throw new Error(`Eufy camera ${sn} not found`);
 
     const device = await this.account.getDevice(sn);
+    if (!this.rememberViews(device).includes(view)) throw new Error(`${device.name} has no lens ${view + 1}`);
     const info = device.info?.();
+    const name = cameraName(device.name, view);
 
-    this.logger.log(`Adopted camera ${device.name}`);
+    this.logger.log(`Adopted camera ${name}`);
 
     return {
-      name: device.name,
-      nativeId: sn,
+      name,
+      nativeId: cameraNativeId(sn, view),
       isCloud: true,
-      type: device.has('doorbell') ? 'doorbell' : 'camera',
+      type: view === 0 && device.has('doorbell') ? 'doorbell' : 'camera',
       info: {
         manufacturer: 'Eufy',
         model: device.modelName,
@@ -284,7 +290,9 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     await this.deactivate();
 
     this.account = account;
+    this.history = new StationHistory(account.client, this.logger, (sn) => this.onStationRecording(account, sn));
     account.client.on('event', (event) => this.routeEvent(account, event));
+    account.client.on('deviceCapabilities', (info) => this.onCapabilitiesGained(account, info.deviceSn));
     account.client.on('deviceAdded', (record) => this.onDeviceAdded(account, record));
     account.client.on('deviceRemoved', (record) => this.onDeviceRemoved(account, record));
     account.client.on('sessionExpired', (error) => this.onSessionExpired(account, error));
@@ -298,6 +306,9 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     this.account = undefined;
     this.devicesLoaded = false;
     this.records.clear();
+    this.views.clear();
+    this.history?.stop();
+    this.history = undefined;
 
     await Promise.all([...this.cameras.values()].map((camera) => camera.unbind().catch(() => undefined)));
 
@@ -332,8 +343,9 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     if (this.account !== account) return;
     this.records.set(record.sn, record);
 
-    const camera = [...this.cameraDevices.values()].find((cameraDevice) => cameraDevice.nativeId === record.sn);
-    if (camera) await this.initializeCamera(camera);
+    for (const camera of this.cameraDevices.values()) {
+      if (camera.nativeId && parseCameraNativeId(camera.nativeId).sn === record.sn) await this.initializeCamera(camera);
+    }
 
     for (const standalone of this.standalone.values()) {
       if (standalone.sn === record.sn) await this.bindStandalone(standalone);
@@ -344,11 +356,31 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
   private onDeviceRemoved(account: EufyAccount, record: EufyDevice): void {
     if (this.account !== account) return;
     this.records.delete(record.sn);
+    this.views.delete(record.sn);
     account.forgetDevice(record.sn);
     this.logger.log(`${record.name ?? record.sn} was removed from the Eufy account`);
 
     for (const standalone of this.standalone.values()) {
       if (standalone.sn === record.sn) standalone.markRemoved();
+    }
+  }
+
+  private async onCapabilitiesGained(account: EufyAccount, sn: string): Promise<void> {
+    if (this.account !== account) return;
+    for (const controller of this.cameras.values()) {
+      if (controller.sn !== sn) continue;
+      try {
+        await controller.refreshSensors();
+      } catch (error) {
+        this.logger.warn(`Could not add the new controls of ${controller.cameraDevice.name}: ${errorMessage(error)}`);
+      }
+    }
+  }
+
+  private onStationRecording(account: EufyAccount, sn: string): void {
+    if (this.account !== account) return;
+    for (const controller of this.cameras.values()) {
+      if (controller.sn === sn) controller.handleRecording();
     }
   }
 
@@ -364,7 +396,9 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     // pushes that name the triggering camera often leave the station out
     const stationSn = event.stationSn ?? this.records.get(sn)?.stationSn;
 
-    this.cameras.get(sn)?.handleEvent(event);
+    for (const controller of this.cameras.values()) {
+      if (controller.sn === sn) controller.handleEvent(event);
+    }
     for (const standalone of this.standalone.values()) {
       if (standalone.sn === sn) {
         standalone.handleEvent(event, true);
@@ -376,18 +410,22 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
 
   private async initializeCamera(cameraDevice: CameraDevice): Promise<void> {
     const account = this.account;
-    const sn = cameraDevice.nativeId;
-    if (!account || !sn || !this.records.has(sn)) return;
+    const nativeId = cameraDevice.nativeId;
+    if (!account || !nativeId) return;
+    const { sn, view } = parseCameraNativeId(nativeId);
+    if (!this.records.has(sn)) return;
 
-    let controller = this.cameras.get(sn);
+    let controller = this.cameras.get(nativeId);
     if (!controller) {
-      controller = new EufyCamera(cameraDevice);
-      this.cameras.set(sn, controller);
+      controller = new EufyCamera(cameraDevice, sn, view);
+      this.cameras.set(nativeId, controller);
     }
 
     try {
       const device = await account.getDevice(sn);
       if (this.account !== account) return;
+      this.rememberViews(device);
+      if (this.records.get(device.stationSn)?.model === 'T9000' && device.stationSn !== sn) this.history?.watch(device.stationSn);
       await controller.bind(device, this.createContext(account));
       if (this.account !== account) await controller.unbind();
       if (this.storage.values.debug) this.logger.debug(`Initialized camera ${device.name}`);
@@ -400,6 +438,7 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     const values = this.storage.values;
     return {
       client: account.client,
+      history: this.history!,
       debug: values.debug ?? false,
       maxLiveStreamDuration: Math.max(10, Math.min(DEFAULT_MAX_LIVE_STREAM_SECONDS, values.maxLiveStreamDuration ?? DEFAULT_MAX_LIVE_STREAM_SECONDS)),
     };
@@ -422,7 +461,13 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
       standalone.bind(undefined);
       return;
     }
-    if (!this.records.has(standalone.sn)) {
+    const record = this.records.get(standalone.sn);
+    if (!record) {
+      standalone.markRemoved();
+      return;
+    }
+    if (isCameraRecord(record)) {
+      this.logger.warn(`${standalone.sensor.displayName} is now part of the camera ${record.name ?? record.sn}, adopt the camera and remove this sensor`);
       standalone.markRemoved();
       return;
     }
@@ -442,9 +487,23 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
 
   private discoveredCameras(): DiscoveredCamera[] {
     const adopted = new Set([...this.cameraDevices.values()].map((camera) => camera.nativeId));
-    return [...this.records.values()]
-      .filter((record) => isCameraRecord(record) && !adopted.has(record.sn) && !this.isIgnored(record.sn))
-      .map((record) => ({ id: `eufy:${record.sn}`, name: record.name ?? record.sn, manufacturer: 'Eufy', model: record.model }));
+    const discovered: DiscoveredCamera[] = [];
+    for (const record of this.records.values()) {
+      if (!isCameraRecord(record) || this.isIgnored(record.sn)) continue;
+      // further lenses are known once the device was read, which happens when its first camera is adopted
+      for (const view of this.views.get(record.sn) ?? [0]) {
+        const nativeId = cameraNativeId(record.sn, view);
+        if (adopted.has(nativeId)) continue;
+        discovered.push({ id: `eufy:${nativeId}`, name: cameraName(record.name ?? record.sn, view), manufacturer: 'Eufy', model: record.model });
+      }
+    }
+    return discovered;
+  }
+
+  private rememberViews(device: Device): readonly number[] {
+    const views = device.camera?.()?.views?.() ?? [0];
+    this.views.set(device.sn, views);
+    return views;
   }
 
   private isIgnored(sn: string): boolean {

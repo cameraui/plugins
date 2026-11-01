@@ -6,6 +6,7 @@ import {
   EufyBatteryInfo,
   EufyCameraSwitch,
   EufyLightControl,
+  EufyLockControl,
   EufyMotionSensor,
   EufyObjectSensor,
   EufyPtzControl,
@@ -23,6 +24,20 @@ import type { BindableSensor } from './sensors.js';
 import type { EufyCameraStorage, EufyContext, StreamMode } from './types.js';
 
 const RTSP_URL_ATTEMPTS = 2;
+// a recording shows up in the station's list after its push, how long after is not measured
+const RECORDING_PUSH_GRACE_MS = 120_000;
+const VIEW_SUFFIX = /^(.+):view(\d+)$/;
+const DETECTION_EVENTS = new Set<AnyDeviceEvent['eventName']>([
+  'motion',
+  'personDetected',
+  'strangerDetected',
+  'vehicleDetected',
+  'petDetection',
+  'dogDetected',
+  'soundDetected',
+  'cryingDetected',
+  'doorbellPress',
+]);
 
 class CameraDeviceImplementations implements StreamingInterface, SnapshotInterface {
   constructor(private readonly camera: EufyCamera) {}
@@ -58,8 +73,14 @@ export class EufyCamera {
   private ptzControl?: EufyPtzControl;
   private cameraSwitch?: EufyCameraSwitch;
   private securitySystem?: EufySecuritySystem;
+  private lockControl?: EufyLockControl;
+  private lastDetectionAt = 0;
 
-  constructor(public readonly cameraDevice: CameraDevice) {
+  constructor(
+    public readonly cameraDevice: CameraDevice,
+    public readonly sn: string,
+    public readonly view: number,
+  ) {
     this.logger = cameraDevice.logger;
   }
 
@@ -79,6 +100,7 @@ export class EufyCamera {
           sensor.device = device;
           sensor.sync();
         }
+        this.lockControl?.refresh();
         if (this.streamMode === 'p2p') await this.ensureRelay();
         await this.cameraDevice.connect();
       } catch (error) {
@@ -90,6 +112,12 @@ export class EufyCamera {
 
   public unbind(): Promise<void> {
     return this.serialize(() => this.detach());
+  }
+
+  public refreshSensors(): Promise<void> {
+    return this.serialize(async () => {
+      if (this.device) await this.addSensors(this.device);
+    });
   }
 
   public release(): Promise<void> {
@@ -111,19 +139,17 @@ export class EufyCamera {
     const camera = device?.camera?.();
     if (!device || !camera) return undefined;
 
-    if (!forceNew && camera.snapshotStored) {
-      try {
-        return toArrayBuffer(await camera.snapshotStored());
-      } catch (error) {
-        if (this.context?.debug) this.logger.debug(`No stored snapshot: ${errorMessage(error)}`);
-      }
+    // event pictures show the main lens
+    if (!forceNew && this.view === 0) {
+      const image = (await this.recordedImage(device)) ?? (await this.storedImage(device));
+      if (image) return toArrayBuffer(image);
     }
 
     // a fresh still wakes a battery camera, only an explicit request may pay for that
     if (!camera.snapshotLive || (!forceNew && isBatteryPowered(device))) return undefined;
 
     try {
-      const shot = await camera.snapshotLive();
+      const shot = await camera.snapshotLive({ view: this.view });
       return toArrayBuffer(shot.jpeg);
     } catch (error) {
       this.logger.warn(`Could not capture a snapshot: ${errorMessage(error)}`);
@@ -132,6 +158,7 @@ export class EufyCamera {
   }
 
   public handleEvent(event: AnyDeviceEvent): void {
+    if (DETECTION_EVENTS.has(event.eventName)) this.lastDetectionAt = Date.now();
     switch (event.eventName) {
       case 'motion':
         this.motionSensor?.pulse();
@@ -165,13 +192,20 @@ export class EufyCamera {
       case 'propertyChanged':
       case 'armingModeChanged':
       case 'cameraEnabledChanged':
+      case 'lockState':
         for (const sensor of this.bindables) sensor.sync();
         break;
     }
   }
 
+  public handleRecording(): void {
+    // in home mode a HomeBase S1 Pro pushes nothing, its event list is the only trace of the event
+    if (Date.now() - this.lastDetectionAt < RECORDING_PUSH_GRACE_MS) return;
+    this.motionSensor?.pulse();
+  }
+
   private get streamMode(): StreamMode {
-    if (!this.device || !canPublishRtsp(this.device)) return 'p2p';
+    if (!this.device || !this.offersRtsp(this.device)) return 'p2p';
     return this.storage?.values.streamMode ?? 'p2p';
   }
 
@@ -195,8 +229,39 @@ export class EufyCamera {
     return this.device;
   }
 
+  private async recordedImage(device: Device): Promise<Buffer | undefined> {
+    try {
+      return await this.context?.history.latestImage(device.sn);
+    } catch (error) {
+      if (this.context?.debug) this.logger.debug(`No event picture from the HomeBase: ${errorMessage(error)}`);
+      return undefined;
+    }
+  }
+
+  private async storedImage(device: Device): Promise<Buffer | undefined> {
+    const camera = device.camera?.();
+    if (!camera?.snapshotStored) return undefined;
+    try {
+      return await camera.snapshotStored();
+    } catch (error) {
+      if (this.context?.debug) this.logger.debug(`No stored snapshot: ${errorMessage(error)}`);
+      return undefined;
+    }
+  }
+
+  private offersRtsp(device: Device): boolean {
+    return this.view === 0 && device.rtsp?.()?.publish !== undefined;
+  }
+
   private async addSensors(device: Device): Promise<void> {
     const camera = device.camera?.();
+    const dualLens = (camera?.views?.()?.length ?? 1) > 1;
+
+    // pan and tilt move the second lens of a dual-lens camera, which is a camera of its own
+    if (this.view > 0) {
+      if (!this.ptzControl && device.ptz?.()) this.ptzControl = await this.addBindable(new EufyPtzControl(device, this.logger));
+      return;
+    }
 
     this.motionSensor ??= await this.add(new EufyMotionSensor('Eufy Motion'));
     this.objectSensor ??= await this.add(new EufyObjectSensor('Eufy Object'));
@@ -221,7 +286,7 @@ export class EufyCamera {
       this.sirenControl = await this.addBindable(new EufySirenControl(device, this.logger));
     }
 
-    if (!this.ptzControl && device.ptz?.()) {
+    if (!this.ptzControl && device.ptz?.() && !dualLens) {
       this.ptzControl = await this.addBindable(new EufyPtzControl(device, this.logger));
     }
 
@@ -232,6 +297,10 @@ export class EufyCamera {
     // a HomeBase owns the guard mode of its cameras, that one is adopted as a standalone sensor
     if (!this.securitySystem && device.arming?.() && device.stationSn === device.sn) {
       this.securitySystem = await this.addBindable(new EufySecuritySystem(device, this.logger));
+    }
+
+    if (!this.lockControl && device.lock?.()) {
+      this.lockControl = await this.addBindable(new EufyLockControl(device, this.logger, 'Eufy Lock'));
     }
   }
 
@@ -259,7 +328,7 @@ export class EufyCamera {
     const logger = this.createRelayLogger(context);
     const talkback = new EufyTalkback(device, logger);
     const relay = new Relay({
-      source: new EufyLiveSource(device, context.maxLiveStreamDuration * 1000, logger),
+      source: new EufyLiveSource(device, this.view, context.maxLiveStreamDuration * 1000, logger),
       idleTimeout: isBatteryPowered(device) ? 10_000 : 30_000,
       stallTimeout: 8_000,
       logger,
@@ -341,7 +410,7 @@ export class EufyCamera {
   }
 
   private createStorage(device: Device): DeviceStorage<EufyCameraStorage> {
-    if (!canPublishRtsp(device)) return this.cameraDevice.createStorage<EufyCameraStorage>([]);
+    if (!this.offersRtsp(device)) return this.cameraDevice.createStorage<EufyCameraStorage>([]);
 
     return this.cameraDevice.createStorage<EufyCameraStorage>([
       {
@@ -360,8 +429,17 @@ export class EufyCamera {
   }
 }
 
-function canPublishRtsp(device: Device): boolean {
-  return device.rtsp?.()?.publish !== undefined;
+export function cameraNativeId(sn: string, view: number): string {
+  return view === 0 ? sn : `${sn}:view${view}`;
+}
+
+export function parseCameraNativeId(nativeId: string): { sn: string; view: number } {
+  const match = VIEW_SUFFIX.exec(nativeId);
+  return match ? { sn: match[1], view: Number(match[2]) } : { sn: nativeId, view: 0 };
+}
+
+export function cameraName(name: string, view: number): string {
+  return view === 0 ? name : `${name} Lens ${view + 1}`;
 }
 
 function toArrayBuffer(data: Buffer): ArrayBuffer {

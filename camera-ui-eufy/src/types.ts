@@ -1,4 +1,5 @@
 import type { EufyMega, PersistedSession } from '@mega-yfue/eufy-sdk';
+import type { StationHistory } from './history.js';
 
 export type StreamMode = 'p2p' | 'rtsp';
 
@@ -26,6 +27,7 @@ export interface StoredSession {
 
 export interface EufyContext {
   readonly client: EufyMega;
+  readonly history: StationHistory;
   readonly debug: boolean;
   readonly maxLiveStreamDuration: number;
 }

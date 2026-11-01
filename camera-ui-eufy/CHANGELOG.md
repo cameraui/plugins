@@ -1,3 +1,12 @@
+## [2.1.3]
+
+- **Video Smart Lock S330: add it again as a camera.** It now shows up under the cameras, with its live view and the lock as a control. The lock sensor adopted so far shows as removed, delete it on the Sensors page.
+- **Cameras behind a HomeBase S1 Pro show the picture of their latest event**, read from the HomeBase. In Home mode the HomeBase sends no notifications, their recordings now come in as motion, up to half a minute late.
+- **The second lens of a PoE S4 is a camera of its own.** It is offered once the S4 is added, and pan and tilt move to it, since they turn that lens.
+- **Cameras behind a recorder that send G.711 audio play with sound.** They played without sound before.
+- **A HomeBase S1 Pro can be armed and disarmed again after its connection dropped.** It refused every new connection for up to an hour, also from the Eufy app.
+- **Controls a camera reports after startup show up right away**, such as a light, siren or pan and tilt. They appeared only after the next restart before.
+
 ## [2.1.2]
 
 - **Cameras behind a HomeBase 3 no longer lose their live view for hours.** With two or more cameras streaming, one of them could stay without a picture until the HomeBase restarted.

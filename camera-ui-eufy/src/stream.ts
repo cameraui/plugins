@@ -4,19 +4,20 @@ import { PassThrough } from 'node:stream';
 import { StationClock, TrackTimeline } from './timeline.js';
 
 import type { Device, LiveAudioFrame, LiveStreamConsumer, LiveVideoConfig, LiveVideoFrame, StreamBudgetNotice } from '@mega-yfue/eufy-sdk';
-import type { Logger, MediaPacket, MultiSourceInput, Source, StreamInfo, TrackInfo } from '@seydx/rtsp';
+import type { Logger, MediaPacket, MultiSourceInput, RawAudioInput, Source, StreamInfo, TrackInfo } from '@seydx/rtsp';
 
 const AUDIO_PROBE_MS = 500;
 const PROBE_TIMEOUT_MS = 45_000;
-const ELD_SAMPLE_RATE = 16000;
-const ELD_CHANNELS = 1;
+// eufy sends no rate, the app assumes 16 kHz mono for every codec
+const AUDIO_SAMPLE_RATE = 16000;
+const AUDIO_CHANNELS = 1;
 const ELD_FRAME_LENGTH = 480;
 const FALLBACK_VIDEO_STEP_S = 1 / 15;
 const FALLBACK_AUDIO_STEP_S = 0.064;
 
 interface Probe {
   config: LiveVideoConfig;
-  audio?: LiveAudioFrame['codec'];
+  audio?: LiveAudioFrame;
 }
 
 export class EufyLiveSource implements Source {
@@ -26,7 +27,7 @@ export class EufyLiveSource implements Source {
   private stationClock = new StationClock();
   private videoTimeline = new TrackTimeline(this.stationClock, 'frames', FALLBACK_VIDEO_STEP_S);
   private audioTimeline = new TrackTimeline(this.stationClock, 'samples', FALLBACK_AUDIO_STEP_S);
-  private eldTranscoder?: RawAudioTranscoder;
+  private audioTranscoder?: RawAudioTranscoder;
   private video?: PassThrough;
   private audio?: PassThrough;
   private audioCodec?: LiveAudioFrame['codec'];
@@ -40,6 +41,7 @@ export class EufyLiveSource implements Source {
 
   constructor(
     private readonly device: Device,
+    private readonly view: number,
     private readonly maxDurationMs: number,
     private readonly logger: Logger,
   ) {}
@@ -56,7 +58,7 @@ export class EufyLiveSource implements Source {
     const live = this.device.camera?.()?.live;
     if (!live) throw new Error(`${this.device.name} offers no live stream`);
 
-    const consumer = await live();
+    const consumer = await live({ view: this.view });
     if (this.closed) {
       consumer.stop();
       throw closedError();
@@ -115,9 +117,9 @@ export class EufyLiveSource implements Source {
     this.endInputs();
 
     const multi = this.multi;
-    const transcoder = this.eldTranscoder;
+    const transcoder = this.audioTranscoder;
     this.multi = undefined;
-    this.eldTranscoder = undefined;
+    this.audioTranscoder = undefined;
     this.video = undefined;
     this.audio = undefined;
     this.audioCodec = undefined;
@@ -156,43 +158,51 @@ export class EufyLiveSource implements Source {
         if (settled || audioTimer || !frame.keyframe) return;
         const keyframeConfig: LiveVideoConfig = { codec: frame.codec, width: config?.width ?? frame.width, height: config?.height ?? frame.height };
         audioTimer = setTimeout(() => settle(() => resolve({ config: keyframeConfig })), AUDIO_PROBE_MS);
-        consumer.on('audio', (audio) => settle(() => resolve({ config: keyframeConfig, audio: audio.codec })));
+        consumer.on('audio', (audio) => settle(() => resolve({ config: keyframeConfig, audio })));
       });
       consumer.on('error', (error) => settle(() => reject(error)));
       consumer.on('stop', () => settle(() => reject(new Error(`${this.device.name} stopped streaming before the first keyframe`))));
     });
   }
 
-  private createAudioInput(codec: LiveAudioFrame['codec'] | undefined): MultiSourceInput | undefined {
-    if (codec === 'aac-lc') {
-      this.audioCodec = codec;
+  private createAudioInput(frame: LiveAudioFrame | undefined): MultiSourceInput | undefined {
+    if (frame?.codec === 'aac-lc') {
+      this.audioCodec = frame.codec;
       this.audio = new PassThrough();
       return { input: this.audio, format: 'aac' };
     }
 
-    if (codec === 'aac-eld') {
-      this.audioCodec = codec;
-      const transcoder = new RawAudioTranscoder({
-        from: {
-          codec: 'aac',
-          decoder: 'libfdk_aac',
-          sampleRate: ELD_SAMPLE_RATE,
-          channels: ELD_CHANNELS,
-          samplesPerFrame: ELD_FRAME_LENGTH,
-          config: buildAacEldConfig(ELD_SAMPLE_RATE, ELD_CHANNELS, ELD_FRAME_LENGTH),
-        },
-        to: { bitRate: 32000 },
-        logger: this.logger,
-        onError: (error) => this.logger.error?.('AAC-ELD transcoding failed, audio stops until the stream restarts:', error),
+    if (frame?.codec === 'aac-eld') {
+      return this.transcodeAudio(frame.codec, {
+        codec: 'aac',
+        decoder: 'libfdk_aac',
+        sampleRate: AUDIO_SAMPLE_RATE,
+        channels: AUDIO_CHANNELS,
+        samplesPerFrame: ELD_FRAME_LENGTH,
+        config: buildAacEldConfig(AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, ELD_FRAME_LENGTH),
       });
-      this.eldTranscoder = transcoder;
-      this.audioTimeline = new TrackTimeline(this.stationClock, 'resampled', FALLBACK_AUDIO_STEP_S);
-      transcoder.start();
-      return { input: transcoder.stream, format: 'aac' };
     }
 
-    if (codec) this.logger.warn?.(`${this.device.name} sends ${codec} audio, which is not relayed. Serving video only.`);
+    if (frame?.codec === 'g711a') {
+      // a-law carries one byte per sample
+      return this.transcodeAudio(frame.codec, { codec: 'pcm_alaw', sampleRate: AUDIO_SAMPLE_RATE, channels: AUDIO_CHANNELS, samplesPerFrame: frame.data.length });
+    }
+
     return undefined;
+  }
+
+  private transcodeAudio(codec: LiveAudioFrame['codec'], from: RawAudioInput): MultiSourceInput {
+    this.audioCodec = codec;
+    const transcoder = new RawAudioTranscoder({
+      from,
+      to: { bitRate: 32000 },
+      logger: this.logger,
+      onError: (error) => this.logger.error?.(`${codec} transcoding failed, audio stops until the stream restarts:`, error),
+    });
+    this.audioTranscoder = transcoder;
+    this.audioTimeline = new TrackTimeline(this.stationClock, 'resampled', FALLBACK_AUDIO_STEP_S);
+    transcoder.start();
+    return { input: transcoder.stream, format: 'aac' };
   }
 
   private writeVideo(frame: LiveVideoFrame): void {
@@ -221,9 +231,9 @@ export class EufyLiveSource implements Source {
     }
     if (frame.codec !== this.audioCodec) return;
 
-    if (this.eldTranscoder) {
+    if (this.audioTranscoder) {
       this.audioTimeline.push(frame.sourceTimestamp);
-      this.eldTranscoder.push(stripAdts(frame.data));
+      this.audioTranscoder.push(frame.codec === 'aac-eld' ? stripAdts(frame.data) : frame.data);
     } else if (this.audio && !this.audio.writableEnded) {
       this.audioTimeline.push(frame.sourceTimestamp);
       this.audio.write(frame.data);
@@ -264,7 +274,7 @@ export class EufyLiveSource implements Source {
     if (this.video && !this.video.writableEnded) this.video.end();
     if (this.audio && !this.audio.writableEnded) this.audio.end();
     // the transcoder output is its own stream and only ends on close
-    this.eldTranscoder?.close();
+    this.audioTranscoder?.close();
   }
 }
 

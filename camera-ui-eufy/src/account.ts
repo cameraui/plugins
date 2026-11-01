@@ -1,4 +1,4 @@
-import { EufyMega, FileFcmStore, FileSessionStore } from '@mega-yfue/eufy-sdk';
+import { EufyMega, FileFcmStore, FileSessionStore, MODEL_REGISTRY } from '@mega-yfue/eufy-sdk';
 import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -151,7 +151,8 @@ export function accountKey(credentials: AccountCredentials): string {
 }
 
 export function isCameraRecord(record: EufyDevice): boolean {
-  return record.deviceClass === 'camera';
+  // a video lock keeps its lock class and streams through its camera capability
+  return record.deviceClass === 'camera' || MODEL_REGISTRY[record.model.trim().toUpperCase()]?.caps?.includes('camera') === true;
 }
 
 function hash(value: string): string {
