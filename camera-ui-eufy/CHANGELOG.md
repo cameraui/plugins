@@ -1,3 +1,7 @@
+## [2.1.2]
+
+- Update dependencies
+
 ## [2.1.1]
 
 - **Some cameras without a HomeBase show a live view again**, among them the Wired Doorbell 2K and the Floodlight Cam 2. They accepted the live view and never sent a picture.
