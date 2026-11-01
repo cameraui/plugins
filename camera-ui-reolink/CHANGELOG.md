@@ -1,3 +1,7 @@
+## [1.3.7]
+
+- **Battery cameras with Reolink's newer AI report people, vehicles and bicycles too.** A battery camera that sleeps between events sends these detections over its push address, and the plugin only read them from cameras that stay connected.
+
 ## [1.3.6]
 
 - **Wi-Fi cameras that close a quiet connection early keep their events.** Some models drop the connection after about 12 seconds without traffic, so the plugin reconnected all the time and could miss motion in between. It now checks on the camera often enough to keep the connection open.
