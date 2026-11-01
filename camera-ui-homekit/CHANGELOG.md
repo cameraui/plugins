@@ -1,3 +1,7 @@
+## [1.3.6]
+
+- Update deps
+
 ## [1.3.5]
 
 - **Transcoded live view on the classic path no longer blocks up or freezes.** Cameras that Home cannot play as they are, MJPEG or H.265 on the classic path, got the bitrate the Home app asks for, at best 300 kbit/s for 720p. Now the bitrate follows the picture size and frame rate, and the picture keeps the camera's aspect ratio. A lost packet froze the picture for up to 8 s. Now Home gets a new keyframe as soon as it reports the loss, and every 2 s anyway.

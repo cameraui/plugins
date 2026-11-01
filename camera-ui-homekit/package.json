@@ -25,7 +25,7 @@
     "chacha": "^2.1.0",
     "pick-port": "^2.2.1",
     "save": "^2.9.0",
-    "werift": "^0.25.2"
+    "werift": "^0.26.0"
   },
   "devDependencies": {
     "@camera.ui/cli": "^0.0.120",
