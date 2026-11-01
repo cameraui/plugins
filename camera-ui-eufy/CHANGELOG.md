@@ -1,5 +1,8 @@
 ## [2.1.2]
 
+- **Cameras behind a HomeBase 3 no longer lose their live view for hours.** With two or more cameras streaming, one of them could stay without a picture until the HomeBase restarted.
+- **Baby monitors from eufy Care connect**, such as the T8360. Their connection failed with error 20028.
+- **Smaller fixes.** A camera whose connection setup failed once streams again without a plugin restart, the picture of the latest event comes back after a new login, and a full disk no longer stops the plugin when a notification comes in.
 - Update dependencies
 
 ## [2.1.1]
