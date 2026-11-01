@@ -1,3 +1,8 @@
+## [1.3.6]
+
+- **Wi-Fi cameras that close a quiet connection early keep their events.** Some models drop the connection after about 12 seconds without traffic, so the plugin reconnected all the time and could miss motion in between. It now checks on the camera often enough to keep the connection open.
+- **Cameras with Reolink's newer AI report people, vehicles and bicycles.** Models such as the RP-PCB8MZ send these detections in a newer format that the plugin did not read, so their AI detection stayed silent.
+
 ## [1.3.5]
 
 - **A camera you connect to an NVR or Home Hub later shows up in the camera search.** The plugin checks the NVRs you added on every search, before you had to add the NVR again.

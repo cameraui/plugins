@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -470,9 +471,11 @@ func (c *reolinkCamera) reportObjects(event bridge.MotionEvent) {
 
 	detections := make([]sdk.Detection, 0, len(event.AITypes))
 	for _, aiType := range event.AITypes {
-		if label, ok := objectLabel(aiType); ok {
-			detections = append(detections, sdk.Detection{Label: label, Confidence: 1})
+		label, ok := objectLabel(aiType)
+		if !ok || slices.ContainsFunc(detections, func(d sdk.Detection) bool { return d.Label == label }) {
+			continue
 		}
+		detections = append(detections, sdk.Detection{Label: label, Confidence: 1})
 	}
 	if len(detections) == 0 {
 		c.objectSensor.ReportDetections(false, nil)
@@ -526,7 +529,7 @@ func objectLabel(aiType string) (string, bool) {
 	switch aiType {
 	case "people":
 		return "person", true
-	case "vehicle":
+	case "vehicle", "non-motor vehicle":
 		return "vehicle", true
 	case "dog_cat":
 		return "animal", true
