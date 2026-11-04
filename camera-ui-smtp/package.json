@@ -20,7 +20,7 @@
     "update": "updates -M npm,pypi,go,cargo,docker --update ./"
   },
   "dependencies": {
-    "mailparser": "^3.14.1",
+    "mailparser": "^3.14.2",
     "smtp-server": "^3.21.3"
   },
   "devDependencies": {
