@@ -6,6 +6,7 @@
 - **Cameras behind a recorder that send G.711 audio play with sound.** They played without sound before.
 - **A HomeBase S1 Pro can be armed and disarmed again after its connection dropped.** It refused every new connection for up to an hour, also from the Eufy app.
 - **Controls a camera reports after startup show up right away**, such as a light, siren or pan and tilt. They appeared only after the next restart before.
+- Update dependencies
 
 ## [2.1.2]
 
