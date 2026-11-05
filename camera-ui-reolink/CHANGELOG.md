@@ -1,3 +1,7 @@
+## [1.3.8]
+
+- **PTZ cameras move evenly while you hold the joystick.** Each repeated command made the camera brake and start again, so it moved in jerks.
+
 ## [1.3.7]
 
 - **Battery cameras with Reolink's newer AI report people, vehicles and bicycles too.** A battery camera that sleeps between events sends these detections over its push address, and the plugin only read them from cameras that stay connected.

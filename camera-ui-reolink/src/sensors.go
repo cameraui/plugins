@@ -125,6 +125,14 @@ func (s *reolinkSpotlight) UpdateValue(property string, value any) error {
 
 const presetRefreshInterval = time.Minute
 
+// a repeated move restarts the motor ramp, the camera keeps moving until the next command anyway
+const ptzRepeatWindow = 2 * time.Second
+
+type ptzMove struct {
+	command string
+	speed   int
+}
+
 type reolinkPTZ struct {
 	*sdk.PTZControl
 	cam         *reolinkCamera
@@ -133,6 +141,10 @@ type reolinkPTZ struct {
 
 	presetMu  sync.Mutex
 	presetIDs map[string]int
+
+	moveMu     sync.Mutex
+	lastMove   ptzMove
+	lastMoveAt time.Time
 
 	stop     chan struct{}
 	stopOnce sync.Once
@@ -257,6 +269,7 @@ func (s *reolinkPTZ) SetTargetPreset(name string) {
 		s.cam.logger.Error("Failed to move to PTZ preset", name, ":", err)
 		return
 	}
+	s.forgetMove()
 	s.PTZControl.SetTargetPreset(name)
 }
 
@@ -278,15 +291,20 @@ func (s *reolinkPTZ) SetVelocity(value sdk.PTZDirection) {
 	}
 
 	command, speed := ptzCommand(value)
+	if s.repeatsMove(ptzMove{command: command, speed: speed}) {
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
 	cam, err := s.cam.cam()
 	if err != nil {
+		s.forgetMove()
 		s.cam.logger.Error("PTZ command failed:", err)
 		return
 	}
 	if err := cam.PTZ(ctx, command, speed); err != nil {
+		s.forgetMove()
 		var statusErr *baichuan.StatusError
 		if errors.As(err, &statusErr) && s.unsupported.CompareAndSwap(false, true) {
 			s.cam.logger.Warn("Camera rejected PTZ command (not a PTZ model?), disabling PTZ control. Re-adopt the camera without PTZ to remove the sensor.")
@@ -315,6 +333,23 @@ func (s *reolinkPTZ) UpdateValue(property string, value any) error {
 		}
 	}
 	return s.PTZControl.UpdateValue(property, value)
+}
+
+func (s *reolinkPTZ) repeatsMove(move ptzMove) bool {
+	s.moveMu.Lock()
+	defer s.moveMu.Unlock()
+
+	now := time.Now()
+	repeat := move.command != "Stop" && move == s.lastMove && now.Sub(s.lastMoveAt) < ptzRepeatWindow
+	s.lastMove = move
+	s.lastMoveAt = now
+	return repeat
+}
+
+func (s *reolinkPTZ) forgetMove() {
+	s.moveMu.Lock()
+	s.lastMove = ptzMove{}
+	s.moveMu.Unlock()
 }
 
 func ptzCommand(direction sdk.PTZDirection) (string, int) {
