@@ -4,10 +4,12 @@ import type { PluginContract } from '@camera.ui/sdk';
 
 export const contract: PluginContract = {
   name: 'Home Assistant',
-  role: PluginRole.SensorProvider,
+  role: PluginRole.CameraAndSensorProvider,
   provides: [
     SensorType.Motion,
+    SensorType.Object,
     SensorType.Audio,
+    SensorType.Battery,
     SensorType.Occupancy,
     SensorType.Contact,
     SensorType.Doorbell,
@@ -33,7 +35,7 @@ export const contract: PluginContract = {
     SensorType.Siren,
   ],
   consumes: [],
-  interfaces: [PluginInterface.Notifier, PluginInterface.SensorDiscovery],
+  interfaces: [PluginInterface.Notifier, PluginInterface.SensorDiscovery, PluginInterface.DiscoveryProvider],
 };
 
 export default contract;

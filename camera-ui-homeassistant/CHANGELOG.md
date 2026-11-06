@@ -1,3 +1,11 @@
+## [1.1.0]
+
+**Needs camera.ui 2.4.8.**
+
+- **Cameras from Home Assistant.** Cameras that other integrations add to Home Assistant can be adopted on the Cameras page. They stream through Home Assistant, and their motion, person, vehicle, animal, sound, doorbell and battery sensors, light and siren come along with the camera.
+- **Sensors of a camera come in as what they detect.** Adopted on their own on the Sensors page, a camera's person, vehicle and animal sensors become object detection instead of motion, its sound sensors audio with the sound's name. Sensors you adopted before keep their type.
+- **Two-way audio through Home Assistant.** Works with Home Assistant 2026.11 or newer, the README says what it needs.
+
 ## [1.0.19]
 
 **Needs camera.ui 2.4.4.**

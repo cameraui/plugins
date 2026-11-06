@@ -17,6 +17,7 @@ export interface HaStateAttributes {
   device_class?: string;
   state_class?: string;
   friendly_name?: unknown;
+  supported_features?: number;
   [key: string]: unknown;
 }
 
@@ -36,6 +37,9 @@ export interface HaRegistryEntry {
   area_id?: string | null;
   name?: string | null;
   original_name?: string | null;
+  translation_key?: string | null;
+  entity_category?: string | null;
+  disabled_by?: string | null;
 }
 
 export interface HaArea {
@@ -46,8 +50,27 @@ export interface HaArea {
 export interface HaDevice {
   id: string;
   area_id?: string | null;
+  name?: string | null;
+  name_by_user?: string | null;
   manufacturer?: string | null;
+  model?: string | null;
+  sw_version?: string | null;
+  hw_version?: string | null;
+  serial_number?: string | null;
   identifiers?: [string, unknown][];
+}
+
+export interface Registry {
+  byId: Map<string, HaRegistryEntry>;
+  byEntityId: Map<string, HaRegistryEntry>;
+  areas: Map<string, string>;
+  devices: Map<string, HaDevice>;
+  cameraDevices: Set<string>;
+}
+
+export interface HaCameraCapabilities {
+  frontend_stream_types: string[];
+  two_way_audio: boolean;
 }
 
 export interface HaPanel {
@@ -67,11 +90,20 @@ export interface HaStateEvent {
   new_state: HaState | null;
 }
 
+export interface HaBusEvent {
+  type?: unknown;
+  device_id?: unknown;
+  [key: string]: unknown;
+}
+
 export interface HaMessage {
   type: string;
   id?: number;
   success?: boolean;
   result?: unknown;
   error?: { code: string; message: string };
-  event?: { event_type: 'state_changed'; data: HaStateEvent } | { event_type: 'entity_registry_updated'; data: HaRegistryEvent };
+  event?:
+    | { event_type: 'state_changed'; data: HaStateEvent }
+    | { event_type: 'entity_registry_updated'; data: HaRegistryEvent }
+    | { event_type: `${string}_event`; data: HaBusEvent };
 }

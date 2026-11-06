@@ -1,16 +1,23 @@
 import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 
+import { cameraConfig, cameraGroups, discoveredCamera, groupNativeId, HaCamera } from './cameras.js';
 import { commandToService } from './controls.js';
 import { HaClient, resolveTarget } from './ha.js';
+import { busEventTypes, entityDetection } from './integrations/index.js';
 import { entityDisplayName } from './mapping.js';
 import { HaNotifier } from './notifier.js';
-import { applyEntityState, createImportedSensor, entityUnavailable, importableSensorType } from './sensors.js';
+import { applyEntityState, createImportedSensor, detectionSensorType, entityUnavailable, importableSensorType } from './sensors.js';
 
 import type {
   AdoptedSensor,
+  CameraConfig,
+  CameraDevice,
   DeviceStorage,
+  DiscoveredCamera,
   DiscoveredSensor,
+  DiscoveryProvider,
   JsonSchema,
+  JsonSchemaWithoutCallbacks,
   LoggerService,
   Notification,
   NotifierDevice,
@@ -18,15 +25,20 @@ import type {
   PluginAPI,
   Sensor,
   SensorDiscoveryProvider,
+  SensorType,
 } from '@camera.ui/sdk';
+import type { CameraGroup, CameraHost } from './cameras.js';
 import type { CommandFn, ControlKind } from './controls.js';
+import type { HaConnectionTarget } from './ha.js';
+import type { Detection } from './integrations/types.js';
 import type { ImportedSensor } from './sensors.js';
-import type { HaDevice, HaRegistryEntry, HaRegistryEvent, HaState, StorageValues } from './types.js';
+import type { HaBusEvent, HaRegistryEntry, HaRegistryEvent, HaState, Registry, StorageValues } from './types.js';
 
 const OWN_MANUFACTURER = 'camera.ui';
 const OWN_PLATFORM = 'cameraui';
 const OWN_ID_PREFIX = 'cameraui_';
 const RESYNC_INTERVAL_MS = 15 * 60_000;
+const REGISTRY_RESYNC_MS = 2_000;
 
 type RuntimeSensor = Sensor<any, any, any>;
 
@@ -36,17 +48,16 @@ interface BoundSensor {
   entityId?: string;
 }
 
-interface Registry {
-  byId: Map<string, HaRegistryEntry>;
-  byEntityId: Map<string, HaRegistryEntry>;
-  areas: Map<string, string>;
-  devices: Map<string, HaDevice>;
-}
-
 type Resolution = 'connected' | 'unavailable' | 'removed' | 'legacy';
 
-export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface, SensorDiscoveryProvider {
+export default class HomeAssistant extends BasePlugin<StorageValues> implements NotifierInterface, SensorDiscoveryProvider, DiscoveryProvider {
   private client?: HaClient;
+  private target?: HaConnectionTarget;
+  private cameras = new Map<string, HaCamera>();
+  private cameraByEntity = new Map<string, HaCamera>();
+  private groups = new Map<string, CameraGroup>();
+  private registrySyncTimer?: NodeJS.Timeout;
+  private lastDiscovered?: string;
   private bound = new Map<string, BoundSensor>();
   private byEntityId = new Map<string, BoundSensor>();
   private registry?: Registry;
@@ -56,6 +67,12 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   private resyncInterval?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
   private notifier = new HaNotifier(this.storage, this.logger, () => this.client);
+  private cameraHost: CameraHost = {
+    client: () => this.client,
+    target: () => this.target,
+    group: (nativeId) => this.groups.get(nativeId),
+    doorbellIds: () => this.doorbellIds(),
+  };
 
   constructor(logger: LoggerService, api: PluginAPI, storage: DeviceStorage<StorageValues>) {
     super(logger, api, storage);
@@ -133,11 +150,47 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     return this.notifier.notificationSettings();
   }
 
-  async configureCameras(): Promise<void> {}
+  async configureCameras(cameras: CameraDevice[]): Promise<void> {
+    for (const camera of cameras) await this.addCamera(camera);
+  }
 
-  async onCameraAdded(): Promise<void> {}
+  async onCameraAdded(camera: CameraDevice): Promise<void> {
+    await this.addCamera(camera);
+    await this.syncEntities();
+  }
 
-  async onCameraReleased(): Promise<void> {}
+  async onCameraReleased(cameraId: string): Promise<void> {
+    this.cameras.delete(cameraId);
+    this.indexCameraEntities();
+    await this.pushDiscoveredCameras();
+  }
+
+  async onDiscoverCameras(): Promise<DiscoveredCamera[]> {
+    const client = this.client;
+    if (!client?.connected) return [];
+    try {
+      const [registry, states] = await Promise.all([this.loadRegistry(client), client.fetchStates()]);
+      this.updateGroups(registry, states);
+    } catch (error) {
+      this.logger.warn('Could not load the Home Assistant cameras:', error);
+      return [];
+    }
+    return this.discoverableCameras();
+  }
+
+  async onGetCameraSettings(): Promise<JsonSchemaWithoutCallbacks[]> {
+    return [];
+  }
+
+  async onAdoptCamera(camera: DiscoveredCamera): Promise<CameraConfig> {
+    const client = this.client;
+    const group = this.groups.get(groupNativeId(camera));
+    if (!client?.connected || !this.registry || !group) throw new Error(`${camera.name} is not available in Home Assistant`);
+
+    const states = await client.fetchStates();
+    this.logger.log(`Adopted camera ${group.name}`);
+    return cameraConfig(group, this.registry, statesById(states), this.doorbellIds());
+  }
 
   async onDiscoverSensors(): Promise<DiscoveredSensor[]> {
     const client = this.client;
@@ -157,8 +210,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     const doorbells = this.doorbellIds();
     for (const state of states) {
       const entityId = state.entity_id;
-      if (this.isOwnEntity(registry, entityId)) continue;
-      const type = importableSensorType(state, doorbells);
+      if (this.isOwnEntity(registry, entityId) || this.cameraByEntity.has(entityId)) continue;
+      const type = this.importableType(state, doorbells);
       if (!type) continue;
       const entry = registry.byEntityId.get(entityId);
       result.push({ id: entry?.id ?? entityId, address: entityId, name: entityDisplayName(state), type, room: areaName(registry, entry) });
@@ -225,13 +278,20 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       this.logger.warn('Home Assistant URL and access token are not configured');
       return;
     }
+    this.target = target;
 
-    this.client = new HaClient(target, this.logger, {
-      onStateChanged: (entityId, state) => this.handleStateChanged(entityId, state),
-      onRegistryUpdated: (event) => this.handleRegistryUpdated(event),
-      onConnected: () => this.syncEntities(),
-      onDisconnected: () => this.markAllUnavailable(),
-    });
+    this.client = new HaClient(
+      target,
+      this.logger,
+      {
+        onStateChanged: (entityId, state) => this.handleStateChanged(entityId, state),
+        onRegistryUpdated: (event) => this.handleRegistryUpdated(event),
+        onBusEvent: (eventType, event) => this.handleBusEvent(eventType, event),
+        onConnected: () => this.syncEntities(),
+        onDisconnected: () => this.markAllUnavailable(),
+      },
+      busEventTypes(),
+    );
     this.client.connect();
     this.resyncInterval = setInterval(() => this.syncEntities(), RESYNC_INTERVAL_MS);
   }
@@ -239,6 +299,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
   private async stop(): Promise<void> {
     if (this.resyncInterval) clearInterval(this.resyncInterval);
     this.resyncInterval = undefined;
+    if (this.registrySyncTimer) clearTimeout(this.registrySyncTimer);
+    this.registrySyncTimer = undefined;
     this.client?.stop();
     this.client = undefined;
   }
@@ -264,7 +326,6 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       this.logger.error('Home Assistant sync failed:', error);
       return;
     }
-    this.rememberStates(states);
     await this.notifier.refreshTargets(states);
 
     let registry: Registry;
@@ -275,7 +336,73 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       this.logger.warn('Could not load the Home Assistant entity registry, adopted entities stay unavailable until the next sync:', error);
       return;
     }
+    this.rememberStates(states);
     this.resolveAll(registry);
+    await this.refreshCameras(registry, states);
+  }
+
+  private async addCamera(camera: CameraDevice): Promise<void> {
+    const haCamera = new HaCamera(camera, this.cameraHost);
+    await haCamera.attach();
+    this.cameras.set(camera.id, haCamera);
+  }
+
+  private updateGroups(registry: Registry, states: HaState[]): void {
+    const groups = cameraGroups(registry, statesById(states), (entityId) => this.isOwnEntity(registry, entityId));
+    this.groups = new Map(groups.map((group) => [group.nativeId, group]));
+  }
+
+  private async refreshCameras(registry: Registry, states: HaState[]): Promise<void> {
+    this.updateGroups(registry, states);
+    const byId = statesById(states);
+    for (const camera of this.cameras.values()) {
+      try {
+        await camera.refresh(registry, byId);
+      } catch (error) {
+        this.logger.warn(`Could not refresh ${camera.cameraDevice.name}:`, error);
+      }
+    }
+    this.indexCameraEntities();
+    await this.pushDiscoveredCameras();
+  }
+
+  private indexCameraEntities(): void {
+    this.cameraByEntity = new Map();
+    for (const camera of this.cameras.values()) {
+      for (const entityId of camera.entityIds) this.cameraByEntity.set(entityId, camera);
+    }
+  }
+
+  private async discoverableCameras(): Promise<DiscoveredCamera[]> {
+    const client = this.client;
+    if (!client?.connected) return [];
+    const adopted = new Set([...this.cameras.values()].map((camera) => camera.cameraDevice.nativeId));
+    const candidates = [...this.groups.values()].filter((group) => !adopted.has(group.nativeId));
+    const webrtc = await Promise.all(
+      candidates.map((group) =>
+        client
+          .fetchCameraCapabilities(group.streams[0].entityId)
+          .then((capabilities) => capabilities.frontend_stream_types.includes('web_rtc'))
+          .catch(() => false),
+      ),
+    );
+    return candidates.filter((_, index) => webrtc[index]).map(discoveredCamera);
+  }
+
+  private async pushDiscoveredCameras(): Promise<void> {
+    const discovered = await this.discoverableCameras();
+    const key = discovered.map((camera) => camera.id).join(',');
+    if (discovered.length === 0 || key === this.lastDiscovered) return;
+    this.lastDiscovered = key;
+    await this.api.deviceManager.pushDiscoveredCameras(discovered);
+  }
+
+  private scheduleRegistrySync(): void {
+    if (this.registrySyncTimer) clearTimeout(this.registrySyncTimer);
+    this.registrySyncTimer = setTimeout(() => {
+      this.registrySyncTimer = undefined;
+      this.syncEntities();
+    }, REGISTRY_RESYNC_MS);
   }
 
   private async loadRegistry(client: HaClient): Promise<Registry> {
@@ -285,6 +412,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       byEntityId: new Map(entries.map((entry) => [entry.entity_id, entry])),
       areas: new Map(areas.map((area) => [area.area_id, area.name])),
       devices: new Map(devices.map((device) => [device.id, device])),
+      cameraDevices: new Set(entries.flatMap((entry) => (entry.device_id && entry.entity_id.startsWith('camera.') ? [entry.device_id] : []))),
     };
     this.registry = registry;
     return registry;
@@ -344,7 +472,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
       bound.imported.sensor.setSourceState('unavailable');
       return 'unavailable';
     }
-    applyEntityState(bound.imported, state, live);
+    applyEntityState(bound.imported, state, live, this.cameraDetection(state, this.doorbellIds()));
     bound.imported.sensor.setSourceState('connected');
     return 'connected';
   }
@@ -367,11 +495,18 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     for (const bound of this.bound.values()) {
       if (bound.entityId) bound.imported.sensor.setSourceState('unavailable');
     }
+    for (const camera of this.cameras.values()) camera.markUnavailable();
+  }
+
+  private handleBusEvent(eventType: string, event: HaBusEvent): void {
+    if (typeof event.device_id !== 'string' || typeof event.type !== 'string') return;
+    for (const camera of this.cameras.values()) camera.handleBusEvent(eventType, event.device_id, event.type);
   }
 
   private handleStateChanged(entityId: string, state: HaState | null): void {
+    this.cameraByEntity.get(entityId)?.handleState(entityId, state);
     const bound = this.byEntityId.get(entityId);
-    if (state && (bound || importableSensorType(state, this.doorbellIds()))) {
+    if (state && (bound || this.importableType(state, this.doorbellIds()))) {
       this.lastStates.set(entityId, state);
     } else if (!state) {
       this.lastStates.delete(entityId);
@@ -387,6 +522,7 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   private handleRegistryUpdated(event: HaRegistryEvent): void {
     const registry = this.registry;
+    this.scheduleRegistrySync();
 
     if (event.action === 'remove') {
       const entry = registry?.byEntityId.get(event.entity_id);
@@ -420,8 +556,20 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
 
   private rememberStates(states: HaState[]): void {
     const doorbells = this.doorbellIds();
-    const relevant = states.filter((state) => this.byEntityId.has(state.entity_id) || importableSensorType(state, doorbells));
+    const relevant = states.filter((state) => this.byEntityId.has(state.entity_id) || this.importableType(state, doorbells));
     this.lastStates = new Map(relevant.map((state) => [state.entity_id, state]));
+  }
+
+  private importableType(state: HaState, doorbells: ReadonlySet<string>): SensorType | undefined {
+    const detection = this.cameraDetection(state, doorbells);
+    return detection ? detectionSensorType(detection) : importableSensorType(state, doorbells);
+  }
+
+  private cameraDetection(state: HaState, doorbells: ReadonlySet<string>): Detection | undefined {
+    const entry = this.registry?.byEntityId.get(state.entity_id);
+    // only a camera's own entities follow its integration's rules, a Matter button elsewhere is no doorbell
+    if (!entry?.device_id || !this.registry?.cameraDevices.has(entry.device_id)) return undefined;
+    return entityDetection(entry, state, doorbells);
   }
 
   private isOwnEntity(registry: Registry, entityId: string): boolean {
@@ -442,6 +590,10 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
         .filter(Boolean),
     );
   }
+}
+
+function statesById(states: HaState[]): Map<string, HaState> {
+  return new Map(states.map((state) => [state.entity_id, state]));
 }
 
 function areaName(registry: Registry, entry: HaRegistryEntry | undefined): string | undefined {

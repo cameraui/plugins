@@ -1,13 +1,14 @@
 import WebSocket from 'ws';
 
 import type { LoggerService } from '@camera.ui/sdk';
-import type { HaArea, HaDevice, HaMessage, HaPanel, HaRegistryEntry, HaRegistryEvent, HaState } from './types.js';
+import type { HaArea, HaBusEvent, HaCameraCapabilities, HaDevice, HaMessage, HaPanel, HaRegistryEntry, HaRegistryEvent, HaState } from './types.js';
 
 const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 10_000;
 const COMMAND_TIMEOUT_MS = 15_000;
 const RECONNECT_MIN_MS = 5_000;
 const RECONNECT_MAX_MS = 60_000;
+const SUPERVISOR_WS_URL = 'ws://supervisor/core/websocket';
 
 export interface HaClientOptions {
   host?: string;
@@ -23,6 +24,7 @@ export interface HaConnectionTarget {
 export interface HaClientEvents {
   onStateChanged: (entityId: string, state: HaState | null) => void;
   onRegistryUpdated: (event: HaRegistryEvent) => void;
+  onBusEvent: (eventType: string, event: HaBusEvent) => void;
   onConnected: () => void;
   onDisconnected: () => void;
 }
@@ -43,10 +45,19 @@ export function resolveTarget(options: HaClientOptions): HaConnectionTarget | un
 
   const supervisorToken = process.env.SUPERVISOR_TOKEN;
   if (supervisorToken) {
-    return { apiUrl: 'http://supervisor/core/api', wsUrl: 'ws://supervisor/core/websocket', token: supervisorToken };
+    return { apiUrl: 'http://supervisor/core/api', wsUrl: SUPERVISOR_WS_URL, token: supervisorToken };
   }
 
   return undefined;
+}
+
+export function hassStreamSource(target: HaConnectionTarget, entityId: string): string {
+  if (target.wsUrl === SUPERVISOR_WS_URL) return `hass://supervisor?entity_id=${entityId}`;
+
+  const url = new URL(target.apiUrl);
+  const query = new URLSearchParams({ entity_id: entityId, token: target.token });
+  if (url.protocol === 'https:') query.set('tls', '1');
+  return `hass://${url.host}?${query.toString()}`;
 }
 
 export class HaClient {
@@ -65,6 +76,7 @@ export class HaClient {
     private readonly target: HaConnectionTarget,
     private readonly logger: LoggerService,
     private readonly events: HaClientEvents,
+    private readonly busEventTypes: readonly string[] = [],
   ) {}
 
   get connected(): boolean {
@@ -86,6 +98,15 @@ export class HaClient {
 
   public async fetchDeviceRegistry(): Promise<HaDevice[]> {
     return this.command<HaDevice[]>('config/device_registry/list');
+  }
+
+  public async fetchCameraCapabilities(entityId: string): Promise<HaCameraCapabilities> {
+    return this.command<HaCameraCapabilities>('camera/capabilities', { entity_id: entityId });
+  }
+
+  public async fetchSnapshot(entityId: string): Promise<ArrayBuffer> {
+    const response = await this.request(`/camera_proxy/${entityId}`);
+    return response.arrayBuffer();
   }
 
   public async fetchPanels(): Promise<Record<string, HaPanel>> {
@@ -209,6 +230,7 @@ export class HaClient {
         this.logger.log(`Connected to Home Assistant (${this.target.apiUrl.replace(/\/api$/, '')})`);
         ws.send(JSON.stringify({ id: this.messageId++, type: 'subscribe_events', event_type: 'state_changed' }));
         ws.send(JSON.stringify({ id: this.messageId++, type: 'subscribe_events', event_type: 'entity_registry_updated' }));
+        for (const eventType of this.busEventTypes) ws.send(JSON.stringify({ id: this.messageId++, type: 'subscribe_events', event_type: eventType }));
         this.startPing(ws);
         this.events.onConnected();
         return;
@@ -229,6 +251,8 @@ export class HaClient {
           this.events.onStateChanged(message.event.data.entity_id, message.event.data.new_state);
         } else if (message.event.event_type === 'entity_registry_updated') {
           this.events.onRegistryUpdated(message.event.data);
+        } else {
+          this.events.onBusEvent(message.event.event_type, message.event.data);
         }
       }
     });
