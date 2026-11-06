@@ -39,7 +39,6 @@ class YAMNetAudioSensor(AudioDetectorSensor):
         self._logger = logger
         self._camera = camera
         self._detector: AudioDetector | None = None
-        self._listen_set: set[str] = set(DEFAULT_LISTEN_LABELS)
         self._frame_count: int = 0
 
     @property
@@ -66,9 +65,13 @@ class YAMNetAudioSensor(AudioDetectorSensor):
         rms = float(np.sqrt(np.mean(waveform**2)))
         dbfs = 20 * math.log10(max(rms, 1e-10)) if rms > 0 else -100.0
 
+        listen = self._listen_labels()
+        if not listen:
+            return {"detected": False, "detections": [], "decibels": dbfs}
+
         scores = await self._detector.detect(waveform)
 
-        detections = build_detections(scores, self._listen_set, self._confidence())
+        detections = build_detections(scores, listen, self._confidence())
 
         if detections:
             det_str = ", ".join(f"{d.get('attribute', d['label'])}={d['confidence']:.3f}" for d in detections)
@@ -97,6 +100,11 @@ class YAMNetAudioSensor(AudioDetectorSensor):
         if self._detector:
             await self._detector.close()
             self._detector = None
+
+    def _listen_labels(self) -> set[str]:
+        settings = self._camera.detectionSettings.get("audio") or {}
+        labels = settings.get("labels")
+        return set(DEFAULT_LISTEN_LABELS if labels is None else labels)
 
     def _confidence(self) -> float:
         settings = self._camera.detectionSettings.get("audio") or {}
