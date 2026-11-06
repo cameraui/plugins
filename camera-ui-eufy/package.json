@@ -26,8 +26,8 @@
     "node-datachannel": "^0.33.6"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.1.1",
-    "@camera.ui/sdk": "^1.4.6",
+    "@camera.ui/cli": "^0.1.2",
+    "@camera.ui/sdk": "^1.4.7",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.6.6",
     "@typescript-eslint/parser": "^8.72.1",
