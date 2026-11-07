@@ -23,7 +23,7 @@
     "@camera.ui/cli": "^0.1.2",
     "@camera.ui/sdk": "^1.4.7",
     "cross-env": "^10.1.0",
-    "updates": "^20.0.0"
+    "updates": "^20.0.1"
   },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
