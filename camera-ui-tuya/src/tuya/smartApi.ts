@@ -1,6 +1,6 @@
 import { constants, createHash, publicEncrypt } from 'node:crypto';
 
-import { AVAILABLE_REGIONS } from './types.js';
+import { AVAILABLE_REGIONS, CAMERA_CATEGORIES } from './types.js';
 
 import type { Device } from './types.js';
 
@@ -288,7 +288,7 @@ export class TuyaSmartApiClient {
       const rooms = await this.getRoomList(home.gid.toString());
       for (const room of rooms.result) {
         for (const device of room.deviceList) {
-          if ((device.category === 'sp' || device.category === 'dghsxj') && !this.containsDevice(devices, device.deviceId)) {
+          if (CAMERA_CATEGORIES.has(device.category) && !this.containsDevice(devices, device.deviceId)) {
             devices.push(device);
           }
         }
@@ -299,7 +299,7 @@ export class TuyaSmartApiClient {
     if (Array.isArray(sharedHomes.result.securityWebCShareInfoList)) {
       for (const sharedHome of sharedHomes.result.securityWebCShareInfoList) {
         for (const device of sharedHome.deviceInfoList) {
-          if ((device.category === 'sp' || device.category === 'dghsxj') && !this.containsDevice(devices, device.deviceId)) {
+          if (CAMERA_CATEGORIES.has(device.category) && !this.containsDevice(devices, device.deviceId)) {
             devices.push(device);
           }
         }

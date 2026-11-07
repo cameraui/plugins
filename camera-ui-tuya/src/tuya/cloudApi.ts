@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { CAMERA_CATEGORIES } from './types.js';
+
 import type { Device } from './types.js';
 
 interface BaseResponse {
@@ -114,7 +116,7 @@ export class TuyaCloudApiClient {
     }
 
     return response.result
-      .filter((device) => device.category === 'sp' || device.category === 'dghsxj')
+      .filter((device) => CAMERA_CATEGORIES.has(device.category))
       .map((device) => ({
         category: device.category,
         deviceId: device.id,

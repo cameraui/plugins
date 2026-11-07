@@ -1,3 +1,7 @@
+## [1.2.8]
+
+- Cameras in Tuya's `cdsxj` category, such as the Konnek Stein QC21SE, show up for adoption
+
 ## [1.2.7]
 
 - Bump camera.ui engine and SDK

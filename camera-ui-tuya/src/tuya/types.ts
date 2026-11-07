@@ -17,6 +17,8 @@ export const AVAILABLE_REGIONS: Region[] = [
   { name: 'india', host: 'protect-in.ismartlife.me', cloudHost: 'openapi.tuyain.com', description: 'India', continent: 'IN' },
 ];
 
+export const CAMERA_CATEGORIES = new Set(['sp', 'dghsxj', 'cdsxj']);
+
 export interface Device extends SmartDevice {
   type: 'smart' | 'cloud';
 }
