@@ -1,7 +1,7 @@
 {
   "displayName": "Home Assistant",
   "name": "@camera.ui/camera-ui-homeassistant",
-  "version": "1.0.19",
+  "version": "1.1.0",
   "description": "Imports Home Assistant cameras and sensors into camera.ui: cameras from other integrations stream through Home Assistant, motion, occupancy, contacts, doorbells, smoke, leak and more become assignable camera.ui sensors that can trigger camera detection.",
   "author": "seydx (https://github.com/cameraui/plugins)",
   "main": "./bundle/dist/index.js",
