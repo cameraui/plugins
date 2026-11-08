@@ -22,7 +22,7 @@ import {
 } from '@camera.ui/sdk';
 import { ArmingMode, PtzDirection } from '@mega-yfue/eufy-sdk';
 
-import { errorMessage, isBatteryPowered } from './utils.js';
+import { batteryLevel, errorMessage, isBatteryPowered } from './utils.js';
 
 import type { LoggerService, ObjectDetectionLabel, PTZDirection, PTZPosition, PTZRelativeMove, SensorOptions, TrackedDetection } from '@camera.ui/sdk';
 import type { AnyDeviceEvent, Device } from '@mega-yfue/eufy-sdk';
@@ -127,20 +127,20 @@ export class EufyBatteryInfo extends BatteryInfo implements BindableSensor {
   }
 
   public sync(): void {
-    const battery = this.device?.battery?.();
-    if (!battery) return;
-    if (battery.level !== undefined) this.setLevel(battery.level);
-    if (battery.charging !== undefined) this.setCharging(battery.charging ? ChargingState.Charging : ChargingState.NotCharging);
+    const level = batteryLevel(this.device);
+    const charging = this.device?.battery?.()?.charging;
+    if (level !== undefined) this.setLevel(level);
+    if (charging !== undefined) this.setCharging(charging ? ChargingState.Charging : ChargingState.NotCharging);
 
     // eufy pushes the low alert but never its end, a charge or a rising level ends it
-    if (this.lowAtLevel !== undefined && (battery.charging || (battery.level ?? 0) > this.lowAtLevel)) {
+    if (this.lowAtLevel !== undefined && (charging || (level ?? 0) > this.lowAtLevel)) {
       this.lowAtLevel = undefined;
       this.setLow(false);
     }
   }
 
   public reportLow(): void {
-    this.lowAtLevel = this.device?.battery?.()?.level ?? 0;
+    this.lowAtLevel = batteryLevel(this.device) ?? 0;
     this.setLow(true);
   }
 

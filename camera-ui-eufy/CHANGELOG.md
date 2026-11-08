@@ -1,3 +1,8 @@
+## [2.1.4]
+
+- **The guard mode of an Indoor Cam P24 (T8410) can be changed.** The camera kept its old mode, in the Eufy app too.
+- **A HomeBase that could not be reached at startup, or whose connection dropped, connects again by itself.** Until now it stayed without a connection until the next command, such as a guard mode change.
+
 ## [2.1.3]
 
 - **Video Smart Lock S330: add it again as a camera.** It now shows up under the cameras, with its live view and the lock as a control. The lock sensor adopted so far shows as removed, delete it on the Sensors page.
