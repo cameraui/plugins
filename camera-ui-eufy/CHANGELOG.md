@@ -1,3 +1,7 @@
+## [2.1.5]
+
+- **A HomeBase S1 Pro no longer fills the log with "P2P connect timeout" warnings.** The plugin kept trying a connection this HomeBase does not offer.
+
 ## [2.1.4]
 
 - **The guard mode of an Indoor Cam P24 (T8410) can be changed.** The camera kept its old mode, in the Eufy app too.
