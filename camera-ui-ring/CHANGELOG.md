@@ -1,3 +1,10 @@
+## [1.2.8]
+
+**Needs camera.ui 2.4.10.**
+
+- **Motion and doorbell events arrive again.** Since a recent change to Ring's notifications, the plugin missed motion and rings and logged `Public key is not valid for specified curve`.
+- **Ring's Control Center keeps showing camera.ui.** Opening a live view no longer renamed the device to `ring-client-go`.
+
 ## [1.2.7]
 
 - **Battery cameras and doorbells are recognized when you add them.** camera.ui then sets up a battery camera so it can sleep. Needs camera.ui 2.4.0.

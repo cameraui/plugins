@@ -1,25 +1,38 @@
 import { RingBatteryInfo, RingDoorbellTrigger, RingLightControl, RingMotionSensor, RingSirenControl } from './sensors.js';
 
-import type { CameraDevice, DeviceStorage, LoggerService, SnapshotInterface, StreamingInterface } from '@camera.ui/sdk';
-import type { RingCamera } from './ring-client-api.js';
-import type { StorageValues } from './types.js';
+import type { CameraDevice, LoggerService, SnapshotInterface, StreamingInterface } from '@camera.ui/sdk';
+import type { RingCamera, RingRestClient } from './ring-client-api.js';
 
 class CameraDeviceImplementations implements StreamingInterface, SnapshotInterface {
   constructor(
     private cameraDevice: CameraDevice,
     private ringCamera: RingCamera,
-    private storage: DeviceStorage<StorageValues>,
+    private restClient: () => RingRestClient | undefined,
     private logger: LoggerService,
   ) {}
 
   async streamUrl(sourceId: string): Promise<string> {
-    const baseUrl = `ring:?camera_id=${this.ringCamera.id}&device_id=${this.ringCamera.data.device_id}&refresh_token=${this.storage.values.token}`;
-    const source = this.cameraDevice.sources.find((s) => s._id === sourceId);
-    if (source?.name.toLocaleLowerCase() === 'snapshot') {
-      return `${baseUrl}&snapshot`;
+    const restClient = this.restClient();
+    if (!restClient) {
+      throw new Error('Not connected to Ring');
     }
 
-    return baseUrl;
+    // go2rtc only gets the access token: a session of its own would replace ours and stop the push notifications
+    const { access_token } = await restClient.getCurrentAuth();
+    const { hid } = JSON.parse(Buffer.from(restClient.refreshToken!, 'base64').toString()) as { hid: string };
+    const query = new URLSearchParams({
+      camera_id: this.ringCamera.id.toString(),
+      device_id: this.ringCamera.data.device_id,
+      access_token,
+      hardware_id: hid,
+    });
+
+    const source = this.cameraDevice.sources.find((s) => s._id === sourceId);
+    if (source?.name.toLocaleLowerCase() === 'snapshot') {
+      query.set('snapshot', '');
+    }
+
+    return `ring:?${query}`;
   }
 
   async snapshot(_sourceId: string, _forceNew?: boolean): Promise<ArrayBuffer | undefined> {
@@ -38,18 +51,18 @@ export class Camera {
   public readonly cameraDevice: CameraDevice;
   public readonly ringCamera: RingCamera;
 
-  private readonly storage: DeviceStorage<StorageValues>;
+  private readonly restClient: () => RingRestClient | undefined;
   private cameraLogger: LoggerService;
 
-  constructor(storage: DeviceStorage<StorageValues>, ringCamera: RingCamera, cameraDevice: CameraDevice) {
-    this.storage = storage;
+  constructor(restClient: () => RingRestClient | undefined, ringCamera: RingCamera, cameraDevice: CameraDevice) {
+    this.restClient = restClient;
     this.ringCamera = ringCamera;
     this.cameraDevice = cameraDevice;
     this.cameraLogger = cameraDevice.logger;
   }
 
   public async initialize(): Promise<void> {
-    await this.cameraDevice.implement(new CameraDeviceImplementations(this.cameraDevice, this.ringCamera, this.storage, this.cameraLogger));
+    await this.cameraDevice.implement(new CameraDeviceImplementations(this.cameraDevice, this.ringCamera, this.restClient, this.cameraLogger));
     await this.initializeSensors();
     this.subscribeToConnectionState();
   }

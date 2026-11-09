@@ -328,7 +328,7 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
       return;
     }
 
-    const camera = new Camera(this.storage, ringCamera, cameraDevice);
+    const camera = new Camera(() => this.ringConnections.get(this.storage.values.name)?.restClient, ringCamera, cameraDevice);
     await camera.initialize();
     this.ringCameras.set(ringCameraId, camera);
     this.logger.debug(`Initialized camera: ${ringCamera.name}`);
