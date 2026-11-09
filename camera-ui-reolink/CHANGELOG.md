@@ -23,7 +23,9 @@
 
 - **Battery cameras on a Home Hub or NVR get their events through the recorder.** The plugin keeps its connection to the recorder open for them, as Home Assistant does, and no longer takes over the recorder's push address, which Home Assistant uses too.
 - **Battery cameras reached over their UID can sleep as soon as the plugin is done.** The plugin now tells the camera it leaves, before it stayed awake until it timed out.
-- **Smaller fixes.** Cameras on an NVR or Home Hub no longer log a warning about alarms for other channels, and an account device that offers no local login at all is named as such.
+- **Smaller fixes.**
+  - Cameras on an NVR or Home Hub no longer log a warning about alarms for other channels
+  - An account device that offers no local login at all is named as such
 
 ## [1.3.2]
 
@@ -48,7 +50,9 @@
 - **Sleeping cameras react to the first command.** A battery camera, also one behind a Home Hub, turns down the first command while it wakes up, so the siren, spotlight or PTZ did nothing. The plugin now tries again, and a snapshot gets the time the camera needs to wake.
 - **Battery cameras end their motion when they go back to sleep.** Motion could stay on until the next reconnect, and a second press of a battery doorbell could go unreported.
 - **No second full-size stream.** If a camera's sub stream is only a copy of its main stream, it is no longer added as a low-resolution source.
-- **Smaller fixes.** A camera that refuses the continuous siren sounds it twice instead of staying silent, and the log says when camera.ui takes over a battery camera's push address from another app, such as Home Assistant.
+- **Smaller fixes.**
+  - A camera that refuses the continuous siren sounds it twice instead of staying silent
+  - The log says when camera.ui takes over a battery camera's push address from another app, such as Home Assistant
 - Bump camera.ui engine and SDK
 
 ## [1.2.26]
