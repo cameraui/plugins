@@ -1,3 +1,9 @@
+## [1.2.9]
+
+- The URL setting takes `https://` and a path, e.g. `https://192.168.1.100` or `http://192.168.1.100:8899/onvif/device_service`. Before, only the address and port were used, always over http
+- When the camera forwards the ONVIF request to another address on the same camera, the plugin follows it. When the connection still fails, the log names the address the plugin tried and where the camera sent it
+- Cameras that can only zoom get zoom commands without pan and tilt values
+
 ## [1.2.8]
 
 - Bump camera.ui engine and SDK

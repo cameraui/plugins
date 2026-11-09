@@ -1,7 +1,7 @@
 import { PTZCapability, PTZControl } from '@camera.ui/sdk';
 
 import type { CameraDevice, JsonSchema, PTZDirection, PTZPosition, PTZRelativeMove } from '@camera.ui/sdk';
-import type { Onvif, PTZStatus } from '@seydx/onvif';
+import type { Onvif, PTZInputVector, PTZStatus, PTZVector } from '@seydx/onvif';
 
 const POLL_INTERVAL_MS = 200;
 const POLL_BACKOFF_MAX_MS = 30_000;
@@ -121,7 +121,7 @@ export class OnvifPTZSensor extends PTZControl {
 
     try {
       await this.device.ptz.absoluteMove({
-        position: target,
+        position: this.moveVector(target.pan, target.tilt, target.zoom),
       });
 
       await super.setPosition(target);
@@ -149,11 +149,7 @@ export class OnvifPTZSensor extends PTZControl {
         await this.device.ptz.stop();
       } else {
         await this.device.ptz.continuousMove({
-          velocity: {
-            x: velocity.panSpeed ?? 0,
-            y: velocity.tiltSpeed ?? 0,
-            zoom: velocity.zoomSpeed ?? 0,
-          },
+          velocity: this.moveVector(velocity.panSpeed ?? 0, velocity.tiltSpeed ?? 0, velocity.zoomSpeed ?? 0),
           timeout: 1000,
         });
       }
@@ -467,5 +463,13 @@ export class OnvifPTZSensor extends PTZControl {
       return true;
     }
     return false;
+  }
+
+  private moveVector(pan: number, tilt: number, zoom: number): PTZInputVector | PTZVector {
+    const has = (cap: PTZCapability) => this.capabilities.includes(cap);
+    if (has(PTZCapability.Zoom) && !has(PTZCapability.Pan) && !has(PTZCapability.Tilt)) {
+      return { zoom: { x: zoom } };
+    }
+    return { pan, tilt, zoom };
   }
 }

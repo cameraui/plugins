@@ -20,12 +20,44 @@ export interface OnvifStorageValues {
 }
 
 const RETRY_INTERVAL_MS = 10_000;
+const DEVICE_SERVICE_PATH = '/onvif/device_service';
 
 interface OnvifCapabilities {
   hasPTZ: boolean;
   hasEvents: boolean;
   eventProperties?: EventProperties;
   advertisedTypes: EventCategory[];
+}
+
+interface OnvifEndpoint {
+  hostname: string;
+  port: number;
+  path: string;
+  useSecure: boolean;
+}
+
+export function onvifEndpoint(url: string): OnvifEndpoint {
+  const normalizedUrl = String(url ?? '').trim();
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalizedUrl.includes('://') ? normalizedUrl : `http://${normalizedUrl}`);
+  } catch {
+    const redacted = normalizedUrl.replace(/\/\/[^@/]*@/, '//***@');
+    throw new Error(`Invalid ONVIF device URL (type ${typeof url}): "${redacted}", expected e.g. http://192.168.1.100:8000`);
+  }
+
+  const useSecure = parsed.protocol === 'https:';
+  return {
+    hostname: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : useSecure ? 443 : 80,
+    path: parsed.pathname === '/' ? DEVICE_SERVICE_PATH : parsed.pathname,
+    useSecure,
+  };
+}
+
+function endpointUrl({ hostname, port, path, useSecure }: OnvifEndpoint): string {
+  return `${useSecure ? 'https' : 'http'}://${hostname}:${port}${path}`;
 }
 
 export class OnvifCamera {
@@ -331,28 +363,14 @@ export class OnvifCamera {
   }
 
   private async connectToDevice(url: string, username: string, password: string): Promise<Onvif> {
-    const normalizedUrl = String(url ?? '').trim();
+    const endpoint = onvifEndpoint(url);
+    const device = new Onvif({ ...endpoint, username, password, preserveAddress: true });
 
-    let cameraUrl: URL;
     try {
-      cameraUrl = new URL(normalizedUrl.includes('://') ? normalizedUrl : `http://${normalizedUrl}`);
-    } catch {
-      const redacted = normalizedUrl.replace(/\/\/[^@/]*@/, '//***@');
-      throw new Error(`Invalid ONVIF device URL (type ${typeof url}): "${redacted}" — expected e.g. http://192.168.1.100`);
+      return await device.connect();
+    } catch (error) {
+      throw new Error(`${endpointUrl(endpoint)}: ${error instanceof Error ? error.message : error}`, { cause: error });
     }
-
-    const hostname = cameraUrl.hostname;
-    const port = cameraUrl.port;
-
-    const device = new Onvif({
-      hostname,
-      username,
-      password,
-      port: port ? parseInt(port) : 80,
-      preserveAddress: true,
-    });
-
-    return await device.connect();
   }
 
   private async detectCapabilities(): Promise<OnvifCapabilities> {
@@ -409,7 +427,7 @@ export class OnvifCamera {
         type: 'string',
         key: 'url',
         title: 'URL',
-        description: 'Device address, e.g. http://192.168.1.100',
+        description: 'Camera address with its ONVIF port, e.g. http://192.168.1.100:8000. Without a port, 80 is used.',
         store: true,
         required: true,
         onSet: async () => {

@@ -1,7 +1,7 @@
 import { API_EVENT, BasePlugin } from '@camera.ui/sdk';
 import { Discovery } from '@seydx/onvif';
 
-import { OnvifCamera } from './camera.js';
+import { OnvifCamera, onvifEndpoint } from './camera.js';
 
 import type {
   CameraConfig,
@@ -268,9 +268,8 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
       }
 
       try {
-        const parsed = new URL(url);
-        const port = parsed.port || '80';
-        if (`${parsed.hostname}:${port}` === endpoint) {
+        const { hostname, port } = onvifEndpoint(url);
+        if (`${hostname}:${port}` === endpoint) {
           return true;
         }
       } catch {
