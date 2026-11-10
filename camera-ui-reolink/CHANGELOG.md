@@ -1,3 +1,7 @@
+## [1.3.9]
+
+- Update dependencies
+
 ## [1.3.8]
 
 - **PTZ cameras move evenly while you hold the joystick.** Each repeated command made the camera brake and start again, so it moved in jerks.
