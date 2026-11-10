@@ -1,3 +1,7 @@
+## [1.3.8]
+
+- Update deps
+
 ## [1.3.7]
 
 - **Update HAP-NodeJS to 2.3.0.** Security fixes for the connection to Home. Malformed requests or HomeKit Secure Video data no longer crash the plugin.
