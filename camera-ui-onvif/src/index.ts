@@ -177,7 +177,7 @@ export default class OnvifPlugin extends BasePlugin implements DiscoveryProvider
       info: {
         manufacturer: deviceInfo?.manufacturer,
         model: deviceInfo?.model,
-        serialNumber: deviceInfo?.serialNumber != null ? String(deviceInfo.serialNumber) : undefined,
+        serialNumber: deviceInfo?.serialNumber,
         firmwareVersion: deviceInfo?.firmwareVersion,
       },
       sources: [],

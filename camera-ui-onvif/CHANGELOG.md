@@ -1,3 +1,7 @@
+## [1.2.10]
+
+- Cameras that report a firmware version of plain digits, such as 1.10, can be added. Before, adding them failed with an error
+
 ## [1.2.9]
 
 - The URL setting takes `https://` and a path, e.g. `https://192.168.1.100` or `http://192.168.1.100:8899/onvif/device_service`. Before, only the address and port were used, always over http
