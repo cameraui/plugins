@@ -1,12 +1,12 @@
 import { RingBatteryInfo, RingDoorbellTrigger, RingLightControl, RingMotionSensor, RingSirenControl } from './sensors.js';
 
-import type { CameraDevice, LoggerService, SnapshotInterface, StreamingInterface } from '@camera.ui/sdk';
+import type { CameraDevice, LoggerService, Sensor, SnapshotInterface, StreamingInterface } from '@camera.ui/sdk';
 import type { RingCamera, RingRestClient } from './ring-client-api.js';
 
 class CameraDeviceImplementations implements StreamingInterface, SnapshotInterface {
   constructor(
     private cameraDevice: CameraDevice,
-    private ringCamera: RingCamera,
+    private ringCamera: () => RingCamera,
     private restClient: () => RingRestClient | undefined,
     private logger: LoggerService,
   ) {}
@@ -20,9 +20,10 @@ class CameraDeviceImplementations implements StreamingInterface, SnapshotInterfa
     // go2rtc only gets the access token: a session of its own would replace ours and stop the push notifications
     const { access_token } = await restClient.getCurrentAuth();
     const { hid } = JSON.parse(Buffer.from(restClient.refreshToken!, 'base64').toString()) as { hid: string };
+    const ringCamera = this.ringCamera();
     const query = new URLSearchParams({
-      camera_id: this.ringCamera.id.toString(),
-      device_id: this.ringCamera.data.device_id,
+      camera_id: ringCamera.id.toString(),
+      device_id: ringCamera.data.device_id,
       access_token,
       hardware_id: hid,
     });
@@ -37,7 +38,7 @@ class CameraDeviceImplementations implements StreamingInterface, SnapshotInterfa
 
   async snapshot(_sourceId: string, _forceNew?: boolean): Promise<ArrayBuffer | undefined> {
     try {
-      const snapshotBuffer = await this.ringCamera.getSnapshot();
+      const snapshotBuffer = await this.ringCamera().getSnapshot();
       if (snapshotBuffer.length) {
         return Uint8Array.from(snapshotBuffer).buffer;
       }
@@ -49,10 +50,12 @@ class CameraDeviceImplementations implements StreamingInterface, SnapshotInterfa
 
 export class Camera {
   public readonly cameraDevice: CameraDevice;
-  public readonly ringCamera: RingCamera;
+  public ringCamera: RingCamera;
 
   private readonly restClient: () => RingRestClient | undefined;
   private cameraLogger: LoggerService;
+  private sensorIds: string[] = [];
+  private dataSubscription?: { unsubscribe(): void };
 
   constructor(restClient: () => RingRestClient | undefined, ringCamera: RingCamera, cameraDevice: CameraDevice) {
     this.restClient = restClient;
@@ -62,38 +65,46 @@ export class Camera {
   }
 
   public async initialize(): Promise<void> {
-    await this.cameraDevice.implement(new CameraDeviceImplementations(this.cameraDevice, this.ringCamera, this.restClient, this.cameraLogger));
+    await this.cameraDevice.implement(new CameraDeviceImplementations(this.cameraDevice, () => this.ringCamera, this.restClient, this.cameraLogger));
+    await this.attach();
+  }
+
+  public async bind(ringCamera: RingCamera): Promise<void> {
+    await this.unbind();
+    this.ringCamera = ringCamera;
+    await this.attach();
+  }
+
+  public async unbind(): Promise<void> {
+    this.dataSubscription?.unsubscribe();
+    this.dataSubscription = undefined;
+    this.ringCamera.disconnect();
+
+    await Promise.all(this.sensorIds.map((sensorId) => this.cameraDevice.removeSensor(sensorId)));
+    this.sensorIds = [];
+    await this.cameraDevice.disconnect();
+  }
+
+  private async attach(): Promise<void> {
     await this.initializeSensors();
     this.subscribeToConnectionState();
   }
 
   private async initializeSensors(): Promise<void> {
-    const motionSensor = new RingMotionSensor(this.ringCamera);
-    await this.cameraDevice.addSensor(motionSensor);
+    await this.addSensor(new RingMotionSensor(this.ringCamera));
+    if (this.ringCamera.hasBattery) await this.addSensor(new RingBatteryInfo(this.ringCamera));
+    if (this.ringCamera.hasLight) await this.addSensor(new RingLightControl(this.ringCamera));
+    if (this.ringCamera.hasSiren) await this.addSensor(new RingSirenControl(this.ringCamera));
+    if (this.ringCamera.hasInHomeDoorbell) await this.addSensor(new RingDoorbellTrigger(this.ringCamera));
+  }
 
-    if (this.ringCamera.hasBattery) {
-      const batterySensor = new RingBatteryInfo(this.ringCamera);
-      await this.cameraDevice.addSensor(batterySensor);
-    }
-
-    if (this.ringCamera.hasLight) {
-      const lightControl = new RingLightControl(this.ringCamera);
-      await this.cameraDevice.addSensor(lightControl);
-    }
-
-    if (this.ringCamera.hasSiren) {
-      const sirenControl = new RingSirenControl(this.ringCamera);
-      await this.cameraDevice.addSensor(sirenControl);
-    }
-
-    if (this.ringCamera.hasInHomeDoorbell) {
-      const doorbellTrigger = new RingDoorbellTrigger(this.ringCamera);
-      await this.cameraDevice.addSensor(doorbellTrigger);
-    }
+  private async addSensor<T extends object>(sensor: Sensor<T>): Promise<void> {
+    await this.cameraDevice.addSensor(sensor);
+    this.sensorIds.push(sensor.id);
   }
 
   private subscribeToConnectionState(): void {
-    this.ringCamera.onData.subscribe((data) => {
+    this.dataSubscription = this.ringCamera.onData.subscribe((data) => {
       const isOffline = data.alerts?.connection === 'offline' || this.ringCamera.isOffline;
 
       if (isOffline && this.cameraDevice.connected) {

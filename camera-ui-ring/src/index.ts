@@ -129,6 +129,13 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
         description: 'Sign in to your Ring account.',
         onClick: this.onFormSubmit.bind(this, 'onLogin'),
       },
+      {
+        type: 'submit',
+        key: 'onLogout',
+        title: 'Log Out',
+        description: 'Disconnect from Ring and forget the login.',
+        onClick: this.onFormSubmit.bind(this, 'onLogout'),
+      },
     ];
   }
 
@@ -243,12 +250,31 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
   }
 
   private stop(): void {
-    this.discoveredRingCameras.clear();
     this.ringCameras.forEach((camera) => camera.ringCamera.disconnect());
     this.ringCameras.clear();
+    this.closeConnections();
+  }
+
+  private closeConnections(): void {
+    this.discoveredRingCameras.clear();
     this.ringConnections.forEach((ringApi) => ringApi.disconnect());
-    this.restClients.clear();
     this.ringConnections.clear();
+    this.restClients.clear();
+  }
+
+  private async logout(): Promise<FormSubmitResponse> {
+    if (!this.storage.values.token) {
+      return { toast: { message: 'Not logged in', type: 'info' } };
+    }
+
+    await Promise.all([...this.ringCameras.values()].map((camera) => camera.unbind()));
+    this.closeConnections();
+
+    this.storage.values = { ...this.storage.values, token: undefined, password: '' };
+    await this.storage.save();
+
+    this.logger.log(this.storage.values.name, 'Logged out of Ring');
+    return { toast: { message: 'Logged out of Ring', type: 'success' } };
   }
 
   private async connectHome(home: RingHome): Promise<void> {
@@ -310,7 +336,10 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
   private async initializeExistingCamera(ringCamera: RingCamera): Promise<void> {
     const ringCameraId = ringCamera.id.toString();
 
-    if (this.ringCameras.has(ringCameraId)) {
+    const controller = this.ringCameras.get(ringCameraId);
+    if (controller) {
+      // a new connection brings new camera objects, the old ones are disconnected
+      if (controller.ringCamera !== ringCamera) await controller.bind(ringCamera);
       return;
     }
 
@@ -423,6 +452,8 @@ export default class RingPlugin extends BasePlugin<StorageValues> implements Dis
 
   private async onFormSubmit(actionId: string, home: RingHome & { twoFactorCode?: string }): Promise<FormSubmitResponse | void> {
     switch (actionId) {
+      case 'onLogout':
+        return this.logout();
       case 'onLogin':
         if (home.twoFactorCode) {
           try {
