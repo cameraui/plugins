@@ -39,11 +39,14 @@ export class Camera {
       throw new Error(`Invalid region: ${this.storage.values.region}`);
     }
 
+    const { uid = '', clientId = '', clientSecret = '', email = '', password = '' } = this.storage.values;
+
     if (this.tuyaCamera.type === 'cloud') {
-      // eslint-disable-next-line @stylistic/max-len
-      return `tuya://${region.cloudHost}?device_id=${this.tuyaCamera.deviceId}&uid=${this.storage.values.uid}&client_id=${this.storage.values.clientId}&client_secret=${this.storage.values.clientSecret}`;
-    } else {
-      return `tuya://${region.host}?device_id=${this.tuyaCamera.deviceId}&email=${this.storage.values.email}&password=${this.storage.values.password}`;
+      const query = new URLSearchParams({ device_id: this.tuyaCamera.deviceId, uid, client_id: clientId, client_secret: clientSecret });
+      return `tuya://${region.cloudHost}?${query}`;
     }
+
+    const query = new URLSearchParams({ device_id: this.tuyaCamera.deviceId, email, password });
+    return `tuya://${region.host}?${query}`;
   }
 }

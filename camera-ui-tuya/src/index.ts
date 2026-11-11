@@ -43,22 +43,20 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         key: 'email',
         title: 'Email',
         format: 'email',
-        description: 'Email of your Tuya / Smart Life account.',
+        description: 'Email of your Tuya Smart account. Smart Life accounts only work through a cloud project.',
         required: true,
         store: true,
         group: 'Smart API',
-        onSet: this.scheduleConnect.bind(this),
       },
       {
         type: 'string',
         key: 'password',
         title: 'Password',
-        description: 'Password of your Tuya / Smart Life account.',
+        description: 'Password of your Tuya Smart account.',
         format: 'password',
         required: true,
         store: true,
         group: 'Smart API',
-        onSet: this.scheduleConnect.bind(this),
       },
       {
         type: 'string',
@@ -68,7 +66,6 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         required: true,
         store: true,
         group: 'Cloud API',
-        onSet: this.scheduleConnect.bind(this),
       },
       {
         type: 'string',
@@ -79,7 +76,6 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         required: true,
         store: true,
         group: 'Cloud API',
-        onSet: this.scheduleConnect.bind(this),
       },
       {
         type: 'string',
@@ -89,7 +85,6 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         required: true,
         store: true,
         group: 'Cloud API',
-        onSet: this.scheduleConnect.bind(this),
       },
       {
         type: 'string',
@@ -100,7 +95,6 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
         store: true,
         defaultValue: 'West America',
         enum: AVAILABLE_REGIONS.map((region) => region.description),
-        onSet: this.scheduleConnect.bind(this),
       },
       {
         type: 'submit',
@@ -201,6 +195,12 @@ export default class TuyaPlugin extends BasePlugin<TuyaConfig> implements Discov
   }
 
   private async start(): Promise<void> {
+    // older versions called Tuya's Western Europe data center East Europe
+    if (this.storage.values.region === 'East Europe') {
+      this.storage.values.region = 'Western Europe';
+      await this.storage.save();
+    }
+
     const hasSmartApiCredentials = !!(this.storage.values.email && this.storage.values.password);
     const hasCloudApiCredentials = !!(this.storage.values.clientId && this.storage.values.clientSecret && this.storage.values.uid);
     const hasRegion = !!this.storage.values.region;
