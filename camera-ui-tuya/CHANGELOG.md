@@ -2,6 +2,7 @@
 
 **Needs camera.ui 2.4.10.**
 
+- Live view works again. Since camera.ui 2.2.5 the stream failed with a wrong password error
 - Live view starts up to a second sooner, and the cameras of one account share one login
 - A camera that misses the first connection attempt, like a battery camera that is still waking up, gets asked again instead of the live view hanging
 - A camera that already streams to as many viewers as it allows is left alone for a while, so its running streams no longer freeze with every new attempt
