@@ -37,7 +37,7 @@
     "eslint": "9.39.2",
     "fs-extra": "^11.4.1",
     "globals": "^17.14.0",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.0",
     "rimraf": "^6.1.4",
     "set-interval-async": "^3.0.6",
     "sharp": "^0.35.5",
