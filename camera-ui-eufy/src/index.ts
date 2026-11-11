@@ -132,7 +132,7 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
         type: 'submit',
         key: 'onLogout',
         title: 'Log Out',
-        description: 'End the Eufy session and forget the saved login',
+        description: 'Disconnect from Eufy and forget the login.',
         onClick: this.onLogout.bind(this),
       },
     ];
@@ -579,9 +579,11 @@ export default class Eufy extends BasePlugin<StorageValues> implements Discovery
     this.pendingLogin = undefined;
     this.pendingStep = undefined;
 
-    if (!this.account) return { toast: { type: 'info', message: 'Not logged in' } };
+    if (!this.account && !this.storage.values.password) return { toast: { type: 'info', message: 'Not logged in' } };
 
     await this.deactivate(true);
+    this.storage.values = { ...this.storage.values, password: '' };
+    await this.storage.save();
     this.logger.log('Logged out of Eufy');
     return { toast: { type: 'success', message: 'Logged out of Eufy' } };
   }

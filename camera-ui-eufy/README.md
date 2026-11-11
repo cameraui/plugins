@@ -4,6 +4,6 @@ Integrates Eufy cameras, doorbells and HomeBases into camera.ui. Cameras stream 
 
 ## Setup
 
-Enter the email, password and country of your Eufy account in the plugin settings and press Log In. Eufy may ask for a captcha or send a verification code, the settings then show a field for it. The login is saved, a restart does not ask again.
+Enter the email, password and country of your Eufy account in the plugin settings and press Log In. Eufy may ask for a captcha or send a verification code, the settings then show a field for it. The login is saved, a restart does not ask again. Log Out ends the session and forgets the password.
 
 Eufy keeps one session per device. The plugin logs in as its own device, so it runs next to the Eufy app and other integrations on the same account.
