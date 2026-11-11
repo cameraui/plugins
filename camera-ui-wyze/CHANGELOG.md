@@ -1,3 +1,12 @@
+## [1.2.9]
+
+**Cameras added before 1.2.9 still connect to the address they had when they were added.** Give them a fixed IP address in your router, or remove them and add them again.
+
+- The stream follows the camera's IP address from your Wyze account. Before, a new address from the router broke the stream
+- The API fields point to the Wyze developer console
+- Log Out disconnects from Wyze and forgets the login
+- The README explains the setup, including the API key
+
 ## [1.2.8]
 
 - Bump camera.ui engine and SDK

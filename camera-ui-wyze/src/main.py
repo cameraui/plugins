@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any
-from urllib.parse import urlencode
 
 from camera_ui_sdk import (
     API_EVENT,
@@ -67,7 +65,7 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
                 "type": "string",
                 "key": "apiId",
                 "title": "API ID",
-                "description": "Wyze Developer API ID (from developer.wyze.com)",
+                "description": "Key ID of your API key from the Wyze developer console.",
                 "required": True,
                 "store": True,
             },
@@ -75,7 +73,7 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
                 "type": "string",
                 "key": "apiKey",
                 "title": "API Key",
-                "description": "Wyze Developer API Key (from developer.wyze.com)",
+                "description": "Your API key from the Wyze developer console.",
                 "format": "password",
                 "required": True,
                 "store": True,
@@ -103,6 +101,13 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
                 "description": "Login to Wyze",
                 "onClick": partial(self._on_form_submit, "onLogin"),
             },
+            {
+                "type": "submit",
+                "key": "onLogout",
+                "title": "Log Out",
+                "description": "Disconnect from Wyze and forget the login.",
+                "onClick": partial(self._on_form_submit, "onLogout"),
+            },
         ]
 
     async def onDiscoverCameras(self) -> list[DiscoveredCamera]:
@@ -120,14 +125,10 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
         if not wyze_camera:
             raise ValueError(f"Wyze camera {mac} not found")
 
-        stream_url = self._build_wyze_url(wyze_camera)
-        sd_url = self._build_wyze_url(wyze_camera, subtype="sd")
-
         sources: list[CameraConfigInputSettings] = [
             {
                 "name": "HD Stream",
                 "role": "high-resolution",
-                "urls": [stream_url],
                 "useForSnapshot": True,
                 "hotMode": False,
                 "preload": False,
@@ -135,7 +136,6 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
             {
                 "name": "SD Stream",
                 "role": "low-resolution",
-                "urls": [sd_url],
                 "useForSnapshot": False,
                 "hotMode": False,
                 "preload": False,
@@ -233,7 +233,11 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
 
     async def _initialize_existing_camera(self, wyze_camera: WyzeCamera) -> None:
         mac = wyze_camera.mac
-        if mac in self._camera_controllers:
+        controller = self._camera_controllers.get(mac)
+        if controller:
+            # a new login brings new camera objects and a new camera service
+            if controller.wyze_camera is not wyze_camera and self._camera_service:
+                await controller.bind(wyze_camera, self._camera_service)
             return
 
         camera_device = next((c for c in self._existing_cameras.values() if c.nativeId == mac), None)
@@ -277,19 +281,9 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
             "model": camera.product_model,
         }
 
-    def _build_wyze_url(self, camera: WyzeCamera, subtype: str = "hd") -> str:
-        params: dict[str, Any] = {
-            "uid": camera.device_params.get("p2p_id", ""),
-            "enr": getattr(camera, "enr", camera.raw_dict.get("enr", "")),
-            "mac": camera.mac,
-            "model": camera.product_model,
-            "dtls": "true" if camera.device_params.get("dtls", 0) == 1 else "false",
-            "subtype": subtype,
-        }
-        ip = camera.device_params.get("ip", "")
-        return f"wyze://{ip}?{urlencode(params)}"
-
     async def _on_form_submit(self, action_id: str, values: WyzeConfig) -> FormSubmitResponse | None:
+        if action_id == "onLogout":
+            return await self._logout()
         if action_id != "onLogin":
             return None
 
@@ -316,6 +310,28 @@ class Wyze(BasePlugin[WyzeConfig], DiscoveryProvider):
         except Exception as e:
             self.logger.error(f"Login failed: {e}")
             return {"toast": {"message": f"Login failed: {e}", "type": "error"}}
+
+    async def _logout(self) -> FormSubmitResponse:
+        if not self.storage.values.get("accessToken"):
+            return {"toast": {"message": "Not logged in", "type": "info"}}
+
+        for controller in self._camera_controllers.values():
+            await controller.unbind()
+        self._wyze_cameras.clear()
+        self._wyze_client = None
+        self._camera_service = None
+
+        stored = self.storage.values
+        self.storage.values = {
+            "username": stored["username"],
+            "password": "",
+            "apiId": stored["apiId"],
+            "apiKey": stored["apiKey"],
+        }
+        await self.storage.save()
+
+        self.logger.log("Logged out of Wyze")
+        return {"toast": {"message": "Logged out of Wyze", "type": "success"}}
 
 
 def __main__() -> type[Wyze]:
