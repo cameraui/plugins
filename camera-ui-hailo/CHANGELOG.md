@@ -1,5 +1,9 @@
-## [1.3.2]
+## [1.4.0]
 
+**Needs the Hailo driver 4.24.0.** Download the current `cameraui-host.sh`, run `sudo bash cameraui-host.sh hailo` again and reboot.
+
+- Fix installation: the plugin now brings its own HailoRT runtime and no longer needs a compiler
+- Detect Hailo-8 and Hailo-8L, so a Hailo-8 runs its own model instead of the Hailo-8L one
 - Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.4.10 and later)
 - Update dependencies
 
