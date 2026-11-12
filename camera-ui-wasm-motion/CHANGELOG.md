@@ -1,3 +1,7 @@
+## [1.2.8]
+
+- Update dependencies
+
 ## [1.2.7]
 
 - Bump camera.ui engine and SDK

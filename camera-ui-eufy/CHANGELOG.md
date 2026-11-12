@@ -6,6 +6,7 @@
 - **The Smart Lock C220 locks and unlocks without a HomeBase.** Every command failed after about a minute.
 - **A HomeBase S1 Pro no longer fills the log with "P2P connect timeout" warnings.** The plugin kept trying a connection this HomeBase does not offer.
 - **Log Out also forgets the password.** Before, the plugin logged in again on its own after a restart.
+- Update dependencies
 
 ## [2.1.4]
 

@@ -1,6 +1,7 @@
 ## [1.2.10]
 
 - Cameras that report a firmware version of plain digits, such as 1.10, can be added. Before, adding them failed with an error
+- Update dependencies
 
 ## [1.2.9]
 

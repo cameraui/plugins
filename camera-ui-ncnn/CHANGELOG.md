@@ -1,3 +1,7 @@
+## [1.3.3]
+
+- Update dependencies
+
 ## [1.3.2]
 
 - **Detection on a Raspberry Pi is many times faster.** It ran on the Pi's graphics chip, now it runs on the CPU.

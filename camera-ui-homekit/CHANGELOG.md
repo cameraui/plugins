@@ -1,6 +1,6 @@
 ## [1.3.8]
 
-- Update deps
+- Update dependencies
 
 ## [1.3.7]
 

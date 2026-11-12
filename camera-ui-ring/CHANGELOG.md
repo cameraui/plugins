@@ -6,6 +6,7 @@
 - **Ring's Control Center keeps showing camera.ui.** Opening a live view no longer renamed the device to `ring-client-go`.
 - **Log Out disconnects from Ring and forgets the login.** It sits below Login in the plugin settings.
 - **Motion, doorbell and the live view keep working after a new login.** The same goes for a change of Polling or Location Ids, which needed a restart of the plugin before.
+- Update dependencies
 
 ## [1.2.7]
 

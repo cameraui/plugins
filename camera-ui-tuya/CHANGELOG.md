@@ -14,6 +14,7 @@
 - The email field says which account works there
 - The README explains both ways to sign in, step by step
 - Save only keeps the settings, Log In connects. Before, every saved field started a new login
+- Update dependencies
 
 ## [1.2.8]
 

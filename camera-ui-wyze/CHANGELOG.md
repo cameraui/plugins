@@ -6,6 +6,7 @@
 - The API fields point to the Wyze developer console
 - Log Out disconnects from Wyze and forgets the login
 - The README explains the setup, including the API key
+- Update dependencies
 
 ## [1.2.8]
 
