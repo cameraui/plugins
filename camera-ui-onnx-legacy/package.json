@@ -39,6 +39,11 @@
   "cpu": [
     "x64"
   ],
+  "cameraui": {
+    "libc": [
+      "glibc"
+    ]
+  },
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-onnx-legacy#readme",
   "keywords": [
     "camera-ui-plugin",

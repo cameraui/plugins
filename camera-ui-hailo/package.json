@@ -39,6 +39,11 @@
     "x64",
     "arm64"
   ],
+  "cameraui": {
+    "libc": [
+      "glibc"
+    ]
+  },
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-hailo#readme",
   "keywords": [
     "camera-ui-plugin",

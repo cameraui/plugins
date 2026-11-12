@@ -48,6 +48,11 @@
   },
   "os": [],
   "cpu": [],
+  "cameraui": {
+    "libc": [
+      "glibc"
+    ]
+  },
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-pamdiff#readme",
   "keywords": [
     "camera-ui-plugin",

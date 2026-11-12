@@ -40,6 +40,11 @@
     "x64",
     "arm64"
   ],
+  "cameraui": {
+    "libc": [
+      "glibc"
+    ]
+  },
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-openvino-legacy#readme",
   "keywords": [
     "camera-ui-plugin",

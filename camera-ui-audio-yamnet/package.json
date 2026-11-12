@@ -27,6 +27,11 @@
   },
   "os": [],
   "cpu": [],
+  "cameraui": {
+    "libc": [
+      "glibc"
+    ]
+  },
   "bugs": {
     "url": "https://github.com/cameraui/plugins/issues"
   },
