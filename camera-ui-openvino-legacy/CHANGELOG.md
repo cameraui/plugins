@@ -1,3 +1,7 @@
+## [1.3.2]
+
+- Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.4.10 and later)
+
 ## [1.3.1]
 
 - **Changing the Device or downloading the models again also reloads the face landmark model.** It kept running on the old setting until the plugin restarted.

@@ -1,3 +1,7 @@
+## [1.2.11]
+
+- Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.4.10 and later)
+
 ## [1.2.9]
 
 - Listens only for the sounds selected in the camera's audio detection settings (camera.ui 2.4.8 and later)
