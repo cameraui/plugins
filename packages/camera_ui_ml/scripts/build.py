@@ -111,7 +111,7 @@ def main() -> None:
     log("Type check passed", "success")
 
     log("Building package...")
-    run_command("python -m build --sdist")
+    run_command("python -m build")
     log("Package built successfully", "success")
 
     log("Validating package with twine...")
@@ -172,7 +172,7 @@ def build_local() -> None:
     log("Type check passed", "success")
 
     log("Building package...")
-    run_command("python -m build --sdist")
+    run_command("python -m build")
     log("Package built successfully", "success")
 
     log("Validating package with twine...")
