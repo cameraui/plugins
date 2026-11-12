@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import subprocess
 from collections.abc import Callable, Mapping
 
 from camera_ui_ml import BaseModelManager, InferenceBackend
@@ -14,27 +13,19 @@ _ARCH_DISPLAY = {"hailo8": "Hailo-8", "hailo8l": "Hailo-8L"}
 _DEFAULT_ARCH = "hailo8l"  # Raspberry Pi AI Kit chip
 
 
-def _detect_arch() -> str | None:
+def _detect_arch(device_id: str | None) -> str | None:
+    # the wheel has no hailortcli, so ask the device directly
     try:
-        result = subprocess.run(
-            ["hailortcli", "fw-control", "identify"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=15,
-        )
+        from hailo_platform import Device
+
+        with Device(device_id) as device:
+            arch = str(device.control.identify().device_architecture).lower()
     except Exception:
         return None
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.splitlines():
-        if "Device Architecture" in line:
-            lowered = line.lower()
-            if "hailo8l" in lowered:
-                return "hailo8l"
-            if "hailo8" in lowered:
-                return "hailo8"
-            break
+    if arch.startswith("hailo8l"):
+        return "hailo8l"
+    if arch.startswith("hailo8"):
+        return "hailo8"
     return None
 
 
@@ -70,7 +61,7 @@ class HailoModelManager(BaseModelManager):
         await self._arch_task
 
     async def _detect_arch_async(self) -> None:
-        self._arch = await asyncio.to_thread(_detect_arch)
+        self._arch = await asyncio.to_thread(_detect_arch, self._get_device_id())
         if self._arch is None:
             self.logger.warn(f"Could not detect Hailo device; assuming {_DEFAULT_ARCH}")
         else:
