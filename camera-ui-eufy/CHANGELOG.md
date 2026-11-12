@@ -2,6 +2,8 @@
 
 - **A HomeBase S1 Pro or a recorder connects on accounts where it failed with error 401**, for example in the UK and Switzerland. The live view and controls of the cameras behind it work there now.
 - **The Video Doorbell C30 and C31 ring in camera.ui.** Their button press never reached camera.ui before.
+- **The Wired Doorbell 2K shows a live view on more firmware versions.** On some it stayed without a picture.
+- **The Smart Lock C220 locks and unlocks without a HomeBase.** Every command failed after about a minute.
 - **A HomeBase S1 Pro no longer fills the log with "P2P connect timeout" warnings.** The plugin kept trying a connection this HomeBase does not offer.
 - **Log Out also forgets the password.** Before, the plugin logged in again on its own after a restart.
 
