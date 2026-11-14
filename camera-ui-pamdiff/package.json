@@ -24,7 +24,7 @@
     "pipe2pam": "^0.7.1"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.1.5",
+    "@camera.ui/cli": "^0.1.6",
     "@camera.ui/sdk": "^1.4.10",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.6.6",
