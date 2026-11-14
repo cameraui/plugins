@@ -28,8 +28,8 @@
     "werift": "^0.27.0"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.1.4",
-    "@camera.ui/sdk": "^1.4.9",
+    "@camera.ui/cli": "^0.1.5",
+    "@camera.ui/sdk": "^1.4.10",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.6.6",
     "@typescript-eslint/parser": "^8.72.2",
