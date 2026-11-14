@@ -61,7 +61,7 @@ export default [
       '@typescript-eslint/no-redundant-type-constituents': 'off',
       '@typescript-eslint/no-namespace': 'off',
       '@stylistic/generator-star-spacing': ['error', { before: true, after: false }],
-
+      '@stylistic/list-style': 'off',
       '@stylistic/max-len': ['error', { code: 170, tabWidth: 2 }],
       '@stylistic/quotes': ['error', 'single', { avoidEscape: true }],
       '@stylistic/operator-linebreak': 'off',
