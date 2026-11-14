@@ -20,8 +20,8 @@
     "update": "updates -M npm,pypi,go,cargo,docker --update ./ && cupdate"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.1.6",
-    "@camera.ui/sdk": "^1.4.10",
+    "@camera.ui/cli": "^0.1.7",
+    "@camera.ui/sdk": "^1.4.11",
     "cross-env": "^10.1.0",
     "updates": "^20.0.1"
   },

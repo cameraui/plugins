@@ -28,9 +28,9 @@
     "werift": "^0.27.0"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.1.6",
-    "@camera.ui/sdk": "^1.4.10",
-    "@stylistic/eslint-plugin": "^5.10.0",
+    "@camera.ui/cli": "^0.1.7",
+    "@camera.ui/sdk": "^1.4.11",
+    "@stylistic/eslint-plugin": "^6.0.0",
     "@types/node": "26.6.6",
     "@typescript-eslint/parser": "^8.72.2",
     "concurrently": "^10.0.7",
