@@ -278,7 +278,7 @@ export class EufyCamera {
       this.doorbellTrigger = await this.add(new DoorbellTrigger('Eufy Doorbell'));
     }
 
-    if (!this.lightControl && device.light?.()) {
+    if (!this.lightControl && device.light?.()?.on) {
       this.lightControl = await this.addBindable(new EufyLightControl(device, this.logger));
     }
 

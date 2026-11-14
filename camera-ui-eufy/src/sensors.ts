@@ -167,14 +167,14 @@ export class EufyLightControl extends LightControl implements BindableSensor {
 
   public override async setOn(): Promise<void> {
     await runCommand(this.logger, 'turn on the light', async () => {
-      await required(this.device?.light?.(), this.displayName).on();
+      await required(this.device?.light?.()?.on?.(), this.displayName);
       await super.setOn();
     });
   }
 
   public override async setOff(): Promise<void> {
     await runCommand(this.logger, 'turn off the light', async () => {
-      await required(this.device?.light?.(), this.displayName).off();
+      await required(this.device?.light?.()?.off?.(), this.displayName);
       await super.setOff();
     });
   }

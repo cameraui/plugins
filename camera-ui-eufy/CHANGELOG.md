@@ -4,6 +4,8 @@
 - **The Video Doorbell C30 and C31 ring in camera.ui.** Their button press never reached camera.ui before.
 - **The Wired Doorbell 2K shows a live view on more firmware versions.** On some it stayed without a picture.
 - **The Smart Lock C220 locks and unlocks without a HomeBase.** Every command failed after about a minute.
+- **The Eufy Water and Freeze Sensor can be adopted on the Sensors page** and reports leaks. It never showed up there before.
+- **A doorbell press or detection comes in once.** On some accounts every ring and detection reached camera.ui twice.
 - **A HomeBase S1 Pro no longer fills the log with "P2P connect timeout" warnings.** The plugin kept trying a connection this HomeBase does not offer.
 - **Log Out also forgets the password.** Before, the plugin logged in again on its own after a restart.
 - Update dependencies
