@@ -1,5 +1,8 @@
 ## [1.1.1]
 
+**Needs camera.ui 2.4.10.**
+
+- **Notify targets are for admins.** The Home Assistant notify targets belong to the whole installation: only admins see them under Devices in the notification settings and switch them on or off, and they follow the admins' notification settings.
 - Update dependencies
 
 ## [1.1.0]

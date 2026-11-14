@@ -15,7 +15,6 @@ function toHaImageUrl(imageUrl: string | undefined): string | undefined {
 export class HaNotifier {
   private services: string[] = [];
   private entities = new Map<string, string>();
-  private lastOwnerUserId = '';
   private panelPath: string | undefined;
 
   constructor(
@@ -51,15 +50,13 @@ export class HaNotifier {
     }
   }
 
-  public async getDevices(ownerUserIds: string[]): Promise<NotifierDevice[]> {
-    const owner = ownerUserIds[0] ?? this.lastOwnerUserId;
-    if (owner) this.lastOwnerUserId = owner;
-    return this.targetKeys().map((key) => this.toDevice(key, owner));
+  public async getDevices(): Promise<NotifierDevice[]> {
+    return this.targetKeys().map((key) => this.toDevice(key));
   }
 
   public async getDevice(deviceId: string): Promise<NotifierDevice | null> {
     const key = this.keyForId(deviceId);
-    return key ? this.toDevice(key, this.lastOwnerUserId) : null;
+    return key ? this.toDevice(key) : null;
   }
 
   public async sendNotification(deviceIds: string[], n: Notification): Promise<void> {
@@ -120,7 +117,7 @@ export class HaNotifier {
       this.storage.values.notifyServiceNames = { ...this.storage.values.notifyServiceNames, [key]: patch.name };
       await this.storage.save();
     }
-    return this.toDevice(key, this.lastOwnerUserId);
+    return this.toDevice(key);
   }
 
   public async notificationSettings(): Promise<JsonSchema[] | undefined> {
@@ -154,10 +151,10 @@ export class HaNotifier {
     await this.storage.save();
   }
 
-  private toDevice(key: string, owner: string): NotifierDevice {
+  private toDevice(key: string): NotifierDevice {
     return {
       id: `${DEVICE_PREFIX}${key}`,
-      ownerUserId: owner,
+      ownerUserId: '', // admin only
       name: this.storage.values.notifyServiceNames?.[key] ?? this.entities.get(key) ?? key,
       active: !this.isMuted(key),
       metadata: this.isEntity(key) ? { entity: key } : { service: key },

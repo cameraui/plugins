@@ -122,8 +122,8 @@ export default class HomeAssistant extends BasePlugin<StorageValues> implements 
     ];
   }
 
-  async getDevices(ownerUserIds: string[]): Promise<NotifierDevice[]> {
-    return this.notifier.getDevices(ownerUserIds);
+  async getDevices(): Promise<NotifierDevice[]> {
+    return this.notifier.getDevices();
   }
 
   async getDevice(deviceId: string): Promise<NotifierDevice | null> {
