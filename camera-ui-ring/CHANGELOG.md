@@ -1,6 +1,6 @@
 ## [1.2.8]
 
-**Needs camera.ui 2.4.10.**
+**Needs camera.ui 2.5.0.**
 
 - **Motion and doorbell events arrive again.** Since a recent change to Ring's notifications, the plugin missed motion and rings and logged `Public key is not valid for specified curve`.
 - **Ring's Control Center keeps showing camera.ui.** Opening a live view no longer renamed the device to `ring-client-go`.

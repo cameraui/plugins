@@ -1,6 +1,6 @@
 ## [1.2.8]
 
-- Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.4.10 and later)
+- Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.5.0 and later)
 - Update dependencies
 
 ## [1.2.7]

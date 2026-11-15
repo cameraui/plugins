@@ -4,7 +4,7 @@
 
 - Fix installation: the plugin now brings its own HailoRT runtime and no longer needs a compiler
 - Detect Hailo-8 and Hailo-8L, so a Hailo-8 runs its own model instead of the Hailo-8L one
-- Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.4.10 and later)
+- Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.5.0 and later)
 - Update dependencies
 
 ## [1.3.1]

@@ -1,6 +1,6 @@
 ## [1.3.0]
 
-**Needs camera.ui 2.4.10.**
+**Needs camera.ui 2.5.0.**
 
 - Live view works again. Since camera.ui 2.2.5 the stream failed with a wrong password error
 - Live view starts up to a second sooner, and the cameras of one account share one login
