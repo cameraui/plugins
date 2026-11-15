@@ -1,3 +1,3 @@
 export default {
-  exclude: ['typescript', 'eslint', '@seydx/onvif'],
+  exclude: ['typescript', 'eslint', '@seydx/onvif', '@stylistic/eslint-plugin'],
 };

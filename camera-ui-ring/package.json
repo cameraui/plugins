@@ -18,7 +18,7 @@
     "publish:alpha": "npm i --save --force && npm run bundle && cui publish --alpha",
     "publish:beta": "npm i --save --force && npm run bundle && cui publish --beta",
     "publish:latest": "npm i --save --force && npm run bundle && cui publish --latest",
-    "update": "updates -M npm,pypi,go,cargo,docker --update ./"
+    "update": "updates -M npm,pypi,go,cargo,docker -u"
   },
   "dependencies": {
     "ring-client-api": "file:../externals/ring"
@@ -26,7 +26,7 @@
   "devDependencies": {
     "@camera.ui/cli": "^0.1.7",
     "@camera.ui/sdk": "^1.4.11",
-    "@stylistic/eslint-plugin": "^6.0.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "26.6.6",
     "@types/ws": "^8.18.2",
     "@typescript-eslint/parser": "^8.72.2",

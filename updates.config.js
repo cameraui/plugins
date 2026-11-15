@@ -1,3 +1,3 @@
 export default {
-  exclude: ['typescript'],
+  exclude: ['typescript', 'eslint', '@stylistic/eslint-plugin'],
 };

@@ -1,3 +1,3 @@
 export default {
-  exclude: ['numpy'],
+  exclude: ['numpy', '@stylistic/eslint-plugin'],
 };
