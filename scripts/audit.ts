@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,10 +8,16 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function runsHere(fullPath: string): boolean {
+  const { os, cpu } = JSON.parse(readFileSync(resolve(fullPath, 'package.json'), 'utf8')) as { os?: string[]; cpu?: string[] };
+  return (!os || os.includes(process.platform)) && (!cpu || cpu.includes(process.arch));
+}
+
 function runCommandsInDirectory(directoryPath: string) {
   try {
-    const cmd = 'npm audit fix --min-release-age=0';
     const fullPath = resolve(__dirname, directoryPath);
+    // npm refuses to fix a plugin built for another platform, report only
+    const cmd = runsHere(fullPath) ? 'npm audit fix --min-release-age=0' : 'npm audit';
 
     console.log(chalk.cyan('USER:', userInfo().username));
     console.log(chalk.cyan('DIR:', fullPath));
