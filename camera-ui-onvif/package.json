@@ -60,5 +60,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-onvif"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

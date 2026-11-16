@@ -61,5 +61,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-smtp"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

@@ -29,6 +29,7 @@ function runCommandsInDirectory(directoryPath: string) {
 
     console.log('\r\n', chalk.bgGreen(' SUCCESS '), chalk.green(`Command completed in ${fullPath}`));
   } catch (error) {
+    process.exitCode = 1;
     console.error('\r\n', chalk.bgRed.bold(' ERROR '), chalk.red(`Failed to run command in ${directoryPath}: ${error}`));
   } finally {
     console.log('\r\n----------------------------------------\r\n');

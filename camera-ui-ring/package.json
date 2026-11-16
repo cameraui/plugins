@@ -61,5 +61,10 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-ring"
+  },
+  "allowScripts": {
+    "protobufjs": true,
+    "esbuild": true,
+    "ffmpeg-for-homebridge": false
   }
 }

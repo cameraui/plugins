@@ -52,5 +52,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-ncnn"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

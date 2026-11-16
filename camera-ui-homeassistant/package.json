@@ -60,5 +60,9 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-homeassistant"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": true
   }
 }

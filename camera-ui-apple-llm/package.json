@@ -61,5 +61,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-apple-llm"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

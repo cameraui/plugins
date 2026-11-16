@@ -45,5 +45,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-wyze"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

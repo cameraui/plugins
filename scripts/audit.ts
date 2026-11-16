@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 
 function runCommandsInDirectory(directoryPath: string) {
   try {
-    const cmd = 'npm audit fix';
+    const cmd = 'npm audit fix --min-release-age=0';
     const fullPath = resolve(__dirname, directoryPath);
 
     console.log(chalk.cyan('USER:', userInfo().username));
@@ -20,6 +20,7 @@ function runCommandsInDirectory(directoryPath: string) {
 
     console.log('\r\n', chalk.bgGreen(' SUCCESS '), chalk.green(`Command completed in ${fullPath}`));
   } catch (error) {
+    process.exitCode = 1;
     console.error('\r\n', chalk.bgRed.bold(' ERROR '), chalk.red(`Failed to run command in ${directoryPath}: ${error}`));
   } finally {
     console.log('\r\n----------------------------------------\r\n');

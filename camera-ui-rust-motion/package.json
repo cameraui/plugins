@@ -61,5 +61,8 @@
     "node": ">=24.5.0"
   },
   "os": [],
-  "cpu": []
+  "cpu": [],
+  "allowScripts": {
+    "esbuild": true
+  }
 }

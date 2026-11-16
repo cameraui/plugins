@@ -5,7 +5,7 @@
   "description": "camera.ui plugins monorepo",
   "type": "module",
   "scripts": {
-    "audit": "npm audit fix && tsx ./scripts/audit.ts",
+    "audit": "npm audit fix --min-release-age=0 && tsx ./scripts/audit.ts",
     "build": "tsx ./scripts/build.ts",
     "bundle": "cross-env MODE=development tsx ./scripts/bundle.ts",
     "catalog": "tsx ./scripts/catalog.ts",
@@ -35,5 +35,9 @@
     "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "updates": "^20.0.1"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": true
   }
 }

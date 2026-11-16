@@ -66,5 +66,8 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-wasm-motion"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

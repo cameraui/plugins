@@ -66,6 +66,7 @@
     "directory": "camera-ui-eufy"
   },
   "allowScripts": {
-    "node-av@6.2.0-beta.32": true
+    "esbuild": true,
+    "node-av": true
   }
 }

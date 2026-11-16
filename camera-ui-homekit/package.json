@@ -65,5 +65,9 @@
     "type": "git",
     "url": "git+https://github.com/cameraui/plugins.git",
     "directory": "camera-ui-homekit"
+  },
+  "allowScripts": {
+    "chacha-native": true,
+    "esbuild": true
   }
 }
