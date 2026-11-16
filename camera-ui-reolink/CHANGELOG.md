@@ -1,3 +1,7 @@
+## [1.3.10]
+
+- Update camera.ui SDK
+
 ## [1.3.9]
 
 - Update dependencies
