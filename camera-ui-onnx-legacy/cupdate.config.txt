@@ -1,3 +1,4 @@
 # gpu 1.27+ builds against CUDA 13 (docker image ships 12) and drops pre-Turing
 # cards; 1.26 still carries sm_52-61 and runs Blackwell via 90-virtual PTX
 onnxruntime-gpu
+numpy
