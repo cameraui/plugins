@@ -290,7 +290,8 @@ export class EufyCamera {
       this.ptzControl = await this.addBindable(new EufyPtzControl(device, this.logger));
     }
 
-    if (!this.cameraSwitch && camera?.enabled !== undefined) {
+    // the sdk leaves out on and off where it does not know the power wire
+    if (!this.cameraSwitch && camera?.enabled !== undefined && camera.on !== undefined) {
       this.cameraSwitch = await this.addBindable(new EufyCameraSwitch(device, this.logger));
     }
 
@@ -299,7 +300,9 @@ export class EufyCamera {
       this.securitySystem = await this.addBindable(new EufySecuritySystem(device, this.logger));
     }
 
-    if (!this.lockControl && device.lock?.()) {
+    // a SmartDrop lid can only be opened and reports no state
+    const lock = device.lock?.();
+    if (!this.lockControl && (lock?.lock || lock?.locked !== undefined || lock?.refreshStatus)) {
       this.lockControl = await this.addBindable(new EufyLockControl(device, this.logger, 'Eufy Lock'));
     }
   }

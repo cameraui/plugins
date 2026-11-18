@@ -1,3 +1,9 @@
+## [2.1.6]
+
+- **The spotlight of a Video Doorbell E340 or C45 behind a HomeBase can be switched.** camera.ui showed no light control for it before.
+- **The Smart Lock C33 locks and unlocks.** It did not react to any command from camera.ui before.
+- **The plugin no longer crashes now and then while it connects to a device.** The live views and controls of every Eufy device dropped with it.
+
 ## [2.1.5]
 
 - **A HomeBase S1 Pro or a recorder connects on accounts where it failed with error 401**, for example in the UK and Switzerland. The live view and controls of the cameras behind it work there now.

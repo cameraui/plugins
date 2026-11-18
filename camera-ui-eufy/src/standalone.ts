@@ -1,16 +1,7 @@
 import { SensorType } from '@camera.ui/sdk';
 
 import { isCameraRecord } from './account.js';
-import {
-  EufyCarbonMonoxideSensor,
-  EufyContactSensor,
-  EufyLeakSensor,
-  EufyLockControl,
-  EufyMotionSensor,
-  EufySecuritySystem,
-  EufySirenControl,
-  EufySmokeSensor,
-} from './sensors.js';
+import { EufyContactSensor, EufyLeakSensor, EufyLockControl, EufyMotionSensor, EufySecuritySystem, EufySirenControl, EufySmokeSensor } from './sensors.js';
 
 import type { AdoptedSensor, DiscoveredSensor, LoggerService, SensorOptions } from '@camera.ui/sdk';
 import type { AnyDeviceEvent, Device, EufyDevice } from '@mega-yfue/eufy-sdk';
@@ -23,12 +14,11 @@ const KINDS = {
   siren: { type: SensorType.Siren, label: 'Siren' },
   leak: { type: SensorType.Leak, label: 'Leak' },
   smoke: { type: SensorType.Smoke, label: 'Smoke' },
-  co: { type: SensorType.CarbonMonoxide, label: 'Carbon Monoxide' },
 } as const;
 
 type StandaloneKind = keyof typeof KINDS;
 
-type BindableStandalone = EufyContactSensor | EufyLockControl | EufySecuritySystem | EufySirenControl | EufyLeakSensor | EufySmokeSensor | EufyCarbonMonoxideSensor;
+type BindableStandalone = EufyContactSensor | EufyLockControl | EufySecuritySystem | EufySirenControl | EufyLeakSensor | EufySmokeSensor;
 
 export type StandaloneSensorInstance = EufyMotionSensor | BindableStandalone;
 
@@ -112,7 +102,6 @@ function standaloneKinds(record: EufyDevice, device: Device): StandaloneKind[] {
   if (device.siren?.()?.trigger) kinds.push('siren');
   if (device.leak?.()?.leakDetected !== undefined) kinds.push('leak');
   if (device.smoke?.()?.smokeDetected !== undefined) kinds.push('smoke');
-  if (device.co?.()?.coDetected !== undefined) kinds.push('co');
   return kinds;
 }
 
@@ -132,8 +121,6 @@ function buildSensor(kind: StandaloneKind, name: string, options: SensorOptions,
       return new EufyLeakSensor(undefined, name, options);
     case 'smoke':
       return new EufySmokeSensor(undefined, name, options);
-    case 'co':
-      return new EufyCarbonMonoxideSensor(undefined, name, options);
   }
 }
 

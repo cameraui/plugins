@@ -2,7 +2,6 @@ import {
   AudioSensor,
   BatteryCapability,
   BatteryInfo,
-  CarbonMonoxideSensor,
   ChargingState,
   ContactSensor,
   LeakSensor,
@@ -257,14 +256,14 @@ export class EufyCameraSwitch extends SwitchControl implements BindableSensor {
 
   public override async setOn(): Promise<void> {
     await runCommand(this.logger, 'turn on the camera', async () => {
-      await required(this.device?.camera?.(), this.displayName).on();
+      await required(this.device?.camera?.()?.on?.(), this.displayName);
       await super.setOn();
     });
   }
 
   public override async setOff(): Promise<void> {
     await runCommand(this.logger, 'turn off the camera', async () => {
-      await required(this.device?.camera?.(), this.displayName).off();
+      await required(this.device?.camera?.()?.off?.(), this.displayName);
       await super.setOff();
     });
   }
@@ -452,25 +451,6 @@ export class EufySmokeSensor extends SmokeSensor implements BindableSensor {
 
   public sync(): void {
     const detected = this.device?.smoke?.()?.smokeDetected;
-    if (detected !== undefined) this.setDetected(detected);
-  }
-
-  protected override onStart(): void {
-    this.sync();
-  }
-}
-
-export class EufyCarbonMonoxideSensor extends CarbonMonoxideSensor implements BindableSensor {
-  constructor(
-    public device: Device | undefined,
-    name: string,
-    options?: SensorOptions,
-  ) {
-    super(name, options);
-  }
-
-  public sync(): void {
-    const detected = this.device?.co?.()?.coDetected;
     if (detected !== undefined) this.setDetected(detected);
   }
 
