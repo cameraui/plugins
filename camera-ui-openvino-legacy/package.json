@@ -21,8 +21,8 @@
     "update": "updates -M npm,pypi,go,cargo,docker -u && cupdate --cooldown 7 --cooldown-exclude 'camera-ui-*'"
   },
   "devDependencies": {
-    "@camera.ui/cli": "^0.1.8",
-    "@camera.ui/sdk": "^1.4.11",
+    "@camera.ui/cli": "^0.1.11",
+    "@camera.ui/sdk": "^1.4.12",
     "cross-env": "^10.1.0"
   },
   "bugs": {

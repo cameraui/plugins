@@ -21,8 +21,8 @@
     "update": "updates -M npm,pypi,go,cargo,docker -u"
   },
   "devDependencies": {
-    "@camera.ui/cli": "~0.1.8",
-    "@camera.ui/sdk": "~1.4.11",
+    "@camera.ui/cli": "~0.1.11",
+    "@camera.ui/sdk": "~1.4.12",
     "@types/node": "^26.6.6",
     "cross-env": "^10.1.0",
     "rimraf": "^6.1.4",
@@ -34,7 +34,7 @@
     "url": "https://github.com/cameraui/plugins/issues"
   },
   "engines": {
-    "camera.ui": ">=2.5.0",
+    "camera.ui": ">=2.5.1",
     "node": ">=24.5.0"
   },
   "homepage": "https://github.com/cameraui/plugins/tree/main/camera-ui-reolink#readme",
