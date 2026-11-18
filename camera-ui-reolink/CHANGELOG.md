@@ -1,3 +1,8 @@
+## [1.3.11]
+
+- **PTZ cameras move when you push the joystick all the way out.** At full speed the camera stopped or kept only one direction, so the joystick seemed to work only now and then.
+- Update camera.ui SDK
+
 ## [1.3.10]
 
 - Update camera.ui SDK

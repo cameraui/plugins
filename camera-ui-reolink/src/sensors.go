@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -57,18 +58,6 @@ func (s *reolinkSiren) SetInactive() {
 	s.SirenControl.SetInactive()
 }
 
-func (s *reolinkSiren) UpdateValue(property string, value any) error {
-	if property == "active" {
-		if truthy(value, false) {
-			s.SetActive()
-		} else {
-			s.SetInactive()
-		}
-		return nil
-	}
-	return s.SirenControl.UpdateValue(property, value)
-}
-
 type reolinkSpotlight struct {
 	*sdk.LightControl
 	cam *reolinkCamera
@@ -109,18 +98,6 @@ func (s *reolinkSpotlight) SetOff() {
 		return
 	}
 	s.LightControl.SetOff()
-}
-
-func (s *reolinkSpotlight) UpdateValue(property string, value any) error {
-	if property == "on" {
-		if truthy(value, false) {
-			s.SetOn()
-		} else {
-			s.SetOff()
-		}
-		return nil
-	}
-	return s.LightControl.UpdateValue(property, value)
 }
 
 const presetRefreshInterval = time.Minute
@@ -295,6 +272,7 @@ func (s *reolinkPTZ) SetVelocity(value sdk.PTZDirection) {
 		return
 	}
 
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), controlTimeout)
 	defer cancel()
 	cam, err := s.cam.cam()
@@ -315,24 +293,10 @@ func (s *reolinkPTZ) SetVelocity(value sdk.PTZDirection) {
 		}
 		return
 	}
+	s.cam.logger.Trace(fmt.Sprintf("PTZ %s %d (pan %.2f, tilt %.2f, zoom %.2f), camera answered in %d ms",
+		command, speed, value.PanSpeed, value.TiltSpeed, value.ZoomSpeed, time.Since(start).Milliseconds()))
 	s.PTZControl.SetVelocity(value)
 	s.SetMoving(command != "Stop")
-}
-
-func (s *reolinkPTZ) UpdateValue(property string, value any) error {
-	switch property {
-	case "velocity":
-		if direction, ok := toPTZDirection(value); ok {
-			s.SetVelocity(direction)
-			return nil
-		}
-	case "targetPreset":
-		if name, ok := value.(string); ok {
-			s.SetTargetPreset(name)
-			return nil
-		}
-	}
-	return s.PTZControl.UpdateValue(property, value)
 }
 
 func (s *reolinkPTZ) repeatsMove(move ptzMove) bool {
@@ -388,40 +352,4 @@ func pick(cond bool, a string, b string) string {
 		return a
 	}
 	return b
-}
-
-func toPTZDirection(value any) (sdk.PTZDirection, bool) {
-	if direction, ok := value.(sdk.PTZDirection); ok {
-		return direction, true
-	}
-	values, ok := value.(map[string]any)
-	if !ok {
-		return sdk.PTZDirection{}, false
-	}
-	direction := sdk.PTZDirection{}
-	if v, ok := toFloat(values["panSpeed"]); ok {
-		direction.PanSpeed = v
-	}
-	if v, ok := toFloat(values["tiltSpeed"]); ok {
-		direction.TiltSpeed = v
-	}
-	if v, ok := toFloat(values["zoomSpeed"]); ok {
-		direction.ZoomSpeed = v
-	}
-	return direction, true
-}
-
-func toFloat(value any) (float64, bool) {
-	switch v := value.(type) {
-	case float64:
-		return v, true
-	case float32:
-		return float64(v), true
-	case int:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	default:
-		return 0, false
-	}
 }
