@@ -1,3 +1,8 @@
+## [2.1.7]
+
+- **The Smart Lock C30 locks and unlocks.** It did not react to any command from camera.ui before.
+- **Eufy notifications come back by themselves when their connection stalls.** Detections and doorbell presses could stay away until the plugin restarted.
+
 ## [2.1.6]
 
 - **The spotlight of a Video Doorbell E340 or C45 behind a HomeBase can be switched.** camera.ui showed no light control for it before.
