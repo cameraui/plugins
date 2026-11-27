@@ -828,6 +828,9 @@ class ONNXPlugin(
             "device_id": device_id,
             "cudnn_conv_algo_search": "HEURISTIC",
             "cudnn_conv_use_max_workspace": "1",
+            # every model has its own session; growing each arena by what it needs instead of in powers of two
+            # saves a lot of GPU memory with no measurable cost in speed
+            "arena_extend_strategy": "kSameAsRequested",
         }
 
     def _resolve_provider_lists(self) -> list[ProviderList]:

@@ -1,3 +1,7 @@
+## [1.3.3]
+
+- **Uses much less GPU memory with the CUDA Execution Provider.** Each model's memory pool now grows by what it needs instead of doubling, which saved about 25% of GPU memory on a GTX 1080 and a Tesla P4 with no change in speed.
+
 ## [1.3.2]
 
 - Shows as incompatible on Alpine and other musl-based Linux systems instead of failing to install (camera.ui 2.5.0 and later)
